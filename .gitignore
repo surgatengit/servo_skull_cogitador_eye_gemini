@@ -1,0 +1,86 @@
+# Build outputs and downloaded dependencies
+build/
+build_*/
+build-*/
+cmake-build-*/
+managed_components/
+/dependencies.lock
+sdkconfig
+sdkconfig.old
+sdkconfig.backup
+sdkconfig.local.defaults
+compile_commands.json
+CMakeFiles/
+CMakeCache.txt
+.ninja_*
+*.o
+*.obj
+*.elf
+*.map
+*.irisfw
+
+# Local runtimes and caches
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+.codex-runs/
+*.log
+*.tmp
+
+# Firmware images and generated bundles: they can embed configuration, so
+# they are never versioned. Rebuild them from source instead.
+*.bin
+*.hex
+*.img
+*.uf2
+*.gspb
+*.zip
+*.coredump
+core.*
+dist/
+*.egg-info/
+.tox/
+
+# Local credentials (example configuration remains versioned)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.token
+*.secret
+*.secrets
+secrets/
+secret/
+credentials/
+*credentials*.json
+*api_key*.txt
+*api_key*.json
+*_secrets.csv
+nvs_*.csv
+sdkconfig.*.local
+sdkconfig.local*
+.iris/
+iris-evidence/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Keep sdkconfig*.defaults, idf_component.yml and source assets versioned.
