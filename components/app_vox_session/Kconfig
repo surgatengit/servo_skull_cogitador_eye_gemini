@@ -56,8 +56,41 @@ menu "VOX M-01 Gemini Direct"
         help
             While listening, close the conversation after this time with no local
             voice (uplink frames above VOX_VOICED_PEAK_THRESHOLD), user
-            transcription, model audio, turn or tap. Counted from the end of
-            VOX's speech.
+            transcription, model output, turn or tap. Counted from the end of
+            VOX's speech. Suspended while a reply is pending (see
+            VOX_RESPONSE_TIMEOUT_S).
+
+    config VOX_GOOGLE_SEARCH
+        bool "Grounding with Google Search (native Live API tool)"
+        default n
+        help
+            Optional, OFF by default (owner's decision, 2026-11-25): in test 10
+            every setup declaring googleSearch was closed with code 1011 because
+            the free-tier quota was exceeded on both models, and VOX could not
+            connect. Enable only with quota available.
+
+            Declare the googleSearch tool in the Live setup message so Gemini can
+            search the web by itself (server side, no intermediate service). Each
+            search may be billed separately: see docs/GOOGLE_SEARCH.md.
+
+    config VOX_SHOW_SEARCH_SOURCES
+        bool "Show Google search suggestions and sources on the status line"
+        depends on VOX_GOOGLE_SEARCH
+        default n
+        help
+            Off by default at the owner's request: VOX searches quietly and never
+            cites sources. When on, the status line rotates "GOOGLE: <query>" and
+            "FUENTE n/m: <domain>" (see docs/GOOGLE_SEARCH.md section 4).
+
+    config VOX_RESPONSE_TIMEOUT_S
+        int "Seconds to wait for Gemini to finish a turn (search, thinking)"
+        range 10 120
+        default 30
+        help
+            After the user's turn, and while the model's turn is open (no
+            turnComplete yet), the idle timeout is suspended and the eye stays
+            amber until this many seconds pass without any server output.
+            Protects searches and reasoning pauses from the idle return.
 
     config VOX_PREROLL_MS
         int "Audio kept after the wake word while connecting (ms)"

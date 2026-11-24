@@ -211,6 +211,12 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
 5. ✅ **Activación por voz «Hola ESP»** (sección 7): versión 1.1.0, validada en el hardware
    (INSTALL.md, pruebas 6–9), fusionada en `main`.
 6. AEC por software y conversación full-duplex (siguiente fase; ver HANDOFF.md §6).
+7. **Google Search nativo** (1.2.0, rama `feat/google-search`): herramienta `googleSearch` en el
+   `setup`, `groundingMetadata` y partes sin audio, respuesta pendiente que suspende el reposo,
+   sugerencias y fuentes en la línea de estado. Diseño, cumplimiento, cuotas y costes en
+   [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Pendiente de validar en el dispositivo.
+8. Ampliaciones futuras sin implementar (cámara bajo demanda, Gemini 3.8 Extended Thinking, base
+   magnética de 5 V): [ROADMAP.md](ROADMAP.md).
 
 ## 7. Activación por voz «Hola ESP» (implementada y validada en 1.1.0)
 

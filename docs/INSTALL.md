@@ -198,7 +198,103 @@ y el siguiente intento abre una sesión nueva.
   cierre con el segundo toque. Activación por «Hola ESP» correcta.
 - 0 errores de pantalla. El bloque DMA interno contiguo mínimo observado fue de 8 192 B (por encima
   de los 7 680 B por transacción; margen ajustado, vigilado por el diagnóstico).
-- **«Hola ESP» (1.1.0) queda validado en el hardware.**
+- **«Hola ESP» (1.1.0) queda validado en el hardware.** Etiqueta Git `v1.1.0` (versión estable).
+
+### Prueba 10: 1.2.0 con Google Search
+
+Rama `feat/google-search`; diseño en [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Instalación con
+`iris system-update`, como siempre. No cambian ni las particiones ni la clave.
+
+**Instalación (2026-11-25, autorizada por el propietario):**
+
+- Antes: `app_version=1.1.0`, firmware `386d32ec304e…`, `crash_count=0`.
+- `iris system-update` (commit `5495f7e`) correcto en 37 s. El paquete escribió la tabla de
+  particiones, la app (2 512 688 B), `ui_apps` y `model`.
+- Después:
+  - mismo Device ID, `firmware_mode=normal`, `app_version=1.2.0`;
+  - Boot ID nuevo, `15367548457134334378`;
+  - firmware `84d60693d603…`, `crash_count=0`.
+- Logs de arranque:
+  - `VOX M-01 ready (model gemini-3.1-flash-live-preview, fallback gemini-3.8-live, search on)`;
+  - `app_wake: listening for "Hola ESP"`;
+  - en reposo, `diag st=0 … largest=12288`, igual que en 1.1.0.
+
+**Primera prueba de voz:** el propietario notó VOX **muy lento**. Los logs de esa conversación se
+perdieron (`log_dropped_bytes`: el búfer del dispositivo no los retuvo) y una captura en directo
+posterior no registró ninguna conversación de 1.2.0, así que no hay medida de latencia.
+Causa probable: la frase añadida a la personalidad («busca ante hechos actuales y cita la fuente»)
+empujaba a buscar y a alargar las respuestas.
+
+**Búsqueda discreta (2026-11-25, autorizada; commit `10a6eaf`):**
+
+- Cambios: VOX responde de inmediato, busca solo si se le pide o ante un dato reciente que desconoce,
+  y no cita fuentes ni muestra nada en pantalla (`VOX_SHOW_SEARCH_SOURCES=n`).
+- `iris system-update` correcto en 42 s.
+- Después:
+  - mismo Device ID, `firmware_mode=normal`, `app_version=1.2.0`;
+  - Boot ID `6174699672841644746`, firmware `66658c0065a5…`, `crash_count=0`.
+- Logs de arranque: `search on`, «Hola ESP» escuchando y `largest=12288` en reposo.
+
+**Prueba de voz (2026-11-25): FALLA. VOX no llega a conectar.** Captura en directo:
+
+- Cada `setup` con `tools:[{"googleSearch":{}}]` recibe `closed (close code 1011)` unos 150 ms
+  después.
+- Pasa con `gemini-3.1-flash-live-preview` (2 intentos) y con `gemini-3.8-live` (3 intentos).
+  Después aparece `Gemini Live unavailable (code 1011)` y el ojo violeta «ERROR DE CONEXIÓN».
+- Sin `tools`, el mismo `setup` funcionaba en 1.1.0.
+- El cliente no registraba el motivo de cierre.
+- La primera prueba «lenta» fue con toda seguridad este mismo fallo: nunca hubo una sesión 1.2.0
+  con búsqueda.
+
+**Causa (2026-11-25, `tools/test_live_setup.py` ejecutado por el propietario):** el servidor
+responde que se ha **excedido la cuota** con los dos modelos. El propietario usa el **plan
+gratuito**.
+
+**Decisión del propietario:** la búsqueda queda **opcional y desactivada por defecto**
+(`VOX_GOOGLE_SEARCH=n`). Para activarla hay que recompilar con `VOX_GOOGLE_SEARCH=y` y tener cuota
+disponible.
+
+**Corrección:**
+
+- `VOX_GOOGLE_SEARCH` desactivado por defecto: VOX conecta como en 1.1.0 y conserva el resto de 1.2.0.
+- El cliente registra ahora `server close reason: …` en las tramas de cierre.
+- `tools/test_live_setup.py`: el propietario lo ejecuta en el PC con su clave para ver qué
+  variante del `setup` acepta Google y con qué motivo rechaza las demás.
+
+**Instalación sin búsqueda (2026-11-25, autorizada; commit `dae739e`):**
+
+- `iris system-update` correcto en 49 s.
+- Después:
+  - mismo Device ID, `app_version=1.2.0`;
+  - Boot ID `5146913244462897174`, firmware `42ff0083c79c…`, `crash_count=0`.
+- Logs de arranque: `search off`, «Hola ESP» escuchando y `largest=12288` en reposo.
+- Prueba de voz (2026-11-25): **VOX habla y funciona perfectamente**, según el propietario.
+  **1.2.0 con la búsqueda desactivada queda validada en el hardware.**
+
+Pendiente de la búsqueda discreta, si se activa con cuota disponible:
+
+- una pregunta sencilla, que debe responder al instante;
+- «¿Cuál es la última película de Nolan?»;
+- «Busca…»;
+- el toque para interrumpir y el reposo a los 15 s.
+
+1. Arranque: `device-status` con `app_version=1.2.0` y `crash_count=0`. En los logs aparece
+   `VOX M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
+2. «Hola ESP» → `connected; setup sent (model gemini-3.1-flash-live-preview, google search)` →
+   `session ready`. **Si no llega `session ready`, el servidor rechaza el campo `tools`**: se anota y
+   se recompila con `VOX_GOOGLE_SEARCH=n`.
+3. Pregunta sin búsqueda («¿Cuánto es siete por ocho?»). Debe comportarse como en 1.1.0, sin línea
+   de fuentes.
+4. Pregunta con búsqueda («¿Qué tiempo hará mañana en Madrid?»):
+   - ámbar mientras busca y verde con voz, que menciona la fuente;
+   - en la línea de estado, «GOOGLE: …» y después «FUENTE 1/N: …», rotando cada 3 s;
+   - logs: `grounded answer: …`, `search{q=… grounded=…}` y `turn usage: … tool=…`.
+5. Pregunta larga con búsqueda: no debe volver al reposo mientras busca (`pending=1` en `diag`).
+   Tras terminar de hablar, a los 15 s vuelve al cian.
+6. Toque mientras habla una respuesta con búsqueda: se interrumpe y vuelve a rojo, como en la
+   prueba 9. Otro toque cierra.
+7. Memoria: `largest=` ≥ 8192 durante las respuestas con búsqueda y ningún `Display render failed`.
+8. Modelo alternativo (opcional): repetir el punto 4 con `gemini-3.8-live`.
 
 ## 3. Volver al firmware actual (restauración)
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "app_gemini_live.h"
+#include "gl_grounding.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +51,7 @@ struct app_gemini_live {
     char *voice;
     char *language;
     char *system_instruction;
+    bool google_search;
     app_gemini_live_cb_t on_event;
     void *ctx;
 
@@ -69,6 +71,12 @@ struct app_gemini_live {
     uint8_t *pcm;
     char *tx;
     char resume_handle[GL_HANDLE_CAPACITY];
+    gl_grounding_t grounding;   /* queries and sources of the current answer */
+    /* Latest usageMetadata (WebSocket task only), logged once per finished turn. */
+    struct {
+        bool seen;
+        int prompt, response, tool_prompt, thoughts, total;
+    } usage;
 };
 
 static void *psram_malloc(size_t size)
@@ -134,6 +142,15 @@ static char *build_setup(struct app_gemini_live *gl)
         cJSON_AddStringToObject(part, "text", gl->system_instruction);
         cJSON_AddItemToArray(parts, part);
     }
+    if (gl->google_search) {
+        /* Native Grounding with Google Search: runs on Google's side, so it needs
+         * no toolResponse from the device. No thinkingConfig is sent: 3.1 Flash
+         * Live keeps its default level and 3.8 Live rejects the field. */
+        cJSON *tools = cJSON_AddArrayToObject(setup, "tools");
+        cJSON *tool = cJSON_CreateObject();
+        cJSON_AddObjectToObject(tool, "googleSearch");
+        cJSON_AddItemToArray(tools, tool);
+    }
     cJSON_AddObjectToObject(setup, "inputAudioTranscription");
     cJSON_AddObjectToObject(setup, "outputAudioTranscription");
     cJSON *rt = cJSON_AddObjectToObject(setup, "realtimeInputConfig");
@@ -173,10 +190,22 @@ static void handle_server_content(struct app_gemini_live *gl, const cJSON *conte
     const cJSON *turn = cJSON_GetObjectItemCaseSensitive(content, "modelTurn");
     const cJSON *parts = cJSON_GetObjectItemCaseSensitive(turn, "parts");
     const cJSON *part;
+    bool activity = false;
     cJSON_ArrayForEach(part, parts) {
         const cJSON *inline_data = cJSON_GetObjectItemCaseSensitive(part, "inlineData");
         const cJSON *data = cJSON_GetObjectItemCaseSensitive(inline_data, "data");
         if (!cJSON_IsString(data)) {
+            /* Text, thought summaries, or the code the model runs to search
+             * (executableCode / codeExecutionResult): never played, but they
+             * prove the turn is in progress. Logged without content. */
+            activity = true;
+            __atomic_add_fetch(&gl->stats.rx_other_parts, 1U, __ATOMIC_RELAXED);
+            ESP_LOGD(TAG, "non-audio part (%s)",
+                     cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(part, "thought")) ? "thought" :
+                     cJSON_GetObjectItemCaseSensitive(part, "executableCode") ? "executableCode" :
+                     cJSON_GetObjectItemCaseSensitive(part, "codeExecutionResult") ?
+                     "codeExecutionResult" :
+                     cJSON_GetObjectItemCaseSensitive(part, "text") ? "text" : "other");
             continue;
         }
         size_t decoded = 0;
@@ -194,9 +223,63 @@ static void handle_server_content(struct app_gemini_live *gl, const cJSON *conte
         };
         gl->on_event(&ev, gl->ctx);
     }
-    if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(content, "turnComplete"))) {
-        emit(gl, APP_GL_EVT_TURN_COMPLETE, 0);
+    const cJSON *grounding = cJSON_GetObjectItemCaseSensitive(content, "groundingMetadata");
+    if (cJSON_IsObject(grounding)) {
+        __atomic_add_fetch(&gl->stats.rx_grounding, 1U, __ATOMIC_RELAXED);
+        const size_t queries = gl_grounding_merge(&gl->grounding, grounding);
+        __atomic_add_fetch(&gl->stats.search_queries, (uint32_t)queries, __ATOMIC_RELAXED);
+        emit(gl, APP_GL_EVT_GROUNDING, 0);
+    } else if (activity) {
+        emit(gl, APP_GL_EVT_MODEL_ACTIVITY, 0);
     }
+    if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(content, "turnComplete"))) {
+        /* Live models that keep working after a spoken filler send turnComplete
+         * with interactionStatus IN_PROGRESS; only IDLE (or no status) ends it. */
+        const cJSON *status = cJSON_GetObjectItemCaseSensitive(content, "interactionStatus");
+        const bool in_progress = cJSON_IsString(status) &&
+                                 strcmp(status->valuestring, "IN_PROGRESS") == 0;
+        if (!in_progress && gl->usage.seen) {
+            ESP_LOGI(TAG, "turn usage: prompt=%d response=%d tool=%d thoughts=%d total=%d",
+                     gl->usage.prompt, gl->usage.response, gl->usage.tool_prompt,
+                     gl->usage.thoughts, gl->usage.total);
+            gl->usage.seen = false;
+        }
+        const app_gemini_live_event_t ev = { .type = APP_GL_EVT_TURN_COMPLETE,
+                                             .in_progress = in_progress };
+        gl->on_event(&ev, gl->ctx);
+    }
+}
+
+static int usage_field(const cJSON *usage, const char *name)
+{
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(usage, name);
+    return cJSON_IsNumber(v) ? v->valueint : 0;
+}
+
+/* Token accounting (prompt, tool-use prompt from search results, thinking):
+ * kept for one INFO line per turn so costs can be followed in the logs. */
+static void handle_usage(struct app_gemini_live *gl, const cJSON *usage)
+{
+    gl->usage.seen = true;
+    gl->usage.prompt = usage_field(usage, "promptTokenCount");
+    gl->usage.response = usage_field(usage, "responseTokenCount");
+    gl->usage.tool_prompt = usage_field(usage, "toolUsePromptTokenCount");
+    gl->usage.thoughts = usage_field(usage, "thoughtsTokenCount");
+    gl->usage.total = usage_field(usage, "totalTokenCount");
+}
+
+/* VOX declares no functions: Google Search runs on the server and needs no
+ * reply. A toolCall here would be unexpected; log it and let the turn continue. */
+static void handle_tool_call(struct app_gemini_live *gl, const cJSON *call)
+{
+    __atomic_add_fetch(&gl->stats.tool_calls, 1U, __ATOMIC_RELAXED);
+    const cJSON *fc;
+    cJSON_ArrayForEach(fc, cJSON_GetObjectItemCaseSensitive(call, "functionCalls")) {
+        const cJSON *name = cJSON_GetObjectItemCaseSensitive(fc, "name");
+        ESP_LOGW(TAG, "unexpected toolCall %s; not answered",
+                 cJSON_IsString(name) ? name->valuestring : "?");
+    }
+    emit(gl, APP_GL_EVT_MODEL_ACTIVITY, 0);
 }
 
 static void handle_message(struct app_gemini_live *gl, esp_websocket_client_handle_t client)
@@ -217,6 +300,17 @@ static void handle_message(struct app_gemini_live *gl, esp_websocket_client_hand
     const cJSON *content = cJSON_GetObjectItemCaseSensitive(root, "serverContent");
     if (content) {
         handle_server_content(gl, content);
+    }
+    const cJSON *usage = cJSON_GetObjectItemCaseSensitive(root, "usageMetadata");
+    if (cJSON_IsObject(usage)) {
+        handle_usage(gl, usage);
+    }
+    const cJSON *tool_call = cJSON_GetObjectItemCaseSensitive(root, "toolCall");
+    if (tool_call) {
+        handle_tool_call(gl, tool_call);
+    }
+    if (cJSON_GetObjectItemCaseSensitive(root, "toolCallCancellation")) {
+        ESP_LOGI(TAG, "toolCallCancellation (nothing pending on the device)");
     }
     const cJSON *update = cJSON_GetObjectItemCaseSensitive(root, "sessionResumptionUpdate");
     if (update) {
@@ -244,6 +338,14 @@ static void handle_message(struct app_gemini_live *gl, esp_websocket_client_hand
 
 static void on_data(struct app_gemini_live *gl, const esp_websocket_event_data_t *d)
 {
+    if (d->op_code == 0x8) {
+        /* Close frame: 2-byte status code, then the server's reason text (it
+         * explains rejected setups, e.g. code 1011 with an unsupported tool). */
+        if (d->data_len > 2) {
+            ESP_LOGW(TAG, "server close reason: %.*s", d->data_len - 2, d->data_ptr + 2);
+        }
+        return;
+    }
     /* Text (1) and binary (2) frames both carry JSON; 0 continues a fragmented message. */
     if (d->op_code != 0x0 && d->op_code != 0x1 && d->op_code != 0x2) {
         return;
@@ -318,8 +420,9 @@ static void ws_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
         const int sent = esp_websocket_client_send_text(d->client, setup, (int)strlen(setup),
                                                         pdMS_TO_TICKS(2000));
         cJSON_free(setup);
-        ESP_LOGI(TAG, "connected; setup %s (model %s%s)", sent >= 0 ? "sent" : "FAILED",
-                 app_gemini_live_active_model(gl), gl->resume_handle[0] ? ", resuming" : "");
+        ESP_LOGI(TAG, "connected; setup %s (model %s%s%s)", sent >= 0 ? "sent" : "FAILED",
+                 app_gemini_live_active_model(gl), gl->google_search ? ", google search" : "",
+                 gl->resume_handle[0] ? ", resuming" : "");
         break;
     }
     case WEBSOCKET_EVENT_DATA:
@@ -391,12 +494,14 @@ esp_err_t app_gemini_live_create(const app_gemini_live_config_t *config,
     gl->voice = dup_or_null(config->voice);
     gl->language = dup_or_null(config->language);
     gl->system_instruction = dup_or_null(config->system_instruction);
+    gl->google_search = config->google_search;
     gl->lock = xSemaphoreCreateMutex();
+    const esp_err_t grounding_err = gl_grounding_init(&gl->grounding);
     gl->rx = heap_caps_malloc(GL_RX_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     gl->pcm = heap_caps_malloc(GL_PCM_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     /* PSRAM: internal DMA RAM is reserved for the display path. */
     gl->tx = heap_caps_malloc(GL_TX_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!gl->model || !gl->lock || !gl->rx || !gl->pcm || !gl->tx ||
+    if (!gl->model || !gl->lock || !gl->rx || !gl->pcm || !gl->tx || grounding_err != ESP_OK ||
             (config->fallback_model && !gl->fallback_model) ||
             (config->voice && !gl->voice) || (config->language && !gl->language) ||
             (config->system_instruction && !gl->system_instruction)) {
@@ -417,6 +522,7 @@ esp_err_t app_gemini_live_connect(app_gemini_live_handle_t gl, const char *api_k
         return ESP_ERR_INVALID_STATE;
     }
     gl->resume_handle[0] = '\0';  /* every tap opens a fresh conversation */
+    gl->usage.seen = false;
     gl->failures = 0;
     gl->got_setup = false;
     gl->last_http_status = 0;
@@ -523,6 +629,27 @@ void app_gemini_live_get_stats(app_gemini_live_handle_t gl, app_gemini_live_stat
     out->rx_messages = __atomic_load_n(&gl->stats.rx_messages, __ATOMIC_RELAXED);
     out->rx_audio_chunks = __atomic_load_n(&gl->stats.rx_audio_chunks, __ATOMIC_RELAXED);
     out->rx_input_transcripts = __atomic_load_n(&gl->stats.rx_input_transcripts, __ATOMIC_RELAXED);
+    out->rx_other_parts = __atomic_load_n(&gl->stats.rx_other_parts, __ATOMIC_RELAXED);
+    out->rx_grounding = __atomic_load_n(&gl->stats.rx_grounding, __ATOMIC_RELAXED);
+    out->search_queries = __atomic_load_n(&gl->stats.search_queries, __ATOMIC_RELAXED);
+    out->tool_calls = __atomic_load_n(&gl->stats.tool_calls, __ATOMIC_RELAXED);
+}
+
+size_t app_gemini_live_get_sources(app_gemini_live_handle_t gl, char *out, size_t cap)
+{
+    return gl ? gl_grounding_copy(&gl->grounding, false, out, cap) : 0;
+}
+
+size_t app_gemini_live_get_queries(app_gemini_live_handle_t gl, char *out, size_t cap)
+{
+    return gl ? gl_grounding_copy(&gl->grounding, true, out, cap) : 0;
+}
+
+void app_gemini_live_clear_sources(app_gemini_live_handle_t gl)
+{
+    if (gl) {
+        gl_grounding_clear(&gl->grounding);
+    }
 }
 
 esp_err_t app_gemini_live_send_audio(app_gemini_live_handle_t gl, const int16_t *pcm,
@@ -598,6 +725,9 @@ esp_err_t app_gemini_live_destroy(app_gemini_live_handle_t *handle)
     psram_free(gl->voice);
     psram_free(gl->language);
     psram_free(gl->system_instruction);
+    if (gl->grounding.lock) {
+        gl_grounding_deinit(&gl->grounding);
+    }
     heap_caps_free(gl->rx);
     heap_caps_free(gl->pcm);
     heap_caps_free(gl->tx);

@@ -18,6 +18,13 @@
 #include "freertos/task.h"
 #include "mbedtls/platform_util.h"
 #include "sdkconfig.h"
+#include "vox_status_text.h"
+
+#if CONFIG_VOX_GOOGLE_SEARCH
+#define VOX_GOOGLE_SEARCH 1
+#else
+#define VOX_GOOGLE_SEARCH 0
+#endif
 
 static const char *TAG = "vox_session";
 
@@ -26,14 +33,19 @@ static const char *TAG = "vox_session";
 #define SESSION_TASK_CORE       0
 #define SESSION_QUEUE_LEN       24
 #define SESSION_TICK_MS         50
-#define PROCESSING_TIMEOUT_US   (15 * 1000 * 1000)
-#define SPEAKING_STALL_US       (8 * 1000 * 1000)
+#define RESPONSE_TIMEOUT_US     ((int64_t)CONFIG_VOX_RESPONSE_TIMEOUT_S * 1000 * 1000)
+#define SPEAKING_GAP_US         (2 * 1000 * 1000)   /* playback drained, turn still open */
 #define CONNECTING_TIMEOUT_US   (45 * 1000 * 1000)
 #define SQUELCH_MAX_US          (10 * 1000 * 1000)
 #define DIAG_PERIOD_US          (5 * 1000 * 1000)
 #define PLAY_TIMEOUT_MS         1500
 #define IDLE_TIMEOUT_US         ((int64_t)CONFIG_VOX_IDLE_TIMEOUT_S * 1000 * 1000)
 #define PREROLL_FRAMES          (CONFIG_VOX_PREROLL_MS / 40)   /* 40 ms uplink frames */
+#define GROUNDING_ITEMS_CAPACITY 384    /* formatted status lines, '\n' separated (PSRAM) */
+#define GROUNDING_RAW_CAPACITY  384     /* scratch copy of queries/sources (PSRAM) */
+#define GROUNDING_ROTATE_US     (3 * 1000 * 1000)
+#define STATUS_CAPACITY         48
+#define STATUS_MAX_CHARS        24      /* fits the round panel's bottom chord at 20 px bold */
 
 static const char PERSONA[] =
     "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
@@ -42,7 +54,13 @@ static const char PERSONA[] =
     "o al Dios Máquina. Ante todo eres útil: respondes con claridad y exactitud a cualquier "
     "pregunta legítima, incluidas operaciones matemáticas sencillas, datos, explicaciones y "
     "conversación cotidiana. Tus respuestas habladas son breves, normalmente de dos a cuatro "
-    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas.";
+    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas."
+#if CONFIG_VOX_GOOGLE_SEARCH
+    " Responde de inmediato con lo que sabes. Usa la búsqueda de Google solo cuando el "
+    "operador te lo pida o cuando no conozcas la respuesta por ser un dato reciente; en ese "
+    "caso responde directamente, sin mencionar fuentes ni que has buscado."
+#endif
+    ;
 
 typedef enum {
     ST_CLOSED = 0,
@@ -89,7 +107,6 @@ static struct {
     session_error_t error;
     int wifi_state;
     int64_t processing_since;
-    int64_t speaking_since;
     int64_t connecting_since;
     int64_t squelch_since;
     int64_t last_diag_us;
@@ -114,7 +131,26 @@ static struct {
     uint32_t preroll_count; /* atomic: frames written (monotonic) */
     uint32_t preroll_on;    /* atomic */
     uint32_t preroll_busy;  /* atomic: writer inside a frame copy */
+    /* Pending reply: from the user's turn (first input transcription or model
+     * output) until turnComplete. While pending, the idle return is suspended
+     * and silence is shown as PROCESSING, so searches and thinking pauses are
+     * never mistaken for an abandoned conversation (VOX_RESPONSE_TIMEOUT_S). */
+    bool reply_pending;
+    int64_t model_progress_us; /* last model output seen by the session task */
+    uint32_t model_rx_ms;   /* atomic: time of the latest model output (WebSocket task) */
+    uint32_t model_rx_seen; /* model_rx_ms value at the last tick */
+    uint32_t activity_queued; /* atomic: one MODEL_ACTIVITY event in the queue at most */
+    /* Grounding shown on the status line (session task only). */
+    char *items;            /* ITEMS + RAW capacity, PSRAM; items "" when none */
+    size_t item_count;
+    size_t item_index;      /* rotation position */
+    int64_t item_shown_us;
 } s;
+
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
 
 static void post(event_kind_t kind, int value, int code)
 {
@@ -209,6 +245,130 @@ static void flush_preroll(void)
     ESP_LOGI(TAG, "sent %u pre-roll frames (%u ms)", (unsigned)n, (unsigned)(n * 40));
 }
 
+/* Status line: an actionable error wins; otherwise the current grounding item
+ * (Search Suggestion "GOOGLE: ..." or "FUENTE 1/3: RAE.ES"), rotated every
+ * GROUNDING_ROTATE_US; otherwise hidden. */
+static void refresh_status(void)
+{
+    if (!s.config.ui.set_status) {
+        return;
+    }
+    if (s.error != ERR_NONE) {
+        s.config.ui.set_status(s.config.ui.ui, status_for(s.error));
+        return;
+    }
+    char text[STATUS_CAPACITY] = "";
+    const char *p = s.items;
+    for (size_t n = s.item_index; p && *p && n > 0; --n) {
+        p += strcspn(p, "\n");
+        p += (*p == '\n');
+    }
+    if (p && s.item_count > 0) {
+        const size_t len = strcspn(p, "\n");
+        if (len < sizeof(text)) {
+            memcpy(text, p, len);
+            text[len] = '\0';
+        }
+    }
+    s.config.ui.set_status(s.config.ui.ui, text);
+}
+
+/* Append one formatted line to s.items; false when it does not fit. */
+static bool add_item(const char *prefix, const char *text, size_t len)
+{
+    char line[STATUS_CAPACITY];
+    if (vox_status_text(prefix, text, len, line, sizeof(line), STATUS_MAX_CHARS) == 0) {
+        return false;
+    }
+    const size_t used = strlen(s.items);
+    const size_t n = strlen(line);
+    if (used + n + 2 > GROUNDING_ITEMS_CAPACITY) {
+        return false;
+    }
+    if (used) {
+        s.items[used] = '\n';
+    }
+    memcpy(s.items + used + (used ? 1 : 0), line, n + 1);
+    s.item_count++;
+    return true;
+}
+
+static void clear_grounding(void)
+{
+    app_gemini_live_clear_sources(s.gl);
+    const bool had = s.item_count > 0;
+    if (s.items) {
+        s.items[0] = '\0';
+    }
+    s.item_count = 0;
+    s.item_index = 0;
+    if (had) {
+        refresh_status();
+    }
+}
+
+/* New groundingMetadata: rebuild the status items. Google's terms show grounded
+ * results together with their Search Suggestions, so the queries come first,
+ * then the web sources. Content is logged only at DEBUG (it mirrors the user's
+ * question). */
+static void load_grounding(void)
+{
+#if !CONFIG_VOX_SHOW_SEARCH_SOURCES
+    /* Quiet search (default): count it for the diagnostics, show nothing. */
+    ESP_LOGD(TAG, "grounded answer (sources not shown)");
+    return;
+#endif
+    if (!s.items) {
+        return;
+    }
+    char *raw = s.items + GROUNDING_ITEMS_CAPACITY;
+    const size_t old_count = s.item_count;
+    s.items[0] = '\0';
+    s.item_count = 0;
+    const size_t queries = app_gemini_live_get_queries(s.gl, raw, GROUNDING_RAW_CAPACITY);
+    ESP_LOGD(TAG, "search suggestions: %s", raw);
+    for (const char *q = raw; *q;) {
+        const size_t len = strcspn(q, "\n");
+        (void)add_item("GOOGLE: ", q, len);
+        q += len;
+        q += (*q == '\n');
+    }
+    const size_t sources = app_gemini_live_get_sources(s.gl, raw, GROUNDING_RAW_CAPACITY);
+    ESP_LOGD(TAG, "sources: %s", raw);
+    size_t index = 0;
+    for (const char *d = raw; *d; ++index) {
+        const size_t len = strcspn(d, "\n");
+        char prefix[24];
+        if (sources == 1) {
+            snprintf(prefix, sizeof(prefix), "FUENTE: ");
+        } else {
+            snprintf(prefix, sizeof(prefix), "FUENTE %u/%u: ", (unsigned)(index + 1),
+                     (unsigned)sources);
+        }
+        (void)add_item(prefix, d, len);
+        d += len;
+        d += (*d == '\n');
+    }
+    if (s.item_count == old_count) {
+        return; /* nothing new to show: keep the rotation where it is */
+    }
+    ESP_LOGI(TAG, "grounded answer: %u search suggestion(s), %u source(s)", (unsigned)queries,
+             (unsigned)sources);
+    s.item_index = 0;
+    s.item_shown_us = esp_timer_get_time();
+    refresh_status();
+}
+
+static void rotate_grounding(int64_t now)
+{
+    if (s.item_count < 2 || s.error != ERR_NONE || now - s.item_shown_us < GROUNDING_ROTATE_US) {
+        return;
+    }
+    s.item_shown_us = now;
+    s.item_index = (s.item_index + 1) % s.item_count;
+    refresh_status();
+}
+
 static void enter(session_state_t st)
 {
     if (st == s.state) {
@@ -234,17 +394,28 @@ static void enter(session_state_t st)
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
     }
     if (st == ST_SPEAKING) {
-        s.speaking_since = esp_timer_get_time();
         s.turn_done = false;
     } else {
         __atomic_store_n(&s.speaking, 0U, __ATOMIC_RELEASE);
     }
+    if (st == ST_CLOSED || st == ST_ERROR || st == ST_CONNECTING) {
+        s.reply_pending = false;
+    }
     if (s.config.ui.set_view) {
         s.config.ui.set_view(s.config.ui.ui, view_for(st));
     }
-    if (s.config.ui.set_status) {
-        s.config.ui.set_status(s.config.ui.ui, status_for(s.error));
+    refresh_status();
+}
+
+/* The user's turn is over or the model started answering: suspend the idle
+ * return until turnComplete (or VOX_RESPONSE_TIMEOUT_S without model output). */
+static void begin_reply(void)
+{
+    if (!s.reply_pending) {
+        s.reply_pending = true;
+        clear_grounding(); /* a new question: the previous answer's sources go away */
     }
+    s.model_progress_us = esp_timer_get_time();
 }
 
 static void fail(session_error_t err)
@@ -260,6 +431,7 @@ static void close_conversation(void)
     (void)app_gemini_live_disconnect(s.gl);
     app_audio_flush_playback();
     __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
+    clear_grounding();
     enter(ST_CLOSED);
 }
 
@@ -305,6 +477,7 @@ static void on_tap(void)
         __atomic_store_n(&s.squelch, 1U, __ATOMIC_RELEASE);
         s.squelch_since = esp_timer_get_time();
         app_audio_flush_playback();
+        s.reply_pending = false; /* the user dropped this answer */
         enter(ST_LISTENING);
         break;
     case ST_ERROR:
@@ -333,19 +506,51 @@ static void on_gl(int type, int code)
             s.transcripts_base = stats.rx_input_transcripts;
             s.audio_base = stats.rx_audio_chunks;
             __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
+            s.reply_pending = false;
             flush_preroll(); /* the question spoken right after "Hola ESP" goes first */
             enter(ST_LISTENING);
         }
         break;
     case APP_GL_EVT_INPUT_TRANSCRIPT:
         s.last_activity_us = esp_timer_get_time();
+        if (open) {
+            begin_reply();
+        }
+        if (s.state == ST_LISTENING) {
+            enter(ST_PROCESSING);
+        }
+        break;
+    case APP_GL_EVT_MODEL_ACTIVITY:
+    case APP_GL_EVT_GROUNDING:
+        /* Searching, thinking or text parts: the model is working on the turn. */
+        if ((app_gemini_live_event_type_t)type == APP_GL_EVT_MODEL_ACTIVITY) {
+            __atomic_store_n(&s.activity_queued, 0U, __ATOMIC_RELEASE);
+        }
+        s.last_activity_us = esp_timer_get_time();
+        if (!open || __atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE)) {
+            break; /* a turn the user interrupted: ignore its leftovers */
+        }
+        begin_reply();
+        if ((app_gemini_live_event_type_t)type == APP_GL_EVT_GROUNDING) {
+            load_grounding();
+        }
         if (s.state == ST_LISTENING) {
             enter(ST_PROCESSING);
         }
         break;
     case APP_GL_EVT_TURN_COMPLETE:
         s.last_activity_us = esp_timer_get_time();
+        if (code) {
+            /* interactionStatus IN_PROGRESS: a spoken filler ended, the model
+             * keeps searching or thinking. Wait for the real end of the turn
+             * (an interrupted turn stays squelched until then). */
+            if (open && !__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE)) {
+                begin_reply();
+            }
+            break;
+        }
         s.turn_done = true;
+        s.reply_pending = false;
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
         if (s.state == ST_PROCESSING) {
             enter(ST_LISTENING);
@@ -353,7 +558,8 @@ static void on_gl(int type, int code)
         break;
     case APP_GL_EVT_INTERRUPTED:
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
-        if (s.state == ST_SPEAKING) {
+        s.reply_pending = false;
+        if (s.state == ST_SPEAKING || s.state == ST_PROCESSING) {
             enter(ST_LISTENING);
         }
         break;
@@ -400,12 +606,14 @@ static void log_diagnostics(int64_t now)
     app_gemini_live_get_stats(s.gl, &gl);
     const float peak_dbfs = mic.peak ? 20.0f * log10f((float)mic.peak / 32768.0f) : -96.0f;
     ESP_LOGI(TAG, "diag st=%d mic{frames=%u peak=%.0f dBFS slot=%u on=%d} "
-             "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u} "
-             "heap{int_dma_free=%u largest=%u}",
+             "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u other=%u} "
+             "search{q=%u grounded=%u} pending=%d heap{int_dma_free=%u largest=%u}",
              (int)s.state, (unsigned)mic.frames, (double)peak_dbfs, (unsigned)mic.slot,
              (int)mic.enabled, (unsigned)gl.tx_messages, (unsigned)gl.tx_failures,
              (unsigned)gl.tx_not_ready, (unsigned)gl.rx_messages, (unsigned)gl.rx_audio_chunks,
-             (unsigned)gl.rx_input_transcripts, (unsigned)int_free, (unsigned)int_largest);
+             (unsigned)gl.rx_input_transcripts, (unsigned)gl.rx_other_parts,
+             (unsigned)gl.search_queries, (unsigned)gl.rx_grounding, (int)s.reply_pending,
+             (unsigned)int_free, (unsigned)int_largest);
 }
 
 /* A model that completes setup but never transcribes (gemini-3.8-live in the
@@ -455,7 +663,22 @@ static void on_tick(void)
         s.voiced_seen = voiced;
         s.last_activity_us = now;
     }
-    if (s.state == ST_LISTENING && !app_audio_is_playing() &&
+    /* Any model output (audio included) proves the turn is alive. */
+    const uint32_t model_rx = __atomic_load_n(&s.model_rx_ms, __ATOMIC_ACQUIRE);
+    if (model_rx != s.model_rx_seen) {
+        s.model_rx_seen = model_rx;
+        s.last_activity_us = now;
+        s.model_progress_us = now;
+    }
+    rotate_grounding(now);
+    if (s.reply_pending && now - s.model_progress_us > RESPONSE_TIMEOUT_US) {
+        ESP_LOGW(TAG, "no model output for %d s; reply abandoned", CONFIG_VOX_RESPONSE_TIMEOUT_S);
+        s.reply_pending = false;
+        if (s.state == ST_PROCESSING) {
+            enter(ST_LISTENING); /* the idle countdown starts now */
+        }
+    }
+    if (s.state == ST_LISTENING && !s.reply_pending && !app_audio_is_playing() &&
             now - s.last_activity_us > IDLE_TIMEOUT_US) {
         ESP_LOGI(TAG, "%d s without activity; back to idle", CONFIG_VOX_IDLE_TIMEOUT_S);
         close_conversation();
@@ -473,12 +696,16 @@ static void on_tick(void)
         fail(ERR_LINK);
         return;
     }
-    if (s.state == ST_SPEAKING) {
-        const bool playing = app_audio_is_playing();
-        if (!playing && (s.turn_done || now - s.speaking_since > SPEAKING_STALL_US)) {
+    if (s.state == ST_SPEAKING && !app_audio_is_playing()) {
+        if (s.turn_done || !s.reply_pending) {
             enter(ST_LISTENING);
+        } else if (now - s.model_progress_us > SPEAKING_GAP_US) {
+            /* Speech drained but the turn is still open (e.g. "let me check" and
+             * then a search): show the model working, keep the idle return off. */
+            enter(ST_PROCESSING);
         }
-    } else if (s.state == ST_PROCESSING && now - s.processing_since > PROCESSING_TIMEOUT_US) {
+    } else if (s.state == ST_PROCESSING && !s.reply_pending &&
+               now - s.processing_since > RESPONSE_TIMEOUT_US) {
         ESP_LOGW(TAG, "no response; listening again");
         enter(ST_LISTENING);
     }
@@ -517,6 +744,7 @@ static void session_task(void *arg)
                 /* Stale start from a turn the user just interrupted: ignore it. */
                 if ((s.state == ST_LISTENING || s.state == ST_PROCESSING) &&
                         !__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE)) {
+                    begin_reply();
                     enter(ST_SPEAKING);
                 }
                 break;
@@ -545,6 +773,7 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
         if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE) || event->samples == 0) {
             return;
         }
+        __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
         (void)app_audio_play(event->pcm, event->samples, PLAY_TIMEOUT_MS);
         /* A tap may interrupt while this chunk waited for ring space: drop what it
          * queued and never report it as the start of a new turn. */
@@ -565,10 +794,22 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
     case APP_GL_EVT_OUTPUT_TRANSCRIPT:
         ESP_LOGD(TAG, "vox: %s", event->text);
         return;
+    case APP_GL_EVT_MODEL_ACTIVITY:
+        __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
+        /* Bursts of thought/code parts must not fill the queue and push out a
+         * turnComplete: the timestamp above already keeps the turn alive. */
+        if (__atomic_exchange_n(&s.activity_queued, 1U, __ATOMIC_ACQ_REL)) {
+            return;
+        }
+        break;
+    case APP_GL_EVT_GROUNDING:
+        __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
+        break;
     default:
         break;
     }
-    post(EV_GL, (int)event->type, event->close_code);
+    post(EV_GL, (int)event->type,
+         event->type == APP_GL_EVT_TURN_COMPLETE ? (int)event->in_progress : event->close_code);
 }
 
 /* Capture task: forward 40 ms frames while listening. */
@@ -662,12 +903,16 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         .voice = CONFIG_VOX_GEMINI_VOICE,
         .language = CONFIG_VOX_GEMINI_LANGUAGE,
         .system_instruction = PERSONA,
+        .google_search = VOX_GOOGLE_SEARCH,
         .on_event = gl_event,
     };
     esp_err_t err = app_gemini_live_create(&gl_config, &s.gl);
     if (err != ESP_OK) {
         goto fail_queue;
     }
+    /* Optional: without it grounded answers simply show no source line. */
+    s.items = heap_caps_calloc(1, GROUNDING_ITEMS_CAPACITY + GROUNDING_RAW_CAPACITY,
+                               MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const app_audio_config_t audio = {
         .on_mic = on_mic,
         .mic_gain_db = config->mic_gain_db > 0.0f ? config->mic_gain_db : (float)CONFIG_VOX_MIC_GAIN_DB,
@@ -698,11 +943,14 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         s.config.ui.set_view(s.config.ui.ui, APP_VOX_VIEW_IDLE);
     }
     set_wake_listening(true); /* starts CLOSED: arm local listening */
-    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s); tap%s to talk", primary, fallback,
+    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s, search %s); tap%s to talk", primary,
+             fallback, VOX_GOOGLE_SEARCH ? "on" : "off",
              s.wake_available ? " or say \"Hola ESP\"" : "");
     return ESP_OK;
 
 fail_gl:
+    heap_caps_free(s.items);
+    s.items = NULL;
     (void)app_gemini_live_destroy(&s.gl);
 fail_queue:
     vQueueDelete(s.queue);
