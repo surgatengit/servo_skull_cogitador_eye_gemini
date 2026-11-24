@@ -122,7 +122,11 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
 
 ## 6. Pendiente y siguientes pasos
 
-0. **1.2.0 / Google Search:** con autorización, instalar la rama `feat/google-search` y hacer la
+0. **Estado 2026-11-25:** 1.2.0 con búsqueda desactivada (`VOX_GOOGLE_SEARCH=n`) instalada y
+   validada por voz (INSTALL.md, prueba 10). Falta fusionar en `main` y etiquetar `v1.2.0` cuando
+   lo pida el propietario. Lo que sigue en este punto 0 es el plan original para la búsqueda, que
+   solo aplica si se reactiva con cuota disponible.
+   **1.2.0 / Google Search:** con autorización, instalar la rama `feat/google-search` y hacer la
    prueba 10 (confirmar que el servidor acepta `tools:[{"googleSearch":{}}]`, las fuentes en pantalla
    y `largest=` ≥ 8192). Si sale bien, fusionar en `main` (solo cuando lo pida el propietario) y
    etiquetar `v1.2.0`. Cumplimiento de la presentación de fuentes en un dispositivo de voz: riesgo

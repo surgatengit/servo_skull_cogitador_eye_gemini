@@ -268,7 +268,8 @@ disponible.
   - mismo Device ID, `app_version=1.2.0`;
   - Boot ID `5146913244462897174`, firmware `42ff0083c79c…`, `crash_count=0`.
 - Logs de arranque: `search off`, «Hola ESP» escuchando y `largest=12288` en reposo.
-- Prueba de voz: pendiente. Depende de que la cuota general del plan gratuito esté disponible.
+- Prueba de voz (2026-11-25): **VOX habla y funciona perfectamente**, según el propietario.
+  **1.2.0 con la búsqueda desactivada queda validada en el hardware.**
 
 Pendiente de la búsqueda discreta, si se activa con cuota disponible:
 
