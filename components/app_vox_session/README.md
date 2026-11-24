@@ -54,5 +54,5 @@ closes the conversation and re-arms local listening.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
 - Transcripts, search queries and source domains are logged only at DEBUG level.
-- The persona asks Gemini to search for current or uncertain facts and to name the main source
-  (only when `VOX_GOOGLE_SEARCH` is enabled).
+- The persona does not mention search: Gemini decides when to use the tool (an explicit
+  "search current facts" instruction made answers slower in test 10 and was removed).

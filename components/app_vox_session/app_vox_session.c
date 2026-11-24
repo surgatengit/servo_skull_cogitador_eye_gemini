@@ -54,13 +54,7 @@ static const char PERSONA[] =
     "o al Dios Máquina. Ante todo eres útil: respondes con claridad y exactitud a cualquier "
     "pregunta legítima, incluidas operaciones matemáticas sencillas, datos, explicaciones y "
     "conversación cotidiana. Tus respuestas habladas son breves, normalmente de dos a cuatro "
-    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas."
-#if CONFIG_VOX_GOOGLE_SEARCH
-    " Cuando la pregunta trate de hechos actuales, noticias, el tiempo, precios, horarios o "
-    "datos que no conozcas con certeza, consulta la búsqueda de Google antes de responder, "
-    "di qué fuente principal has consultado y no inventes datos que no hayas encontrado."
-#endif
-    ;
+    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas.";
 
 typedef enum {
     ST_CLOSED = 0,

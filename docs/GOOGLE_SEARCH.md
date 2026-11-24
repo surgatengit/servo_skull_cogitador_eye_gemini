@@ -25,8 +25,9 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
   ninguna llamada de herramienta.
 - Los modelos no cambian: `gemini-3.1-flash-live-preview` es el principal y `gemini-3.8-live` el
   alternativo. La documentación marca Google Search como **compatible en los dos**.
-- La personalidad añade una frase: buscar ante hechos actuales o dudosos, citar la fuente principal y
-  no inventar.
+- La personalidad **no cambia**: Gemini decide solo cuándo buscar. Una primera versión añadía
+  «busca ante hechos actuales y cita la fuente», pero el propietario notó VOX más lento en la
+  prueba 10 y se quitó el 2026-11-25.
 - La línea de estado del ojo muestra primero las **sugerencias de búsqueda** («GOOGLE: …») y después
   las **fuentes** («FUENTE 1/3: AEMET.ES»). Rotan cada 3 s y se borran con la siguiente pregunta o
   al cerrar.
@@ -103,8 +104,7 @@ Lo que hace VOX, como aproximación prudente:
 1. **Muestra las sugerencias de búsqueda** (`webSearchQueries`) en la línea de estado con el prefijo
    «GOOGLE:», mientras suena la respuesta y antes de las fuentes. El texto se pasa a mayúsculas y se
    limpia para la fuente del ojo (máx. 24 caracteres, «...» si no cabe).
-2. **Muestra las fuentes** (dominios) numeradas, y la personalidad pide **citar de viva voz la fuente
-   principal**.
+2. **Muestra las fuentes** (dominios) numeradas en la pantalla.
 3. **No modifica la respuesta.** El audio de Gemini se reproduce tal cual; VOX solo puede
    interrumpirlo con un toque.
 4. **No guarda nada.** Ni sugerencias, ni fuentes, ni respuestas se escriben en flash. Se borran con la
