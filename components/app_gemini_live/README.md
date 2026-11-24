@@ -1,0 +1,35 @@
+# app_gemini_live
+
+Native Gemini Live client over a secure WebSocket (no bridge). Uses
+`espressif/esp_websocket_client` with the ESP-IDF CA bundle (server certificate
+always verified), `espressif/cjson` (PSRAM allocator) and Mbed TLS base64.
+
+## Protocol
+
+- Endpoint: `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=…`
+- On connect sends `setup`: `models/<model>`, `generationConfig.responseModalities=["AUDIO"]`,
+  `speechConfig` (voice, `languageCode`), `systemInstruction`, input/output
+  transcription, automatic activity detection, `contextWindowCompression.slidingWindow`
+  and `sessionResumption` (with the latest handle on reconnects).
+- Uplink: `realtimeInput.audio` (`audio/pcm;rate=16000`, base64) per 40 ms frame;
+  `audioStreamEnd` when the mic pauses.
+- Downlink: reassembles fragmented frames (text or binary) up to 256 KiB, then
+  decodes `serverContent` (audio 24 kHz, transcripts, `interrupted`,
+  `turnComplete`), `sessionResumptionUpdate`, `goAway` and `error`.
+- Resilience: automatic reconnect (2 s) including after a clean server close;
+  after 2 failed setups the fallback model is used; after 5 a `FAILED` event asks
+  the owner to disconnect.
+
+## Contract
+
+- `create` copies configuration and allocates RX (256 KiB) and PCM (192 KiB)
+  buffers in PSRAM plus a 6 KiB TX buffer.
+- `connect(key)` and `disconnect()` from one application task (the session).
+  The key is copied only into the client URI; the local URI buffer is zeroized
+  immediately. Transport debug logs are set to WARN so the URI is never printed.
+- `send_audio()` / `send_audio_stream_end()` from any task; they share a mutex
+  with `disconnect()`. The WebSocket task never takes that mutex, so stop/destroy
+  cannot deadlock.
+- `on_event` runs on the WebSocket task (core 0, prio 10). It may block briefly
+  (playback backpressure) but must never call `disconnect()` or `destroy()`.
+- Each `connect()` starts a fresh conversation (no resumption handle carried over).

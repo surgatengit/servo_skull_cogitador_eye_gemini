@@ -1,0 +1,276 @@
+{
+  "screen": "vox",
+  "w": 480,
+  "h": 480,
+  "screen_bg": "#000000",
+  "font": "fonts/DejaVuSans.ttf",
+  "default_font_size": 20,
+  "swipe": false,
+  "objects": [
+    {
+      "type": "container",
+      "x": 4,
+      "y": 4,
+      "w": 472,
+      "h": 472,
+      "radius": 236,
+      "bg_color": "#16181A",
+      "border_color": "#3C4044",
+      "border_width": 6,
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 431,
+      "y": 315,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 431,
+      "y": 151,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 35,
+      "y": 315,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 35,
+      "y": 151,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 315,
+      "y": 431,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 151,
+      "y": 431,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 315,
+      "y": 35,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 151,
+      "y": 35,
+      "w": 14,
+      "h": 14,
+      "radius": 7,
+      "bg_color": "#5A5F64",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 40,
+      "y": 40,
+      "w": 400,
+      "h": 400,
+      "radius": 200,
+      "bg_color": "#00E5FF",
+      "name": "glow",
+      "bind": "glow",
+      "bind_target": "color",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 56,
+      "y": 56,
+      "w": 368,
+      "h": 368,
+      "radius": 184,
+      "bg_color": "#040506",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "name": "iris",
+      "x": {
+        "default": 130,
+        "min": 66,
+        "max": 194
+      },
+      "y": {
+        "default": 130,
+        "min": 66,
+        "max": 194
+      },
+      "w": 220,
+      "h": 220,
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "parent": 11,
+      "x": 0,
+      "y": 0,
+      "w": 220,
+      "h": 220,
+      "radius": 110,
+      "bg_color": "#00E5FF",
+      "name": "iris_ring",
+      "bind": "iris_ring",
+      "bind_target": "color"
+    },
+    {
+      "type": "container",
+      "parent": 11,
+      "x": 18,
+      "y": 18,
+      "w": 184,
+      "h": 184,
+      "radius": 92,
+      "bg_color": "#000000A0"
+    },
+    {
+      "type": "container",
+      "parent": 11,
+      "x": 44,
+      "y": 44,
+      "w": 132,
+      "h": 132,
+      "radius": 66,
+      "bg_color": "#00E5FF",
+      "name": "iris_core",
+      "bind": "iris_core",
+      "bind_target": "color"
+    },
+    {
+      "type": "container",
+      "parent": 11,
+      "name": "pupil",
+      "x": {
+        "default": 66,
+        "min": 45,
+        "max": 85
+      },
+      "y": {
+        "default": 66,
+        "min": 45,
+        "max": 85
+      },
+      "w": {
+        "default": 88,
+        "min": 50,
+        "max": 130
+      },
+      "h": {
+        "default": 88,
+        "min": 50,
+        "max": 130
+      },
+      "radius": {
+        "default": 44,
+        "min": 25,
+        "max": 65
+      },
+      "bg_color": "#000000"
+    },
+    {
+      "type": "container",
+      "parent": 11,
+      "x": 146,
+      "y": 46,
+      "w": 24,
+      "h": 24,
+      "radius": 12,
+      "bg_color": "#FFFFFFB4"
+    },
+    {
+      "type": "container",
+      "name": "lid_top",
+      "x": 0,
+      "y": {
+        "default": -250,
+        "min": -250,
+        "max": 0
+      },
+      "w": 480,
+      "h": 250,
+      "bg_color": "#0B0C0D",
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "name": "lid_bottom",
+      "x": 0,
+      "y": {
+        "default": 480,
+        "min": 230,
+        "max": 480
+      },
+      "w": 480,
+      "h": 250,
+      "bg_color": "#0B0C0D",
+      "parent": -1
+    },
+    {
+      "type": "label",
+      "name": "status",
+      "bind": "status",
+      "x": 60,
+      "y": 396,
+      "w": 360,
+      "h": 32,
+      "text": " ",
+      "font_size": 20,
+      "fg_color": "#E8D9FF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑ0123456789-·.:/",
+      "parent": -1
+    },
+    {
+      "type": "button",
+      "name": "tap",
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 480,
+      "radius": 0,
+      "bg_color": "#00000000",
+      "callback": "eye_tap",
+      "parent": -1
+    }
+  ]
+}

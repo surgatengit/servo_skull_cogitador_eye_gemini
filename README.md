@@ -1,83 +1,48 @@
-# ESP-Mosaico servocraneo_gemini_direct
+# VOX M-01 GEMINI DIRECT (cogitador_gemini)
 
-Created with `python mosaico.py project init my_app`.
-The same GSP 1.5.1 scene and portable C UI run on PC and ESP-Mosaico.
+Servocráneo VOX M-01 para ESP-Mosaico: un ojo mecánico a pantalla completa que
+conversa por voz con **Gemini Live directamente por WebSocket seguro y Wi-Fi**,
+sin Windows ni servicios intermedios. Aplicación nativa ESP-IDF (ESP32-S31)
+creada con la plantilla Hello World de `mosaico.py` y GSP 1.5.1.
 
-From the workspace root:
+Diseño, requisitos y decisiones: [docs/DESIGN.md](docs/DESIGN.md).
 
-```sh
+## Componentes
+
+| Componente | Responsabilidad |
+|---|---|
+| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores de estado, toque); también corre en el simulador |
+| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación |
+| [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, reanudación) |
+| [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
+| [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |
+| [`app_secrets`](components/app_secrets/README.md) | Clave de API en NVS propio + RPC privada de provisión |
+| [`app_config`](components/app_config/README.md), [`app_display`](components/app_display/README.md) | Plantilla: lectura de Wi-Fi compartido y pantalla CO5300 |
+
+## Requisitos
+
+Este repositorio debe estar en `esp-mosaico-vibe/projects/servocraneo_gemini_direct/`
+(usa `../../submodule/esp-mosaico-utils` y `../../submodule/esp-mosaico-bsp`), con
+ESP-IDF en el commit `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe` para `esp32s31`.
+
+## Compilar y simular (desde la raíz del espacio de trabajo)
+
+```powershell
+$env:IDF_CONFIGDEP_ENABLE = "0"   # la ruta del espacio de trabajo contiene espacios
+python submodule/esp-mosaico-utils/mosaico-tools/skills/idf-low-noise-build/scripts/idf_low_noise_build.py --project projects/servocraneo_gemini_direct --idf-path C:\esp\esp-idf-master build
 python mosaico.py project sim --project projects/servocraneo_gemini_direct --interactive
-python mosaico.py recover
-python mosaico.py iris system-update --project projects/servocraneo_gemini_direct
 ```
 
-Run `recover` before the first install on a blank or unverified device.
-Use `system-update` for new apps or changed resources/layouts. Use `app-update`
-only for code changes with an identical full partition table and resources.
+El bootloader está excluido de la compilación por defecto: las aplicaciones normales
+usan el bootloader retenido de Vibe Mode.
 
-To add an Iris UART link, run from the generated project directory with ESP-IDF
-activated:
+## Instalación y clave (solo con autorización del propietario)
 
-```sh
-idf.py -B build-uart -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.application.defaults;sdkconfig.uart.defaults" build
-```
+1. Instalar con el flujo oficial: `python mosaico.py iris system-update --project projects/servocraneo_gemini_direct`.
+2. Configurar el Wi-Fi en Vibe Mode (información compartida).
+3. Copiar `.env.example` a `.env` (ignorado por Git) o exportar `GEMINI_API_KEY`, y ejecutar
+   `python tools/provision_key.py` por USB. La clave se guarda en el NVS del dispositivo;
+   nunca va en el código, los binarios ni GitHub.
+4. Tocar la pantalla: el ojo pasa a rojo (escuchando) y VOX responde en verde.
 
-For USB Serial/JTAG, replace `uart` with `usj` in the build directory and overlay
-filename. These optional overlays retain the default transports. UART uses the
-UART0 console pins at 115200 baud. Separate build directories keep each generated
-`sdkconfig` independent; changing defaults does not override an existing config.
-
-Application components:
-
-- `components/app_config`: device-side shared configuration reads from Vibe Mode.
-- `components/app_hello`: portable UI behavior and private controller state.
-- `components/app_display`: BSP-to-GSP display and optional touch policy.
-- `main`: device startup and dependency composition only.
-- `components/app_hello/host`: desktop adapter and its separate CMake build,
-  reusing the same controller and public header; excluded from the ESP32 build.
-- `components/app_hello/ui/main.json`: authored scene; generated bindings and bundles stay in the build.
-
-`project sim` discovers a unique scene under `components/*/ui/main.json` (or the
-older root `ui/main.json`). With multiple scenes, select one using `--scene PATH`,
-relative to the project. This previews only that scene; omit `--scene` to run the
-PC backend and its compiled application behavior.
-
-Dependency direction is `main -> app_hello -> ESP-GSP`,
-`main -> app_display -> BSP/ESP-GSP`, and
-`main -> app_config -> esp_mosaico_app_recovery`. No application component depends on
-`main` or on its sibling. Public headers live in `include/`; private state stays
-in implementation files. Each component README includes its contract and usage.
-
-Device startup reads the saved `wifi_ssid` and `wifi_password` through
-`app_config_load_wifi()` and the public `mosaico_shared_get()` API. Configure Wi-Fi
-in Vibe Mode; shared values live in `sysmeta/shared` and remain available when
-switching to an application. Startup logs availability only and clears the
-temporary credentials. Missing or invalid configuration leaves the UI running.
-Hello World does not start a Wi-Fi connection; use the loaded snapshot when
-adding a device networking component. An empty saved password means an open
-network; a missing password key means configuration is incomplete.
-
-For API keys, tokens and other shared strings, configure a custom key in
-Vibe Mode > Settings > Shared information and follow the example in
-[`app_config`](components/app_config/README.md). Default to this public read path
-for user-provisioned shared configuration. Keep secrets out of source and logs,
-and preserve NVS on errors. The PC backend does not access device configuration.
-[`AGENTS.md`](AGENTS.md) carries these conventions into generated projects.
-
-When adding behavior, keep `main` as a composition root. Add cohesive `app_*`
-components only for independent responsibilities, declare public/private CMake
-dependencies explicitly, and keep the graph acyclic. Avoid cross-module globals;
-pass handles, context and value snapshots. Keep each public API comment within
-three lines, describing its purpose and key preconditions/results. Put detailed
-ownership, lifecycle, threading and timeout contracts in the component README;
-document units and ranges beside fields.
-Third-party dependencies retain upstream names. Pins and workspace overrides live
-in `main/idf_component.yml` and the root CMake configuration. Apply local patches
-in a dedicated dependency checkout and select it with `override_path`; never edit
-`managed_components/` in place.
-
-Git, editor and hook entry files stay at the root; format rules, project policy
-and setup instructions live in `tools/quality/`. See its README to enable hooks.
-The `tools/quality/policy.json` prefix rule checks local application component names.
-Architecture and API semantics also require code review; formatter/static-analysis
-success alone does not establish those contracts.
+Nunca subas `.env`, claves, tokens, `sdkconfig` ni binarios (`.gitignore` los excluye).

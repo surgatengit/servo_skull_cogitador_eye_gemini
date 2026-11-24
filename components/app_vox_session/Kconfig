@@ -1,0 +1,34 @@
+menu "VOX M-01 Gemini Direct"
+
+    config VOX_GEMINI_MODEL
+        string "Primary Gemini Live model"
+        default "gemini-3.8-live"
+        help
+            Model used for new conversations. A provisioned override
+            (RPC set_model) takes precedence without recompiling.
+
+    config VOX_GEMINI_FALLBACK_MODEL
+        string "Fallback Gemini Live model"
+        default "gemini-3.1-flash-live-preview"
+        help
+            Used automatically after repeated setup failures with the primary.
+
+    config VOX_GEMINI_VOICE
+        string "Prebuilt voice"
+        default "Charon"
+
+    config VOX_GEMINI_LANGUAGE
+        string "Speech language (BCP-47)"
+        default "es-ES"
+
+    config VOX_SPEAKER_VOLUME
+        int "Speaker volume (0-100)"
+        range 1 100
+        default 70
+
+    config VOX_MIC_GAIN_DB
+        int "Microphone gain (dB)"
+        range 0 42
+        default 30
+
+endmenu
