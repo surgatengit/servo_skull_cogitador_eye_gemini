@@ -86,7 +86,8 @@ python mosaico.py iris system-update --project projects/servocraneo_gemini_direc
 Kconfig (`components/app_vox_session/Kconfig`): `VOX_GEMINI_MODEL`, `VOX_GEMINI_FALLBACK_MODEL`,
 `VOX_WAKE_WORD`, `VOX_IDLE_TIMEOUT_S`=15, `VOX_PREROLL_MS`=2000, `VOX_SILENT_MODEL_VOICED_FRAMES`=250,
 `VOX_VOICED_PEAK_THRESHOLD`=1036 (≈ −30 dBFS), `VOX_MIC_GAIN_DB`=24, `VOX_SPEAKER_VOLUME`=70.
-Desde 1.2.0: `VOX_GOOGLE_SEARCH`=y, `VOX_SHOW_SEARCH_SOURCES`=n (búsqueda discreta, sin citar
+Desde 1.2.0: `VOX_GOOGLE_SEARCH`=**n** (el servidor cierra con 1011 los `setup` con
+`googleSearch`; ver INSTALL.md, prueba 10), `VOX_SHOW_SEARCH_SOURCES`=n (búsqueda discreta, sin citar
 fuentes, por decisión del propietario) y `VOX_RESPONSE_TIMEOUT_S`=30 (espera máxima sin salida del modelo
 mientras hay una respuesta pendiente; durante ese tiempo no corre el reposo).
 

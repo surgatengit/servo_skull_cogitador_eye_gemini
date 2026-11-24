@@ -338,6 +338,14 @@ static void handle_message(struct app_gemini_live *gl, esp_websocket_client_hand
 
 static void on_data(struct app_gemini_live *gl, const esp_websocket_event_data_t *d)
 {
+    if (d->op_code == 0x8) {
+        /* Close frame: 2-byte status code, then the server's reason text (it
+         * explains rejected setups, e.g. code 1011 with an unsupported tool). */
+        if (d->data_len > 2) {
+            ESP_LOGW(TAG, "server close reason: %.*s", d->data_len - 2, d->data_ptr + 2);
+        }
+        return;
+    }
     /* Text (1) and binary (2) frames both carry JSON; 0 continues a fragmented message. */
     if (d->op_code != 0x0 && d->op_code != 0x1 && d->op_code != 0x2) {
         return;

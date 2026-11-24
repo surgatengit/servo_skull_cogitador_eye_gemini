@@ -235,7 +235,25 @@ empujaba a buscar y a alargar las respuestas.
   - Boot ID `6174699672841644746`, firmware `66658c0065a5…`, `crash_count=0`.
 - Logs de arranque: `search on`, «Hola ESP» escuchando y `largest=12288` en reposo.
 
-**Prueba de voz de la búsqueda discreta:** pendiente. Hay que comprobar:
+**Prueba de voz (2026-11-25): FALLA. VOX no llega a conectar.** Captura en directo:
+
+- Cada `setup` con `tools:[{"googleSearch":{}}]` recibe `closed (close code 1011)` unos 150 ms
+  después.
+- Pasa con `gemini-3.1-flash-live-preview` (2 intentos) y con `gemini-3.8-live` (3 intentos).
+  Después aparece `Gemini Live unavailable (code 1011)` y el ojo violeta «ERROR DE CONEXIÓN».
+- Sin `tools`, el mismo `setup` funcionaba en 1.1.0.
+- El cliente no registraba el motivo de cierre.
+- La primera prueba «lenta» fue con toda seguridad este mismo fallo: nunca hubo una sesión 1.2.0
+  con búsqueda.
+
+**Corrección provisional:**
+
+- `VOX_GOOGLE_SEARCH` desactivado por defecto: VOX conecta como en 1.1.0 y conserva el resto de 1.2.0.
+- El cliente registra ahora `server close reason: …` en las tramas de cierre.
+- `tools/test_live_setup.py`: el propietario lo ejecuta en el PC con su clave para ver qué
+  variante del `setup` acepta Google y con qué motivo rechaza las demás.
+
+Pendiente de la búsqueda discreta, cuando se encuentre un `setup` aceptado:
 
 - una pregunta sencilla, que debe responder al instante;
 - «¿Cuál es la última película de Nolan?»;

@@ -62,8 +62,12 @@ menu "VOX M-01 Gemini Direct"
 
     config VOX_GOOGLE_SEARCH
         bool "Grounding with Google Search (native Live API tool)"
-        default y
+        default n
         help
+            OFF by default: in test 10 (2026-11-25) the server closed every
+            setup that declared googleSearch with code 1011, on both models,
+            so VOX could not connect. Enable only to test a fix.
+
             Declare the googleSearch tool in the Live setup message so Gemini can
             search the web by itself (server side, no intermediate service). Each
             search may be billed separately: see docs/GOOGLE_SEARCH.md.

@@ -18,6 +18,13 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
 [`gemini-3.8-live`](https://aistudio.google.com/docs/models/gemini-3.8-live) y
 [`gemini-3.8-live-extended-thinking`](https://aistudio.google.com/docs/models/gemini-3.8-live-extended-thinking).
 
+> **ESTADO (2026-11-25): búsqueda DESACTIVADA por defecto.**
+>
+> - En la prueba 10, el servidor cerró con código 1011 todos los `setup` que declaraban
+>   `googleSearch`, con los dos modelos, y VOX no podía conectar.
+> - `VOX_GOOGLE_SEARCH=n` hasta encontrar una variante aceptada con `tools/test_live_setup.py`
+>   (detalles en INSTALL.md, prueba 10).
+>
 > **Decisión del propietario tras la prueba 10 (2026-11-25): búsqueda discreta.** Gemini responde
 > de inmediato con lo que sabe y solo busca cuando el operador se lo pide («busca…») o cuando
 > desconoce un dato reciente (por ejemplo, la última película de Nolan). No cita fuentes ni de
