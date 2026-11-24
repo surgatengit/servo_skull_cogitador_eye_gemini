@@ -192,6 +192,14 @@ y el siguiente intento abre una sesión nueva.
   segundo toque. Corregido después: si el turno se interrumpió mientras ese fragmento esperaba, se vacía
   el búfer y no se anuncia un turno nuevo.
 
+### Prueba 9 (2026-11-24): interrupción con un solo toque
+
+- Dos interrupciones con **un toque** (`tap in state 4` → `4 -> 2`, sin volver a HABLANDO) y un
+  cierre con el segundo toque. Activación por «Hola ESP» correcta.
+- 0 errores de pantalla. El bloque DMA interno contiguo mínimo observado fue de 8 192 B (por encima
+  de los 7 680 B por transacción; margen ajustado, vigilado por el diagnóstico).
+- **«Hola ESP» (1.1.0) queda validado en el hardware.**
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
