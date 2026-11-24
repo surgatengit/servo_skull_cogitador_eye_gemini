@@ -62,6 +62,25 @@ particiones NVS (`nvs`, `nvs_keys`). Vibe Mode vuelve a validar el manifiesto en
 Nota: `recover` escribe `bootloader`, `partition-table`, `otadata` y `vibe_mode` desde
 `firmware/recovery/`, y arranca en Vibe Mode. La aplicación se instala después.
 
+### Estado observado antes de instalar (2026-11-24, solo lectura)
+
+Lectura con `iris list` y `iris device-status` por USB, sin escrituras ni reinicios:
+
+| Campo | Valor |
+|---|---|
+| Device ID | `4553502d4952495301001c2904d11390` (serie USB `1C2904D11390`) |
+| Modo | `normal` (aplicación en `main_app`), ESP-Iris 0.2, contrato `esp-mosaico/v2`, ABI 2, layout `mosaico-retained-test-2m-v2` |
+| Aplicación | **Mosaico-Claw 0.8.0** (Idea **100000**, «ESP-Claw»); SHA-256 `ce9f5d16a40ff4040306add4d78f3f83d6d8f99321389b15407e2cc570a4d323` |
+| ESP-IDF de la app | `v6.1-dev-8142-g188e3e55bb2` (la misma base que Vibe Mode 0.4.1 empaquetado) |
+| Salud | `crash_count 0`, sin bucle de bloqueos ni recuperación pendiente |
+| Memoria | PSRAM total 26,8 MB (22,1 MB libres); RAM interna 346 KB (110 KB libres, mínimo 64 KB) |
+| Datos de ESP-Claw | En la **NAND**: `/nand/router_rules`, `/nand/scheduler`, `/nand/memory`. `system-update` no los toca |
+| Wi-Fi | Conectado con las credenciales de Vibe Mode (IP privada, región ES) |
+| Versión de Vibe Mode | No la informa la aplicación. `system-update` exige al menos 0.2.0 y la comprueba antes de escribir; se ve en Vibe Mode → Acerca de |
+
+Conclusión: ESP-Claw es la aplicación que arranca hoy y **será sustituida** en `main_app`.
+Su código Ideas es 100000; sus datos en la NAND, el Wi-Fi y Vibe Mode se conservan.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
