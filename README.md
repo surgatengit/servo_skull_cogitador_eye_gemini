@@ -50,8 +50,8 @@ usan el bootloader retenido de Vibe Mode.
    nunca va en el código, los binarios ni GitHub.
 4. Decir **«Hola ESP»** o tocar la pantalla: ámbar mientras conecta, rojo escuchando, verde cuando
    VOX responde. Un toque mientras habla lo interrumpe; otro toque cierra. Vuelve al reposo (cian)
-   tras 15 s sin actividad. Con Google Search (1.2.0), mientras Gemini busca el ojo sigue ámbar y la
-   línea inferior muestra la búsqueda («GOOGLE: …») y las fuentes («FUENTE 1/2: …»).
+   tras 15 s sin actividad. Con Google Search (1.2.0), VOX solo busca si se lo pides («busca…») o si
+   desconoce un dato reciente; mientras busca el ojo sigue ámbar y no cita fuentes.
 
 `app-update` no sirve en este dispositivo (`recovery_required`); usa siempre `system-update`.
 

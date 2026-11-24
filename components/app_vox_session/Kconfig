@@ -65,9 +65,17 @@ menu "VOX M-01 Gemini Direct"
         default y
         help
             Declare the googleSearch tool in the Live setup message so Gemini can
-            search the web by itself (server side, no intermediate service). The
-            web domains of the sources are shown on the status line. Each search
-            may be billed separately: see docs/GOOGLE_SEARCH.md.
+            search the web by itself (server side, no intermediate service). Each
+            search may be billed separately: see docs/GOOGLE_SEARCH.md.
+
+    config VOX_SHOW_SEARCH_SOURCES
+        bool "Show Google search suggestions and sources on the status line"
+        depends on VOX_GOOGLE_SEARCH
+        default n
+        help
+            Off by default at the owner's request: VOX searches quietly and never
+            cites sources. When on, the status line rotates "GOOGLE: <query>" and
+            "FUENTE n/m: <domain>" (see docs/GOOGLE_SEARCH.md section 4).
 
     config VOX_RESPONSE_TIMEOUT_S
         int "Seconds to wait for Gemini to finish a turn (search, thinking)"

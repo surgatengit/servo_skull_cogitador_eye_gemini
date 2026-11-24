@@ -18,6 +18,14 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
 [`gemini-3.8-live`](https://aistudio.google.com/docs/models/gemini-3.8-live) y
 [`gemini-3.8-live-extended-thinking`](https://aistudio.google.com/docs/models/gemini-3.8-live-extended-thinking).
 
+> **Decisión del propietario tras la prueba 10 (2026-11-25): búsqueda discreta.** Gemini responde
+> de inmediato con lo que sabe y solo busca cuando el operador se lo pide («busca…») o cuando
+> desconoce un dato reciente (por ejemplo, la última película de Nolan). No cita fuentes ni de
+> viva voz ni en pantalla. La línea de estado con sugerencias y fuentes queda desactivada
+> (Kconfig `VOX_SHOW_SEARCH_SOURCES=n`). El código se conserva por si se quiere activar. Las
+> secciones 1 y 4 describen esa opción; el riesgo de cumplimiento de la sección 4 aumenta al no
+> mostrarse nada.
+
 ## 1. Qué cambia
 
 - Gemini decide por sí mismo cuándo buscar en Google. La búsqueda se ejecuta **en los servidores de
@@ -25,12 +33,12 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
   ninguna llamada de herramienta.
 - Los modelos no cambian: `gemini-3.1-flash-live-preview` es el principal y `gemini-3.8-live` el
   alternativo. La documentación marca Google Search como **compatible en los dos**.
-- La personalidad **no cambia**: Gemini decide solo cuándo buscar. Una primera versión añadía
-  «busca ante hechos actuales y cita la fuente», pero el propietario notó VOX más lento en la
-  prueba 10 y se quitó el 2026-11-25.
-- La línea de estado del ojo muestra primero las **sugerencias de búsqueda** («GOOGLE: …») y después
-  las **fuentes** («FUENTE 1/3: AEMET.ES»). Rotan cada 3 s y se borran con la siguiente pregunta o
-  al cerrar.
+- La personalidad añade la regla de búsqueda discreta: responder de inmediato y buscar solo si se
+  le pide o si desconoce un dato reciente, sin mencionar fuentes. Una primera versión decía
+  «busca ante hechos actuales y cita la fuente», y el propietario notó VOX más lento.
+- Opcional (`VOX_SHOW_SEARCH_SOURCES`, **desactivado**): la línea de estado del ojo mostraría primero
+  las **sugerencias de búsqueda** («GOOGLE: …») y después las **fuentes** («FUENTE 1/3: AEMET.ES»),
+  rotando cada 3 s.
 - Mientras Gemini busca o razona, el reposo de 15 s queda **en suspenso** y el ojo se mantiene ámbar.
 - La palabra de despertar, el toque (abrir, interrumpir, cerrar), el semidúplex del audio, la
   ganancia, el volumen y el vigilante de modelo mudo funcionan igual que en 1.1.0.

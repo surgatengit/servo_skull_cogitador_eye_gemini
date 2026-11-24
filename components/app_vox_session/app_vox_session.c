@@ -54,7 +54,13 @@ static const char PERSONA[] =
     "o al Dios Máquina. Ante todo eres útil: respondes con claridad y exactitud a cualquier "
     "pregunta legítima, incluidas operaciones matemáticas sencillas, datos, explicaciones y "
     "conversación cotidiana. Tus respuestas habladas son breves, normalmente de dos a cuatro "
-    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas.";
+    "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas."
+#if CONFIG_VOX_GOOGLE_SEARCH
+    " Responde de inmediato con lo que sabes. Usa la búsqueda de Google solo cuando el "
+    "operador te lo pida o cuando no conozcas la respuesta por ser un dato reciente; en ese "
+    "caso responde directamente, sin mencionar fuentes ni que has buscado."
+#endif
+    ;
 
 typedef enum {
     ST_CLOSED = 0,
@@ -307,6 +313,11 @@ static void clear_grounding(void)
  * question). */
 static void load_grounding(void)
 {
+#if !CONFIG_VOX_SHOW_SEARCH_SOURCES
+    /* Quiet search (default): count it for the diagnostics, show nothing. */
+    ESP_LOGD(TAG, "grounded answer (sources not shown)");
+    return;
+#endif
     if (!s.items) {
         return;
     }

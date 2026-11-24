@@ -28,7 +28,7 @@ tap, a reconnect or close. While pending, the idle return does not run. If no mo
 output arrives for `VOX_RESPONSE_TIMEOUT_S` (30 s), the reply is abandoned and the session
 listens again, after which the normal idle countdown applies.
 
-Grounding (Kconfig `VOX_GOOGLE_SEARCH`): the status line shows the Search Suggestions
+Grounding display (Kconfig `VOX_SHOW_SEARCH_SOURCES`, off by default: quiet search): the status line shows the Search Suggestions
 ("GOOGLE: ...") then the sources ("FUENTE 1/3: RAE.ES"), formatted by the private
 `vox_status_text.c` for the eye's charset (24 characters), rotating every 3 s. They are cleared
 at the next question or on close and never stored. Errors take precedence on the line.
@@ -54,5 +54,5 @@ closes the conversation and re-arms local listening.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
 - Transcripts, search queries and source domains are logged only at DEBUG level.
-- The persona does not mention search: Gemini decides when to use the tool (an explicit
-  "search current facts" instruction made answers slower in test 10 and was removed).
+- Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only
+  when asked or for recent facts it does not know, never mentioning sources or that it searched.
