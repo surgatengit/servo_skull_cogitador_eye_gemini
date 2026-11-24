@@ -27,7 +27,7 @@ static const char *TAG = "gemini_live";
 #define GL_TX_CAPACITY         6144           /* prefix + base64(1600 samples) + suffix */
 #define GL_MAX_FRAME_SAMPLES   1600
 #define GL_HANDLE_CAPACITY     512
-#define GL_WS_BUFFER           16384
+#define GL_WS_BUFFER           4096           /* rx+tx in internal RAM; messages are reassembled */
 #define GL_WS_TASK_STACK       8192
 #define GL_WS_TASK_PRIO        10
 #define GL_WS_TASK_CORE        0
@@ -382,7 +382,8 @@ esp_err_t app_gemini_live_create(const app_gemini_live_config_t *config,
     gl->lock = xSemaphoreCreateMutex();
     gl->rx = heap_caps_malloc(GL_RX_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     gl->pcm = heap_caps_malloc(GL_PCM_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    gl->tx = heap_caps_malloc(GL_TX_CAPACITY, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    /* PSRAM: internal DMA RAM is reserved for the display path. */
+    gl->tx = heap_caps_malloc(GL_TX_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!gl->model || !gl->lock || !gl->rx || !gl->pcm || !gl->tx ||
             (config->fallback_model && !gl->fallback_model) ||
             (config->voice && !gl->voice) || (config->language && !gl->language) ||

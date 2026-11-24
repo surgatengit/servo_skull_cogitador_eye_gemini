@@ -141,10 +141,12 @@ static void playback_task(void *arg)
     }
 }
 
-static void *alloc_internal(size_t bytes)
+/* Work buffers live in PSRAM: esp_codec_dev copies through the I2S driver's own
+ * DMA buffers, and internal DMA RAM is reserved for the display path. */
+static void *alloc_work(size_t bytes)
 {
-    void *p = heap_caps_calloc(1, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    return p ? p : heap_caps_calloc(1, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    void *p = heap_caps_calloc(1, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : heap_caps_calloc(1, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
 static void free_buffers(void)
@@ -178,11 +180,11 @@ esp_err_t app_audio_start(const app_audio_config_t *config)
         s_audio.config.playback_tail_ms = 300;
     }
 
-    s_audio.capture_raw = alloc_internal(CAPTURE_FRAMES * BUS_CHANNELS * sizeof(int16_t));
-    s_audio.capture_mono = alloc_internal(CAPTURE_FRAMES * sizeof(float));
-    s_audio.mic_out = alloc_internal(APP_AUDIO_MIC_FRAME * sizeof(int16_t));
-    s_audio.play_in = alloc_internal(PLAY_IN_SAMPLES * sizeof(int16_t));
-    s_audio.play_out = alloc_internal(PLAY_OUT_FRAMES * BUS_CHANNELS * sizeof(int16_t));
+    s_audio.capture_raw = alloc_work(CAPTURE_FRAMES * BUS_CHANNELS * sizeof(int16_t));
+    s_audio.capture_mono = alloc_work(CAPTURE_FRAMES * sizeof(float));
+    s_audio.mic_out = alloc_work(APP_AUDIO_MIC_FRAME * sizeof(int16_t));
+    s_audio.play_in = alloc_work(PLAY_IN_SAMPLES * sizeof(int16_t));
+    s_audio.play_out = alloc_work(PLAY_OUT_FRAMES * BUS_CHANNELS * sizeof(int16_t));
     s_audio.ring = heap_caps_calloc(RING_SAMPLES, sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!s_audio.capture_raw || !s_audio.capture_mono || !s_audio.mic_out ||
             !s_audio.play_in || !s_audio.play_out || !s_audio.ring) {

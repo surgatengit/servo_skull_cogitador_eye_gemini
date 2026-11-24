@@ -94,6 +94,19 @@ Su código Ideas es 100000; sus datos en la NAND, el Wi-Fi y Vibe Mode se conser
 | Memoria | RAM interna libre 101 KB (mínimo 52 KB); PSRAM 29,8 MB libres de 31,6 MB |
 | Pantalla | `iris screenshot`: ojo cian en reposo y parpadeos. Una captura muestra un desgarro horizontal del iris en movimiento; queda por confirmar en la pantalla física |
 
+### Primera prueba de voz (2026-11-24)
+
+- La clave se provisionó por RPC (`{"api_key":true}`). No aparece ninguna cadena `AIza…` en los logs
+  del dispositivo, de `mosaico.py` ni del Gateway.
+- **Gemini Direct funciona de extremo a extremo con `gemini-3.8-live`:** `setupComplete` en unos 300 ms,
+  cuatro turnos completos ESCUCHANDO → PROCESANDO → HABLANDO → ESCUCHANDO, cierre y reapertura por toque.
+- Un corte de transporte (código 0) se recuperó solo con `sessionResumption` en 3 s.
+- **Fallo encontrado:** la RAM interna mínima bajó de 52 KB a **11,5 KB** con la sesión activa, y la
+  pantalla perdió fotogramas (289 × `spi transmit (queue) color failed` / `TE ticket … ESP_ERR_NO_MEM`).
+- **Corrección (pendiente de instalar con `iris app-update`):** TLS y búferes de Wi-Fi/LWIP en PSRAM
+  (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`, `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP`), búferes del WebSocket
+  de 16 a 4 KB, y búferes de audio y de envío en PSRAM. La tabla de particiones no cambia.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

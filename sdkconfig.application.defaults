@@ -3,3 +3,9 @@
 # CONFIG_ESP_IRIS_OTA is not set
 CONFIG_ESP_IRIS_USB_PRODUCT="ESP-Iris Mosaico servocraneo_gemini_direct"
 CONFIG_ESP_IRIS_HEALTH_TIMEOUT_MS=45000
+
+# VOX M-01: keep internal DMA-capable RAM for the CO5300 display while the
+# Gemini Live TLS/WebSocket session is active (first hardware test dropped the
+# internal heap to 11 KB and the panel SPI queue failed with ESP_ERR_NO_MEM).
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
