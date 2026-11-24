@@ -13,7 +13,7 @@ list(APPEND EXTRA_COMPONENT_DIRS
     "${MOSAICO_UTILS_ROOT}/mosaico-tools/components/esp_mosaico_gsp_bundle"
     "${MOSAICO_UTILS_ROOT}/mosaico-tools/components/esp_mosaico_gsp_iris")
 include("${MOSAICO_UTILS_ROOT}/mosaico-tools/cmake/mosaico_idf_project.cmake")
-project(servocraneo_gemini_direct VERSION 1.1.0)
+project(servocraneo_gemini_direct VERSION 1.2.0)
 # Normal applications update only through retained Vibe Mode and never install
 # their own bootloader. Mirror mosaico-tools' game wrapper: keep the immutable
 # base bootloader out of the default build; explicit bootloader/flash targets

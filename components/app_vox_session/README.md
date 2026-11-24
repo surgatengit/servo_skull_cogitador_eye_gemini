@@ -12,14 +12,26 @@ supplied by `main`. Depends on `app_audio`, `app_gemini_live`, `app_secrets` and
 | CLOSED | idle (cyan) | local only: "Hola ESP" (`app_wake`) | boot, tap to close, 15 s idle |
 | CONNECTING | processing (amber) | off (pre-roll after wake word) | tap or "Hola ESP" to open, link lost (auto-resume) |
 | LISTENING | listening (red) | on | `setupComplete`, end of VOX speech, tap during speech |
-| PROCESSING | processing (amber) | on | first input transcription |
+| PROCESSING | processing (amber) | on | first input transcription, non-audio model output (search, thinking), speech drained with the turn still open |
 | SPEAKING | speaking (green) | off | first model audio of a turn |
 | ERROR | error (violet) + status | off | no Wi-Fi, no key, repeated link failures |
 
 Taps: CLOSED → open; SPEAKING → interrupt (flush playback, drop the rest of
 the turn, listen again); any other state → close. Leaving SPEAKING needs
-`turnComplete` plus the playback ring drained (300 ms tail), or 8 s without audio.
-PROCESSING falls back to LISTENING after 15 s without a reply. Taps are logged.
+`turnComplete` plus the playback ring drained (300 ms tail); if the ring drains for 2 s
+while the turn is still open (e.g. a filler, then a Google search) the eye goes amber
+(PROCESSING) instead. Taps are logged.
+
+Pending reply (1.2.0): from the user's turn (first transcription) or any model output
+until `turnComplete` (`interactionStatus` not `IN_PROGRESS`), `interrupted`, an interrupting
+tap, a reconnect or close. While pending, the idle return does not run. If no model
+output arrives for `VOX_RESPONSE_TIMEOUT_S` (30 s), the reply is abandoned and the session
+listens again, after which the normal idle countdown applies.
+
+Grounding (Kconfig `VOX_GOOGLE_SEARCH`): the status line shows the Search Suggestions
+("GOOGLE: ...") then the sources ("FUENTE 1/3: RAE.ES"), formatted by the private
+`vox_status_text.c` for the eye's charset (24 characters), rotating every 3 s. They are cleared
+at the next question or on close and never stored. Errors take precedence on the line.
 
 Wake word (Kconfig `VOX_WAKE_WORD`): while CLOSED, mic frames go only to `app_wake`;
 no WebSocket exists and nothing leaves the device. A detection blinks the eye,
@@ -41,4 +53,6 @@ closes the conversation and re-arms local listening.
   fallback `gemini-3.8-live`.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
-- Transcripts are logged only at DEBUG level.
+- Transcripts, search queries and source domains are logged only at DEBUG level.
+- The persona asks Gemini to search for current or uncertain facts and to name the main source
+  (only when `VOX_GOOGLE_SEARCH` is enabled).

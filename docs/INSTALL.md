@@ -198,7 +198,30 @@ y el siguiente intento abre una sesión nueva.
   cierre con el segundo toque. Activación por «Hola ESP» correcta.
 - 0 errores de pantalla. El bloque DMA interno contiguo mínimo observado fue de 8 192 B (por encima
   de los 7 680 B por transacción; margen ajustado, vigilado por el diagnóstico).
-- **«Hola ESP» (1.1.0) queda validado en el hardware.**
+- **«Hola ESP» (1.1.0) queda validado en el hardware.** Etiqueta Git `v1.1.0` (versión estable).
+
+### Prueba 10 (pendiente de autorización): 1.2.0 con Google Search
+
+Rama `feat/google-search`; diseño en [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Instalación con
+`iris system-update`, como siempre. No cambian ni las particiones ni la clave.
+
+1. Arranque: `device-status` con `app_version=1.2.0` y `crash_count=0`. En los logs aparece
+   `VOX M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
+2. «Hola ESP» → `connected; setup sent (model gemini-3.1-flash-live-preview, google search)` →
+   `session ready`. **Si no llega `session ready`, el servidor rechaza el campo `tools`**: se anota y
+   se recompila con `VOX_GOOGLE_SEARCH=n`.
+3. Pregunta sin búsqueda («¿Cuánto es siete por ocho?»). Debe comportarse como en 1.1.0, sin línea
+   de fuentes.
+4. Pregunta con búsqueda («¿Qué tiempo hará mañana en Madrid?»):
+   - ámbar mientras busca y verde con voz, que menciona la fuente;
+   - en la línea de estado, «GOOGLE: …» y después «FUENTE 1/N: …», rotando cada 3 s;
+   - logs: `grounded answer: …`, `search{q=… grounded=…}` y `turn usage: … tool=…`.
+5. Pregunta larga con búsqueda: no debe volver al reposo mientras busca (`pending=1` en `diag`).
+   Tras terminar de hablar, a los 15 s vuelve al cian.
+6. Toque mientras habla una respuesta con búsqueda: se interrumpe y vuelve a rojo, como en la
+   prueba 9. Otro toque cierra.
+7. Memoria: `largest=` ≥ 8192 durante las respuestas con búsqueda y ningún `Display render failed`.
+8. Modelo alternativo (opcional): repetir el punto 4 con `gemini-3.8-live`.
 
 ## 3. Volver al firmware actual (restauración)
 

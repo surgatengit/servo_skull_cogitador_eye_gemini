@@ -24,6 +24,10 @@ typedef enum {
     APP_GL_EVT_GO_AWAY,            /**< Server will close soon; client resumes automatically. */
     APP_GL_EVT_DISCONNECTED,       /**< Link lost; automatic reconnect pending. */
     APP_GL_EVT_FAILED,             /**< Repeated failures; caller should disconnect. */
+    APP_GL_EVT_MODEL_ACTIVITY,     /**< Non-audio model output (text, thought, code, tool
+                                        call, generationComplete): the turn is in progress. */
+    APP_GL_EVT_GROUNDING,          /**< groundingMetadata received; sources updated
+                                        (see app_gemini_live_get_sources()). */
 } app_gemini_live_event_type_t;
 
 typedef struct {
@@ -32,6 +36,8 @@ typedef struct {
     size_t samples;
     const char *text;              /**< Transcripts; valid during the callback. */
     int close_code;                /**< RFC 6455 close code or HTTP handshake status. */
+    bool in_progress;              /**< TURN_COMPLETE only: interactionStatus IN_PROGRESS,
+                                        more output follows (fillers while searching). */
 } app_gemini_live_event_t;
 
 /** Runs on the WebSocket task. May block briefly (playback backpressure);
@@ -44,6 +50,7 @@ typedef struct {
     const char *voice;              /**< Prebuilt voice name, e.g. "Charon" (copied). */
     const char *language;           /**< BCP-47, e.g. "es-ES" (copied). */
     const char *system_instruction; /**< Persona (copied). */
+    bool google_search;             /**< Declare the native googleSearch tool in setup. */
     app_gemini_live_cb_t on_event;  /**< Required. */
     void *ctx;
 } app_gemini_live_config_t;
@@ -81,8 +88,24 @@ typedef struct {
     uint32_t rx_messages;          /**< complete server messages */
     uint32_t rx_audio_chunks;      /**< inlineData parts decoded */
     uint32_t rx_input_transcripts; /**< inputTranscription updates */
+    uint32_t rx_other_parts;       /**< non-audio modelTurn parts (text, thought, code) */
+    uint32_t rx_grounding;         /**< messages carrying groundingMetadata */
+    uint32_t search_queries;       /**< webSearchQueries reported by the server */
+    uint32_t tool_calls;           /**< toolCall messages (none expected: search is server side) */
 } app_gemini_live_stats_t;
 void app_gemini_live_get_stats(app_gemini_live_handle_t handle, app_gemini_live_stats_t *out);
+
+/** Grounding of the current answer, accumulated since the last
+ * app_gemini_live_clear_sources(). Both getters copy unique entries separated
+ * by '\n' into out (whole entries only, NUL-terminated) and return how many
+ * were copied. Any task.
+ * - sources: web domains of groundingChunks (lowercase, "www." stripped);
+ * - queries: webSearchQueries, i.e. the Google Search Suggestions (UTF-8). */
+size_t app_gemini_live_get_sources(app_gemini_live_handle_t handle, char *out, size_t cap);
+size_t app_gemini_live_get_queries(app_gemini_live_handle_t handle, char *out, size_t cap);
+
+/** Forget sources and queries (call at the start of each user turn). Any task. */
+void app_gemini_live_clear_sources(app_gemini_live_handle_t handle);
 
 /** Model currently used for setup (valid until the next connect). */
 const char *app_gemini_live_active_model(app_gemini_live_handle_t handle);

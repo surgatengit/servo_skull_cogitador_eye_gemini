@@ -1,6 +1,8 @@
 # VOX M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
 
-Última actualización: **2026-11-24**, al cierre de la sesión de desarrollo inicial.
+Última actualización: **2026-11-25**: rama `feat/google-search` (1.2.0) compilada, probada en PC
+y en GitHub, **pendiente de instalar** (prueba 10 de INSTALL.md). Google Search nativo:
+[GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Ampliaciones futuras: [ROADMAP.md](ROADMAP.md).
 Empieza por aquí en cualquier sesión nueva. El detalle está en [DESIGN.md](DESIGN.md)
 (requisitos y arquitectura) y en [INSTALL.md](INSTALL.md) (instalación, restauración, seguridad y
 el historial completo de las pruebas físicas).
@@ -14,7 +16,8 @@ Todo validado en el hardware (pruebas 1–9 de INSTALL.md).
 
 | Elemento | Valor |
 |---|---|
-| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada |
+| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada, etiqueta **`v1.1.0`** = versión estable |
+| En desarrollo | **1.2.0** en `feat/google-search`: Google Search nativo, espera durante búsquedas y razonamiento, fuentes en la línea de estado |
 | Ruta local | `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (repo Git propio, dentro del espacio de trabajo) |
 | Último commit validado | `35159d8` (main) |
 | Firmware en el dispositivo | 1.1.0, SHA `386d32ec304e…`, instalado con `iris system-update` |
@@ -83,6 +86,11 @@ python mosaico.py iris system-update --project projects/servocraneo_gemini_direc
 Kconfig (`components/app_vox_session/Kconfig`): `VOX_GEMINI_MODEL`, `VOX_GEMINI_FALLBACK_MODEL`,
 `VOX_WAKE_WORD`, `VOX_IDLE_TIMEOUT_S`=15, `VOX_PREROLL_MS`=2000, `VOX_SILENT_MODEL_VOICED_FRAMES`=250,
 `VOX_VOICED_PEAK_THRESHOLD`=1036 (≈ −30 dBFS), `VOX_MIC_GAIN_DB`=24, `VOX_SPEAKER_VOLUME`=70.
+Desde 1.2.0: `VOX_GOOGLE_SEARCH`=y y `VOX_RESPONSE_TIMEOUT_S`=30 (espera máxima sin salida del modelo
+mientras hay una respuesta pendiente; durante ese tiempo no corre el reposo).
+
+Pruebas en PC (MSVC) del análisis de `groundingMetadata` y del formato de la línea de estado:
+`powershell -File tools/host_tests/run.ps1`.
 
 Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 0x210000 (12 224 K),
 `model` 0xE00000 (1 M, `srmodels.bin`), `ui_apps` 0xF00000 (1 M). El paquete de System Update tiene
@@ -112,6 +120,12 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
 
 ## 6. Pendiente y siguientes pasos
 
+0. **1.2.0 / Google Search:** con autorización, instalar la rama `feat/google-search` y hacer la
+   prueba 10 (confirmar que el servidor acepta `tools:[{"googleSearch":{}}]`, las fuentes en pantalla
+   y `largest=` ≥ 8192). Si sale bien, fusionar en `main` (solo cuando lo pida el propietario) y
+   etiquetar `v1.2.0`. Cumplimiento de la presentación de fuentes en un dispositivo de voz: riesgo
+   abierto (GOOGLE_SEARCH.md §4).
+
 1. **Proponer al BSP** (`esp-mosaico-bsp`, fuera de este repo) evaluar `psram_dma_direct = true` para el
    CO5300: eliminaría la presión DMA de raíz.
 2. **AEC por software / full-duplex** (esp-sr AFE, formato «MR» con referencia de reproducción) para
@@ -130,3 +144,4 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
 2. `iris logs --snapshot` → `app_wake: listening for "Hola ESP"`, `diag st=0 … largest=` ≥ 8192,
    ningún `Display render failed`.
 3. Prueba de voz: «Hola ESP» → ámbar → rojo; pregunta → verde con voz; un toque interrumpe; otro cierra.
+4. (1.2.0) Pregunta de actualidad → ámbar mientras busca → verde con «GOOGLE: …» / «FUENTE …» abajo.

@@ -8,6 +8,8 @@ creada con la plantilla Hello World de `mosaico.py` y GSP 1.5.1.
 **Estado actual y cómo retomar: [docs/HANDOFF.md](docs/HANDOFF.md).**
 Diseño, requisitos y decisiones: [docs/DESIGN.md](docs/DESIGN.md).
 Instalación, restauración, auditoría de seguridad y pruebas físicas: [docs/INSTALL.md](docs/INSTALL.md).
+Google Search nativo (1.2.0: fuentes, cuotas, costes y pensamiento): [docs/GOOGLE_SEARCH.md](docs/GOOGLE_SEARCH.md).
+Ampliaciones futuras (cámara, Extended Thinking, base magnética): [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Componentes
 
@@ -15,7 +17,7 @@ Instalación, restauración, auditoría de seguridad y pruebas físicas: [docs/I
 |---|---|
 | [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores de estado, toque); también corre en el simulador |
 | [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación |
-| [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, reanudación) |
+| [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, reanudación, Google Search y grounding) |
 | [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
 | [`app_wake`](components/app_wake/README.md) | «Hola ESP» local (ESP-SR WakeNet10 `wn10_es_holaesp`), solo en reposo |
 | [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |
@@ -48,7 +50,8 @@ usan el bootloader retenido de Vibe Mode.
    nunca va en el código, los binarios ni GitHub.
 4. Decir **«Hola ESP»** o tocar la pantalla: ámbar mientras conecta, rojo escuchando, verde cuando
    VOX responde. Un toque mientras habla lo interrumpe; otro toque cierra. Vuelve al reposo (cian)
-   tras 15 s sin actividad.
+   tras 15 s sin actividad. Con Google Search (1.2.0), mientras Gemini busca el ojo sigue ámbar y la
+   línea inferior muestra la búsqueda («GOOGLE: …») y las fuentes («FUENTE 1/2: …»).
 
 `app-update` no sirve en este dispositivo (`recovery_required`); usa siempre `system-update`.
 
