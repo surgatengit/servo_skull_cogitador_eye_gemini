@@ -59,6 +59,7 @@ struct app_gemini_live {
     bool use_fallback;
     int failures;            /* connection attempts ended before setupComplete */
     bool got_setup;          /* setupComplete seen on the current connection */
+    int last_http_status;    /* handshake status of the latest failed attempt */
 
     char *rx;
     size_t rx_len;
@@ -268,10 +269,18 @@ static void on_data(struct app_gemini_live *gl, const esp_websocket_event_data_t
     gl->rx_overflow = false;
 }
 
+/* Called once per ended connection attempt (DISCONNECTED/CLOSED). A session that
+ * had reached setupComplete gets a fresh retry budget; later failed attempts count,
+ * so an unreachable server ends in FAILED instead of reconnecting forever. */
 static void note_failure(struct app_gemini_live *gl, int code)
 {
     if (gl->got_setup) {
-        return; /* a working session that dropped: plain reconnect */
+        gl->got_setup = false;
+        gl->failures = 0;
+        return;
+    }
+    if (gl->last_http_status) {
+        code = gl->last_http_status;
     }
     gl->failures++;
     if (gl->failures >= GL_FAILURES_TO_FALLBACK && !gl->use_fallback && gl->fallback_model) {
@@ -294,6 +303,7 @@ static void ws_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
         break;
     case WEBSOCKET_EVENT_CONNECTED: {
         gl->got_setup = false;
+        gl->last_http_status = 0;
         gl->rx_len = 0;
         char *setup = build_setup(gl);
         if (!setup) {
@@ -314,8 +324,8 @@ static void ws_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
         const int status = d->error_handle.esp_ws_handshake_status_code;
         ESP_LOGW(TAG, "error type %d, handshake HTTP %d, tls 0x%x", d->error_handle.error_type,
                  status, (unsigned)d->error_handle.esp_tls_last_esp_err);
-        if (status == 400 || status == 401 || status == 403 || status == 404) {
-            note_failure(gl, status);
+        if (status > 0) {
+            gl->last_http_status = status; /* counted when the attempt ends */
         }
         break;
     }
@@ -395,6 +405,8 @@ esp_err_t app_gemini_live_connect(app_gemini_live_handle_t gl, const char *api_k
     }
     gl->resume_handle[0] = '\0';  /* every tap opens a fresh conversation */
     gl->failures = 0;
+    gl->got_setup = false;
+    gl->last_http_status = 0;
     gl->use_fallback = false;
     gl->ready = false;
 

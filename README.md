@@ -6,6 +6,7 @@ sin Windows ni servicios intermedios. Aplicación nativa ESP-IDF (ESP32-S31)
 creada con la plantilla Hello World de `mosaico.py` y GSP 1.5.1.
 
 Diseño, requisitos y decisiones: [docs/DESIGN.md](docs/DESIGN.md).
+Instalación, restauración y auditoría de seguridad: [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Componentes
 

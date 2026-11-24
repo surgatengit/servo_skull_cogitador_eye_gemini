@@ -71,11 +71,15 @@ struct app_vox_eye {
     app_vox_eye_snapshot_t stats;
 };
 
-static void remember(struct app_vox_eye *eye, esp_gsp_err_t err)
+/* Record a setter error; returns true on success so callers cache only values
+ * the scene accepted (a rejected setter is retried on the next tick). */
+static bool remember(struct app_vox_eye *eye, esp_gsp_err_t err)
 {
     if (err != ESP_GSP_OK) {
         eye->stats.last_error = err;
+        return false;
     }
+    return true;
 }
 
 static uint32_t rng_next(struct app_vox_eye *eye)
@@ -155,16 +159,13 @@ static void apply_colors(struct app_vox_eye *eye, float glow_gain)
     const uint32_t glow = scale_rgb(base, glow_gain);
     const uint32_t ring = base;
     const uint32_t core = lighten_rgb(base, 0.35f);
-    if (glow != eye->last_glow) {
-        remember(eye, gsp_vox_glow_set_color_rgb888(eye->ui, glow));
+    if (glow != eye->last_glow && remember(eye, gsp_vox_glow_set_color_rgb888(eye->ui, glow))) {
         eye->last_glow = glow;
     }
-    if (ring != eye->last_ring) {
-        remember(eye, gsp_vox_iris_ring_set_color_rgb888(eye->ui, ring));
+    if (ring != eye->last_ring && remember(eye, gsp_vox_iris_ring_set_color_rgb888(eye->ui, ring))) {
         eye->last_ring = ring;
     }
-    if (core != eye->last_core) {
-        remember(eye, gsp_vox_iris_core_set_color_rgb888(eye->ui, core));
+    if (core != eye->last_core && remember(eye, gsp_vox_iris_core_set_color_rgb888(eye->ui, core))) {
         eye->last_core = core;
     }
 }
@@ -249,8 +250,8 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     }
     const int32_t ix = IRIS_HOME + (int32_t)lroundf(eye->gx);
     const int32_t iy = IRIS_HOME + (int32_t)lroundf(eye->gy);
-    if (ix != eye->last_iris_x || iy != eye->last_iris_y) {
-        remember(eye, gsp_vox_iris_set_position(eye->ui, ix, iy));
+    if ((ix != eye->last_iris_x || iy != eye->last_iris_y) &&
+            remember(eye, gsp_vox_iris_set_position(eye->ui, ix, iy))) {
         eye->last_iris_x = ix;
         eye->last_iris_y = iy;
     }
@@ -275,12 +276,14 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     pupil = pupil < PUPIL_MIN ? PUPIL_MIN : (pupil > PUPIL_MAX ? PUPIL_MAX : pupil);
     pupil &= ~1; /* even diameter keeps the pupil centred */
     if (pupil != eye->last_pupil) {
-        remember(eye, gsp_vox_pupil_set_w(eye->ui, pupil));
-        remember(eye, gsp_vox_pupil_set_h(eye->ui, pupil));
-        remember(eye, gsp_vox_pupil_set_radius(eye->ui, pupil / 2));
-        remember(eye, gsp_vox_pupil_set_position(eye->ui, IRIS_HALF - pupil / 2,
-                                                 IRIS_HALF - pupil / 2));
-        eye->last_pupil = pupil;
+        bool ok = remember(eye, gsp_vox_pupil_set_w(eye->ui, pupil));
+        ok = remember(eye, gsp_vox_pupil_set_h(eye->ui, pupil)) && ok;
+        ok = remember(eye, gsp_vox_pupil_set_radius(eye->ui, pupil / 2)) && ok;
+        ok = remember(eye, gsp_vox_pupil_set_position(eye->ui, IRIS_HALF - pupil / 2,
+                                                      IRIS_HALF - pupil / 2)) && ok;
+        if (ok) {
+            eye->last_pupil = pupil;
+        }
     }
 
     apply_colors(eye, glow_gain);
@@ -289,9 +292,11 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     step_blink(eye);
     const int32_t lid = (int32_t)lroundf(blink_closure(eye) * LID_TRAVEL);
     if (lid != eye->last_lid) {
-        remember(eye, gsp_vox_lid_top_set_y(eye->ui, LID_TOP_OPEN + lid));
-        remember(eye, gsp_vox_lid_bottom_set_y(eye->ui, LID_BOTTOM_OPEN - lid));
-        eye->last_lid = lid;
+        bool ok = remember(eye, gsp_vox_lid_top_set_y(eye->ui, LID_TOP_OPEN + lid));
+        ok = remember(eye, gsp_vox_lid_bottom_set_y(eye->ui, LID_BOTTOM_OPEN - lid)) && ok;
+        if (ok) {
+            eye->last_lid = lid;
+        }
     }
 }
 

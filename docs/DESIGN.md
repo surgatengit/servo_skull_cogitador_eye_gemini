@@ -184,8 +184,10 @@ Mitigación: clave exclusiva, restringida y revocable desde Google Cloud.
 
 ## 5. Riesgos
 
-- **Tamaño frente a `vibe_mode` (0x1C0000):** se mide en cada etapa. Si se acerca al límite, se
-  consultará el mecanismo de mosaico-tools; no se tocan particiones.
+Instalación, datos conservados, restauración y auditoría de la clave: [INSTALL.md](INSTALL.md).
+
+- **Tamaño frente a `vibe_mode` (0x1C0000):** la app ya ocupa 2,04 MB y ESP-IDF solo avisa
+  (va en `main_app`, de 13 MiB). System Update comprueba el tamaño contra `main_app`; no se tocan particiones.
 - **Bootloader:** excluido de `ALL` en `CMakeLists.txt` (patrón oficial de los juegos de mosaico-tools).
   Las apps normales usan el bootloader retenido.
 - **La ruta del espacio de trabajo tiene espacios:** se compila con `IDF_CONFIGDEP_ENABLE=0`.

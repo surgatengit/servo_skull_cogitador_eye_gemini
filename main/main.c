@@ -94,9 +94,19 @@ static esp_err_t start_eye(void)
 void app_main(void)
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_iris_boot_probe());
-    ESP_ERROR_CHECK(nvs_flash_init());
+    /* The app-owned "nvs" partition may hold data from a previously installed
+     * Idea. Never erase it: report the fault and keep Recovery reachable. */
+    const esp_err_t nvs_err = nvs_flash_init();
     /* Recovery must remain reachable even when anything below fails. */
     iris_ota_support_start();
+    if (nvs_err != ESP_OK) {
+        ESP_LOGE(TAG, "app NVS unavailable (%s); not erasing it", esp_err_to_name(nvs_err));
+        if (start_eye() == ESP_OK) {
+            app_vox_eye_set_state(application.eye, APP_VOX_EYE_ERROR);
+            (void)app_vox_eye_set_status(application.eye, "ERROR DE NVS");
+        }
+        return;
+    }
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(app_secrets_init(secrets_changed, NULL));
     ESP_ERROR_CHECK_WITHOUT_ABORT(app_wifi_start(wifi_changed, NULL));
@@ -109,6 +119,15 @@ void app_main(void)
             .ui = application.eye,
         },
     };
-    ESP_ERROR_CHECK_WITHOUT_ABORT(app_vox_session_start(&session));
+    const esp_err_t err = app_vox_session_start(&session);
+    if (err != ESP_OK) {
+        /* Keep the eye and Recovery alive; show the fault instead of a silent idle eye. */
+        ESP_LOGE(TAG, "session unavailable (%s)", esp_err_to_name(err));
+        if (eye_ready) {
+            app_vox_eye_set_state(application.eye, APP_VOX_EYE_ERROR);
+            (void)app_vox_eye_set_status(application.eye, "ERROR INTERNO");
+        }
+        return;
+    }
     ESP_LOGI(TAG, "VOX M-01 GEMINI DIRECT started");
 }

@@ -25,6 +25,8 @@ static const char *TAG = "vox_session";
 #define SESSION_TICK_MS         50
 #define PROCESSING_TIMEOUT_US   (15 * 1000 * 1000)
 #define SPEAKING_STALL_US       (8 * 1000 * 1000)
+#define CONNECTING_TIMEOUT_US   (45 * 1000 * 1000)
+#define SQUELCH_MAX_US          (10 * 1000 * 1000)
 #define PLAY_TIMEOUT_MS         1500
 
 static const char PERSONA[] =
@@ -50,6 +52,7 @@ typedef enum {
     ERR_NO_WIFI,
     ERR_WIFI_UNCONFIGURED,
     ERR_NO_KEY,
+    ERR_KEY_REJECTED,
     ERR_LINK,
     ERR_INTERNAL,
 } session_error_t;
@@ -80,6 +83,8 @@ static struct {
     int wifi_state;
     int64_t processing_since;
     int64_t speaking_since;
+    int64_t connecting_since;
+    int64_t squelch_since;
     bool turn_done;
     uint32_t mic_forward;   /* atomic: forward mic frames to Gemini */
     uint32_t speaking;      /* atomic: first audio of the turn already queued */
@@ -116,6 +121,7 @@ static const char *status_for(session_error_t err)
     case ERR_NO_WIFI:           return "SIN WI-FI";
     case ERR_WIFI_UNCONFIGURED: return "CONFIGURA WI-FI EN VIBE";
     case ERR_NO_KEY:            return "SIN CLAVE";
+    case ERR_KEY_REJECTED:      return "CLAVE RECHAZADA";
     case ERR_LINK:              return "ERROR DE CONEXIÓN";
     case ERR_INTERNAL:          return "ERROR INTERNO";
     case ERR_NONE:
@@ -140,8 +146,13 @@ static void enter(session_state_t st)
         s.error = ERR_NONE;
     }
     set_mic(st == ST_LISTENING || st == ST_PROCESSING);
+    if (st == ST_CONNECTING) {
+        s.connecting_since = esp_timer_get_time();
+    }
     if (st == ST_PROCESSING) {
         s.processing_since = esp_timer_get_time();
+        /* The user started a new turn: never keep dropping replies to it. */
+        __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
     }
     if (st == ST_SPEAKING) {
         s.speaking_since = esp_timer_get_time();
@@ -211,13 +222,13 @@ static void on_tap(void)
     case ST_SPEAKING:
         /* Interrupt VOX without closing: drop queued speech and listen again. */
         __atomic_store_n(&s.squelch, 1U, __ATOMIC_RELEASE);
+        s.squelch_since = esp_timer_get_time();
         app_audio_flush_playback();
         enter(ST_LISTENING);
         break;
     case ST_ERROR:
-        if (s.error == ERR_LINK) {
-            (void)app_gemini_live_disconnect(s.gl);
-        }
+        /* Acknowledge the error; disconnect is a no-op when no link exists. */
+        (void)app_gemini_live_disconnect(s.gl);
         enter(ST_CLOSED);
         break;
     case ST_CONNECTING:
@@ -235,6 +246,7 @@ static void on_gl(int type, int code)
     switch ((app_gemini_live_event_type_t)type) {
     case APP_GL_EVT_READY:
         if (open) {
+            __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
             enter(ST_LISTENING);
         }
         break;
@@ -265,7 +277,8 @@ static void on_gl(int type, int code)
     case APP_GL_EVT_FAILED:
         ESP_LOGE(TAG, "Gemini Live unavailable (code %d)", code);
         (void)app_gemini_live_disconnect(s.gl);
-        fail(code == 400 || code == 401 || code == 403 ? ERR_NO_KEY : ERR_LINK);
+        app_audio_flush_playback();
+        fail(code == 401 || code == 403 ? ERR_KEY_REJECTED : ERR_LINK);
         break;
     default:
         break;
@@ -275,6 +288,18 @@ static void on_gl(int type, int code)
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
+    if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE) && now - s.squelch_since > SQUELCH_MAX_US) {
+        /* The interrupted turn never reported completion: stop discarding audio. */
+        __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
+    }
+    if (s.state == ST_CONNECTING && now - s.connecting_since > CONNECTING_TIMEOUT_US) {
+        ESP_LOGW(TAG, "connection not ready after %d s; giving up",
+                 (int)(CONNECTING_TIMEOUT_US / 1000000));
+        (void)app_gemini_live_disconnect(s.gl);
+        app_audio_flush_playback();
+        fail(ERR_LINK);
+        return;
+    }
     if (s.state == ST_SPEAKING) {
         const bool playing = app_audio_is_playing();
         if (!playing && (s.turn_done || now - s.speaking_since > SPEAKING_STALL_US)) {
@@ -305,7 +330,8 @@ static void session_task(void *arg)
                 }
                 break;
             case EV_SECRETS:
-                if (s.state == ST_ERROR && s.error == ERR_NO_KEY && app_secrets_has_api_key()) {
+                if (s.state == ST_ERROR && (s.error == ERR_NO_KEY || s.error == ERR_KEY_REJECTED) &&
+                        app_secrets_has_api_key()) {
                     enter(ST_CLOSED);
                 }
                 break;
