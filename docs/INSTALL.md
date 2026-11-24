@@ -125,6 +125,15 @@ Conclusiones:
   Bajar la ganancia de 30 dB.
 - Hay cortes de transporte esporádicos (código 0) que se recuperan con `sessionResumption`.
 
+### Prueba 5 (2026-11-24): versión con 3.1 por defecto, 24 dB y vigilante
+
+- Instalación por `system-update`: validada, sana, firmware `d5c4c7b3…`; la clave y el override se conservan.
+- **4 turnos completos** con `gemini-3.1-flash-live-preview`, 0 errores de pantalla, sin bloqueos.
+- Micrófono a 24 dB: voz con picos de unos **−12 dBFS** (antes −3/0 dBFS). Los 0 dBFS restantes son
+  eco del altavoz mientras VOX habla, con el micrófono silenciado (no se envía).
+- 2 × `websocket_client: Could not lock ws-client within 20 timeout`: el `audioStreamEnd` coincide con la
+  llegada del audio del modelo y se descarta. Inofensivo; pendiente de mejora menor.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
