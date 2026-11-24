@@ -22,6 +22,7 @@ static const char *TAG = "app_wake";
 #define WAKE_TASK_CORE       1
 #define WAKE_BUFFER_BYTES    (16000 * 2) /* 1 s of 16 kHz PCM */
 #define WAKE_POLL_MS         100
+#define WAKE_SETTLE_MS       1500
 
 /* Singleton. The wake task owns the detector instance and creates/destroys it
  * according to `desired`, so no other task touches WakeNet state. `desired` and
@@ -79,9 +80,19 @@ static bool create_detector(void)
 static void wake_task(void *arg)
 {
     (void)arg;
+    uint32_t settle_ms = 0;
     for (;;) {
         const bool desired = __atomic_load_n(&s_wake.desired, __ATOMIC_ACQUIRE) != 0;
         if (desired && !s_wake.detector) {
+            /* Let a just-closed TLS/WebSocket session finish releasing internal RAM
+             * before the detector allocates, to limit heap fragmentation (the panel
+             * needs contiguous internal DMA bounce buffers on every transfer). */
+            if (settle_ms < WAKE_SETTLE_MS) {
+                settle_ms += WAKE_POLL_MS;
+                vTaskDelay(pdMS_TO_TICKS(WAKE_POLL_MS));
+                continue;
+            }
+            settle_ms = 0;
             if (!create_detector()) {
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 continue;
@@ -89,6 +100,9 @@ static void wake_task(void *arg)
         } else if (!desired && s_wake.detector) {
             destroy_detector();
             ESP_LOGI(TAG, "local listening paused");
+        }
+        if (!desired) {
+            settle_ms = 0;
         }
         if (!s_wake.detector) {
             vTaskDelay(pdMS_TO_TICKS(WAKE_POLL_MS));

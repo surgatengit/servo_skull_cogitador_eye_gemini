@@ -377,21 +377,34 @@ static void on_gl(int type, int code)
  * silent microphone, failing sends and a silent server apart. */
 static void log_diagnostics(int64_t now)
 {
-    if (s.state == ST_CLOSED || s.state == ST_ERROR || now - s.last_diag_us < DIAG_PERIOD_US) {
+    const bool idle = s.state == ST_CLOSED || s.state == ST_ERROR;
+    if (now - s.last_diag_us < (idle ? 2 * DIAG_PERIOD_US : DIAG_PERIOD_US)) {
         return;
     }
     s.last_diag_us = now;
+    /* The panel needs contiguous internal DMA bounce buffers on every transfer:
+     * report the largest such block next to the free total. */
+    const uint32_t dma_caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA;
+    const size_t int_free = heap_caps_get_free_size(dma_caps);
+    const size_t int_largest = heap_caps_get_largest_free_block(dma_caps);
+    if (idle) {
+        ESP_LOGI(TAG, "diag st=%d wake=%d heap{int_dma_free=%u largest=%u}", (int)s.state,
+                 (int)__atomic_load_n(&s.wake_feed, __ATOMIC_ACQUIRE), (unsigned)int_free,
+                 (unsigned)int_largest);
+        return;
+    }
     app_audio_mic_stats_t mic;
     app_audio_get_mic_stats(&mic);
     app_gemini_live_stats_t gl;
     app_gemini_live_get_stats(s.gl, &gl);
     const float peak_dbfs = mic.peak ? 20.0f * log10f((float)mic.peak / 32768.0f) : -96.0f;
     ESP_LOGI(TAG, "diag st=%d mic{frames=%u peak=%.0f dBFS slot=%u on=%d} "
-             "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u}",
+             "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u} "
+             "heap{int_dma_free=%u largest=%u}",
              (int)s.state, (unsigned)mic.frames, (double)peak_dbfs, (unsigned)mic.slot,
              (int)mic.enabled, (unsigned)gl.tx_messages, (unsigned)gl.tx_failures,
              (unsigned)gl.tx_not_ready, (unsigned)gl.rx_messages, (unsigned)gl.rx_audio_chunks,
-             (unsigned)gl.rx_input_transcripts);
+             (unsigned)gl.rx_input_transcripts, (unsigned)int_free, (unsigned)int_largest);
 }
 
 /* A model that completes setup but never transcribes (gemini-3.8-live in the

@@ -141,6 +141,24 @@ Conclusiones:
 - 2 × `websocket_client: Could not lock ws-client within 20 timeout`: el `audioStreamEnd` coincide con la
   llegada del audio del modelo y se descarta. Inofensivo; pendiente de mejora menor.
 
+### Prueba 6 (2026-11-24): versión 1.1.0 con «Hola ESP»
+
+- System Update con **cuatro componentes**, aceptado por Vibe Mode
+  (`data image and readback verified: label=model`). El modelo se carga (`Successfully load srmodels`)
+  y escucha con 512 muestras por trama a 16 kHz.
+- **2 activaciones por voz** correctas; sesión lista en ~0,6 s; pre-roll de 560–600 ms; 6 turnos.
+  El regreso al reposo a los 30 s funcionó; el cierre por toque quedó registrado
+  (`tap in state 2`) y la escucha local se rearmó.
+- **Fallo:** 29 fotogramas fallidos (`spi transmit (queue) color failed`, `ESP_ERR_NO_MEM`) solo
+  entre los 149 y 161 s, con el detector recreado justo tras cerrar la primera sesión.
+  Causa: el BSP fija `psram_dma_direct = false` y transacciones de 7 680 B (8 líneas) con cola de 10,
+  así que cada trozo pide un búfer intermedio de RAM interna DMA (`spicommon_dma_setup_priv_buffer`).
+  Con la RAM troceada tras la sesión no hay bloques contiguos.
+- **Mitigación en la app (pendiente de instalar):** brillo cuantizado (8 niveles, ≤10 Hz), espera
+  de 1,5 s antes de crear el detector y diagnóstico del bloque interno DMA contiguo más grande.
+  **Recomendación aguas arriba:** que los responsables del BSP evalúen `psram_dma_direct = true`
+  para el CO5300 (elimina los búferes intermedios a cambio de algo de velocidad).
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

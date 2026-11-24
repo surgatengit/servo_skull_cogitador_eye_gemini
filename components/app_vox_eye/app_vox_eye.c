@@ -19,6 +19,8 @@
 #define LID_TOP_OPEN           (-250)
 #define LID_BOTTOM_OPEN        480
 #define LID_TRAVEL             250
+#define GLOW_LEVELS            8.0f     /* quantized glow brightness steps */
+#define GLOW_MIN_TICKS         3        /* >= ~100 ms between glow repaints */
 
 /* Blink phases in ticks (~66 ms close, ~33 ms hold, ~100 ms open). */
 #define BLINK_CLOSE_TICKS      2
@@ -68,6 +70,7 @@ struct app_vox_eye {
     /* Last values pushed to the scene, to avoid redundant setters. */
     int32_t last_iris_x, last_iris_y, last_pupil, last_lid;
     uint32_t last_glow, last_ring, last_core;
+    uint32_t glow_ticks;   /* ticks since the last glow repaint */
     float phase;
     app_vox_eye_snapshot_t stats;
 };
@@ -157,12 +160,22 @@ static void schedule_blink(struct app_vox_eye *eye)
 static void apply_colors(struct app_vox_eye *eye, float glow_gain)
 {
     const uint32_t base = STYLES[eye->drawn_state].color;
-    const uint32_t glow = scale_rgb(base, glow_gain);
+    /* The glow ring is a 400x400 px repaint. Quantize the pulse to 8 levels and at
+     * most GLOW_MIN_TICKS apart: every panel transfer needs internal DMA bounce
+     * buffers (the BSP disables PSRAM-direct DMA), so traffic must stay low. */
+    const float quantized = (float)lroundf(glow_gain * GLOW_LEVELS) / GLOW_LEVELS;
+    const uint32_t glow = scale_rgb(base, quantized);
+    const bool state_changed = base != eye->last_ring;
+    if (++eye->glow_ticks < GLOW_MIN_TICKS && !state_changed) {
+        glow_gain = -1.0f; /* skip the glow this tick */
+    }
+    if (glow_gain >= 0.0f && glow != eye->last_glow &&
+            remember(eye, gsp_vox_glow_set_color_rgb888(eye->ui, glow))) {
+        eye->last_glow = glow;
+        eye->glow_ticks = 0;
+    }
     const uint32_t ring = base;
     const uint32_t core = lighten_rgb(base, 0.35f);
-    if (glow != eye->last_glow && remember(eye, gsp_vox_glow_set_color_rgb888(eye->ui, glow))) {
-        eye->last_glow = glow;
-    }
     if (ring != eye->last_ring && remember(eye, gsp_vox_iris_ring_set_color_rgb888(eye->ui, ring))) {
         eye->last_ring = ring;
     }
