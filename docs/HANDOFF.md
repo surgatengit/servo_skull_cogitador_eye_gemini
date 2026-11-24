@@ -16,11 +16,11 @@ Todo validado en el hardware (pruebas 1–9 de INSTALL.md).
 
 | Elemento | Valor |
 |---|---|
-| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada, etiqueta **`v1.1.0`** = versión estable |
-| En desarrollo | **1.2.0** en `feat/google-search`: Google Search nativo, espera durante búsquedas y razonamiento, fuentes en la línea de estado |
+| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada (**1.2.0**, etiqueta `v1.2.0`); `v1.1.0` = estable anterior |
+| 1.2.0 | Google Search opcional y **desactivado** (`VOX_GOOGLE_SEARCH=n`, cuota del plan gratuito), espera mientras el modelo piensa, motivo de cierre en los logs |
 | Ruta local | `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (repo Git propio, dentro del espacio de trabajo) |
 | Último commit validado | `35159d8` (main) |
-| Firmware en el dispositivo | 1.1.0, SHA `386d32ec304e…`, instalado con `iris system-update` |
+| Firmware en el dispositivo | 1.2.0, SHA `42ff0083c79c…`, instalado con `iris system-update` (2026-11-25), validado por voz |
 | Dispositivo | ESP-Mosaico, Device ID `4553502d4952495301001c2904d11390`, USB (COM7 control / COM6 datos) |
 | Modelo Gemini | `gemini-3.1-flash-live-preview` (principal) / `gemini-3.8-live` (alternativo) |
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
