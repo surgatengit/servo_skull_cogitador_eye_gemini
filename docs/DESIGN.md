@@ -198,13 +198,95 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
 ## 6. Plan incremental
 
 1. ✅ Entorno, compilación y simulador.
-2. Wi-Fi, secretos y RPC de provisión, cliente Gemini Live, audio y ojo (compilado y en el simulador).
+2. ✅ Wi-Fi, secretos y RPC de provisión, cliente Gemini Live, audio y ojo (compilado y en el simulador).
 3. Primera prueba física (requiere autorización para instalar): Wi-Fi, clave, `setupComplete`,
-   voz bidireccional y captura del ojo.
+   voz bidireccional y captura del ojo. Se hace **sin** activación por voz.
 4. Ajustes de ganancia, latencia y VAD; pruebas de larga duración y reanudación.
-5. Fase 2: AEC por software y conversación full-duplex.
+5. **Activación por voz «Hola ESP»** (sección 7).
+6. AEC por software y conversación full-duplex.
 
-## 7. Cómo compilar
+## 7. Fase siguiente: activación por voz «Hola ESP» (requisito, no implementado)
+
+Estado: **requisito aprobado y verificado; se implementará después de la primera prueba física.**
+Se aplaza a propósito: cambia la tabla de particiones, añade dependencias y aumenta el
+tamaño, la PSRAM y la CPU. Eso invalidaría la línea base de la primera prueba de Gemini Direct.
+
+### 7.1 Requisitos
+
+| Requisito | Decisión |
+|---|---|
+| Palabra de activación | «Hola ESP», modelo preentrenado de Espressif `wn10_es_holaesp` (ESP-SR, WakeNet10). Sin palabra personalizada |
+| Procesamiento | 100 % local en el ESP-Mosaico. En reposo **no hay WebSocket abierto** y no sale ningún audio a Gemini ni a la red |
+| Tras la activación | Se abre la sesión Gemini Live; Gemini gestiona las pausas y los turnos (VAD del servidor), como con el toque |
+| Vuelta al reposo | Tras **30 s de inactividad** se cierra la sesión y se vuelve a la escucha local |
+| Alternativa | Se conserva el despertar por toque; el toque sigue abriendo, cerrando e interrumpiendo como hoy |
+| Ojo | En reposo, cian (con escucha local activa); al detectar «Hola ESP», parpadeo de confirmación y ámbar mientras conecta |
+
+«Inactividad» significa que no llega ninguna transcripción del usuario ni audio del modelo,
+no hay ningún toque y no hay reproducción en curso. Cada uno de esos eventos reinicia el plazo de 30 s.
+El plazo no corre mientras VOX habla.
+
+### 7.2 Compatibilidad verificada (2026-11-24)
+
+| Aspecto | Resultado | Evidencia |
+|---|---|---|
+| Existencia del modelo | Sí: `model/wakenet_model/wn10_es_holaesp`, Kconfig `CONFIG_SR_WN_WN10_ES_HOLAESP` | Paquete oficial `espressif/esp-sr` 2.6.2 (registro de componentes) |
+| Soporte ESP32-S31 | Biblioteca precompilada `lib/esp32s31` (`libwakenet.a`, AFE). ESP-SR lo declara «soporte preliminar» desde 2026-05 | README y árbol de esp-sr 2.6.2 |
+| ESP-IDF 6.2 (`7b9cc1ac79f8`) | **Compila**: copia temporal del ejemplo `voice_wake_cmd` del BSP con esp-sr 2.6.2 y `wn10_es_holaesp`, objetivo esp32s31, `BUILD_EXIT=0` | Compilación local de prueba (directorio temporal ya eliminado) |
+| Versión mínima | Usar esp-sr **≥ 2.6.2** (2.6.1 corrige núcleos de WakeNet10; 2.5.0 corrige Kconfig con IDF ≥ 6.1) | CHANGELOG de esp-sr |
+| Tamaño del modelo | Dos variantes cuantizadas a 8 bits (p1 375 KB, p2 418 KB); el empaquetador incluye **417,76 KB** | Salida de `movemodel` en la compilación de prueba |
+| RAM y CPU en S31 | WakeNet10 cuantizado, 3 canales: **16 KB de RAM interna, 523 KB de PSRAM, 6,4 ms por trama de 32 ms, 19,9 % de un núcleo**. Con 1 canal se espera menos; no hay cifra publicada | Benchmark oficial de ESP-SR para esp32s31 |
+| Entrada | PCM 16 kHz, mono, 16 bit (trama de 32 ms = 512 muestras). Ya la producimos: `app_audio` entrega 16 kHz mono en tramas de 640 | Documentación de WakeNet |
+| Tamaño de la app | El ejemplo completo (WakeNet + MultiNet + TTS) ocupa 1,25 MB; el aumento estimado para VOX solo con WakeNet es de +0,3–0,6 MB (por medir). `main_app` tiene margen de sobra | Compilación de prueba |
+
+### 7.3 Almacenamiento: cambio de particiones necesario
+
+esp-sr carga los modelos por mapeo de memoria de una partición llamada **`model`**
+(`esp_srmodel_init("model")`). Su CMake genera `srmodels.bin` y solo lo graba con `idf.py flash`,
+que este proyecto no usa. Plan:
+
+1. Añadir `model` (data, spiffs) de **1 MiB** dentro de la región de aplicación, sin tocar el
+   prefijo inmutable ni `nvs`:
+
+   | Partición | Actual | Propuesta |
+   |---|---|---|
+   | main_app `0x210000` | 13 248 K | 12 224 K (`0xBF0000`) |
+   | model | — | `0xE00000`, 1 M |
+   | ui_apps `0xF00000` | 1 M | 1 M (sin cambio) |
+
+2. Registrar `srmodels.bin` como imagen de datos del paquete de System Update
+   (`MOSAICO_SYSTEM_UPDATE_DATA_LABELS` con `IMAGE`/`TARGET`, igual que `ui_apps`).
+   `prepare_system_update.py` admite particiones de datos en la región de aplicación
+   que no sean NVS.
+3. Como la tabla cambia, esa instalación **será otro `iris system-update`** (nunca `app-update`).
+   Descartado: cargar el modelo desde la NAND o una tarjeta SD (`MODEL_IN_SDCARD` /
+   `ESP_SR_EXTERNAL_MODEL_PATH`). Exige montar el sistema de archivos de Vibe Mode
+   desde la aplicación y no aporta nada para 418 KB.
+
+### 7.4 Arquitectura prevista
+
+- Nuevo componente `app_wake` (WakeNet10 sin AFE: un solo micrófono, sin referencia AEC).
+  Reagrupa tramas de 640 a 512 muestras en un ring propio y detecta en su tarea, en el núcleo 1
+  con prioridad inferior a la de audio. La tarea de captura nunca se bloquea.
+- `app_vox_session`: en CERRADA, el micrófono va **solo** a `app_wake`. Con una detección se llama
+  a `open_conversation()` (las mismas comprobaciones de Wi-Fi y clave). WakeNet queda en pausa mientras
+  la conversación está abierta, para evitar disparos con el altavoz y ahorrar CPU.
+- Pre-roll: se guardan los ~2 s posteriores a «Hola ESP» y se envían a Gemini al recibir
+  `setupComplete`, para no perder la pregunta mientras conecta.
+- Temporizador de inactividad de 30 s en la sesión (Kconfig `VOX_IDLE_TIMEOUT_S`), con un evento
+  de cierre limpio. Kconfig `VOX_WAKE_WORD` para activarlo o desactivarlo.
+
+### 7.5 Riesgos y validación pendiente
+
+- Soporte preliminar de ESP32-S31 en ESP-SR: validar la tasa de aciertos y de falsos disparos en el
+  hardware (por ejemplo, 20 activaciones a 1 y 3 m y 1 h de ruido doméstico).
+- PSRAM: VOX ya reserva ≈ 832 KB (RX WebSocket 256 KB, PCM 192 KB, ring 384 KB) más la UI.
+  Medir con `iris memory` en la primera prueba física antes de sumar unos 0,5 MB para WakeNet.
+- CPU: unos 20 % de un núcleo en el peor caso publicado. Solo funciona en reposo,
+  así que no compite con la conversación.
+- Marcas: «Hola ESP» es un modelo de Espressif; revisar su aviso de uso antes de cualquier uso comercial.
+
+## 8. Cómo compilar
 
 El repositorio debe estar en `esp-mosaico-vibe/projects/servocraneo_gemini_direct/`
 (usa `../../submodule/esp-mosaico-utils` y `../../submodule/esp-mosaico-bsp`).
