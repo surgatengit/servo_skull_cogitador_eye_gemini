@@ -33,3 +33,7 @@ always verified), `espressif/cjson` (PSRAM allocator) and Mbed TLS base64.
 - `on_event` runs on the WebSocket task (core 0, prio 10). It may block briefly
   (playback backpressure) but must never call `disconnect()` or `destroy()`.
 - Each `connect()` starts a fresh conversation (no resumption handle carried over).
+- `app_gemini_live_swap_model()` (session task, while disconnected) makes the other model the
+  starting model for later connections until reboot; used by the session's silent-model watchdog.
+- `app_gemini_live_get_stats()` exposes lock-free counters (frames sent/failed, messages,
+  audio chunks, input transcriptions) for diagnostics.

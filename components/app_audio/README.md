@@ -21,7 +21,7 @@ SPK  ring 24 kHz (8 s, PSRAM) → 47-tap polyphase FIR ×2 (11 kHz) → 48 kHz �
   lock-free and callable from any task.
 - Cross-task state uses GCC `__atomic` builtins; the ring is single-producer /
   single-consumer. Buffers are instance-owned; no large stack arrays.
-- Defaults: mic gain 30 dB, volume 70 (Kconfig `VOX_MIC_GAIN_DB`, `VOX_SPEAKER_VOLUME`).
+- Defaults: mic gain 24 dB (30 dB saturated in hardware tests), volume 70 (Kconfig `VOX_MIC_GAIN_DB`, `VOX_SPEAKER_VOLUME`).
 
 ## Limits
 

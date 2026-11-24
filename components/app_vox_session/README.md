@@ -28,6 +28,10 @@ PROCESSING falls back to LISTENING after 15 s without a reply.
 - `app_vox_session_tap()`, `_wifi_changed()`, `_secrets_changed()` only enqueue
   events (non-blocking, any task including GSP callbacks).
 - UI sink callbacks run on the session task.
+- Silent-model watchdog: after `VOX_SILENT_MODEL_VOICED_FRAMES` voiced uplink frames on a
+  connection with no transcription or audio back, reconnect once per boot with the other
+  model (`app_gemini_live_swap_model`). Defaults: primary `gemini-3.1-flash-live-preview`,
+  fallback `gemini-3.8-live`.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
 - Transcripts are logged only at DEBUG level.

@@ -2,16 +2,35 @@ menu "VOX M-01 Gemini Direct"
 
     config VOX_GEMINI_MODEL
         string "Primary Gemini Live model"
-        default "gemini-3.8-live"
+        default "gemini-3.1-flash-live-preview"
         help
             Model used for new conversations. A provisioned override
             (RPC set_model) takes precedence without recompiling.
+            gemini-3.8-live accepted setup but never transcribed or answered
+            over a raw WebSocket in the 2026-11-24 hardware tests.
 
     config VOX_GEMINI_FALLBACK_MODEL
         string "Fallback Gemini Live model"
-        default "gemini-3.1-flash-live-preview"
+        default "gemini-3.8-live"
         help
-            Used automatically after repeated setup failures with the primary.
+            Used after repeated setup failures, or once per boot when the
+            active model stays silent while the user speaks.
+
+    config VOX_SILENT_MODEL_VOICED_FRAMES
+        int "Voiced 40 ms frames without transcription before swapping model"
+        range 25 1000
+        default 100
+        help
+            Watchdog for a model that completes setup but never answers: after
+            this many loud uplink frames (default 4 s of speech) with no input
+            transcription on the connection, reconnect with the other model.
+
+    config VOX_VOICED_PEAK_THRESHOLD
+        int "Uplink frame peak counted as voiced (0..32767)"
+        range 100 32767
+        default 1036
+        help
+            1036 is about -30 dBFS; the room noise floor measured about -42 dBFS.
 
     config VOX_GEMINI_VOICE
         string "Prebuilt voice"
@@ -29,6 +48,9 @@ menu "VOX M-01 Gemini Direct"
     config VOX_MIC_GAIN_DB
         int "Microphone gain (dB)"
         range 0 42
-        default 30
+        default 24
+        help
+            30 dB saturated (0 dBFS peaks) with normal speech at 20-30 cm and
+            with speaker echo in the first hardware tests.
 
 endmenu

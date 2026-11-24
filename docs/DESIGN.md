@@ -11,8 +11,8 @@ intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Liv
 
 | Requisito | Decisión |
 |---|---|
-| Modelo principal | `gemini-3.8-live` |
-| Modelo alternativo | `gemini-3.1-flash-live-preview`, configurable sin recompilar |
+| Modelo principal | `gemini-3.1-flash-live-preview` (cambio aprobado el 2026-11-24 tras las pruebas físicas: `gemini-3.8-live` completa el `setup` pero no transcribe ni responde por WebSocket directo) |
+| Modelo alternativo | `gemini-3.8-live`, configurable sin recompilar (RPC `set_model`) |
 | Turnos | Micrófono continuo; Gemini detecta las pausas (VAD automático del servidor) |
 | Eco (v1) | Micrófono silenciado mientras el altavoz reproduce; interrupción táctil |
 | Duración | Sin límite artificial (no hay grabación de 8 s); sesión continua con reanudación |
@@ -108,6 +108,10 @@ y emite toques. Cada componente guarda su estado en un contexto privado y expone
 - `goAway` o cierre → reconexión con el último *handle* de reanudación y backoff.
 - El modelo alternativo se usa automáticamente si el principal falla durante el `setup`
   y se puede fijar por RPC.
+- **Vigilante de modelo mudo** (en `app_vox_session`): si en una conexión salen al menos
+  `VOX_SILENT_MODEL_VOICED_FRAMES` tramas con voz (100 = 4 s; pico ≥ `VOX_VOICED_PEAK_THRESHOLD`,
+  ≈ −30 dBFS) y no llega ninguna transcripción ni audio, la sesión reconecta **una vez por arranque**
+  con el otro modelo (`app_gemini_live_swap_model`).
 
 ### 3.3 `app_audio`
 
@@ -199,9 +203,10 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
 
 1. ✅ Entorno, compilación y simulador.
 2. ✅ Wi-Fi, secretos y RPC de provisión, cliente Gemini Live, audio y ojo (compilado y en el simulador).
-3. Primera prueba física (requiere autorización para instalar): Wi-Fi, clave, `setupComplete`,
-   voz bidireccional y captura del ojo. Se hace **sin** activación por voz.
-4. Ajustes de ganancia, latencia y VAD; pruebas de larga duración y reanudación.
+3. ✅ Primera prueba física (2026-11-24): VOX conversa con Gemini Live directamente por Wi-Fi.
+   Se corrigieron la RAM interna de la pantalla y el modelo; detalles en [INSTALL.md](INSTALL.md).
+4. Ajustes: ganancia del micrófono de 30 a 24 dB (saturaba), vigilante de modelo mudo,
+   y después latencia, VAD, pruebas de larga duración y reanudación.
 5. **Activación por voz «Hola ESP»** (sección 7).
 6. AEC por software y conversación full-duplex.
 

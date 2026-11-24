@@ -56,7 +56,8 @@ struct app_gemini_live {
     SemaphoreHandle_t lock;
     esp_websocket_client_handle_t client;
     volatile bool ready;
-    bool use_fallback;
+    bool use_fallback;       /* model of the current connection */
+    bool prefer_fallback;    /* starting model for new connections (sticky per boot) */
     int failures;            /* connection attempts ended before setupComplete */
     bool got_setup;          /* setupComplete seen on the current connection */
     int last_http_status;    /* handshake status of the latest failed attempt */
@@ -412,7 +413,7 @@ esp_err_t app_gemini_live_connect(app_gemini_live_handle_t gl, const char *api_k
     gl->failures = 0;
     gl->got_setup = false;
     gl->last_http_status = 0;
-    gl->use_fallback = false;
+    gl->use_fallback = gl->prefer_fallback && gl->fallback_model;
     gl->ready = false;
 
     char *uri = heap_caps_calloc(1, GL_URI_CAPACITY, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -556,6 +557,20 @@ esp_err_t app_gemini_live_send_audio_stream_end(app_gemini_live_handle_t gl)
 bool app_gemini_live_is_ready(app_gemini_live_handle_t gl)
 {
     return gl && gl->ready;
+}
+
+esp_err_t app_gemini_live_swap_model(app_gemini_live_handle_t gl)
+{
+    if (!gl || !gl->fallback_model) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    if (gl->client) {
+        return ESP_ERR_INVALID_STATE; /* takes effect on the next connect */
+    }
+    gl->prefer_fallback = !gl->use_fallback;
+    ESP_LOGW(TAG, "next conversations use %s",
+             gl->prefer_fallback ? gl->fallback_model : gl->model);
+    return ESP_OK;
 }
 
 esp_err_t app_gemini_live_destroy(app_gemini_live_handle_t *handle)

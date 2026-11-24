@@ -186,7 +186,7 @@ esp_err_t app_audio_start(const app_audio_config_t *config)
     ESP_RETURN_ON_FALSE(!s_audio.started, ESP_ERR_INVALID_STATE, TAG, "already started");
     s_audio.config = *config;
     if (s_audio.config.mic_gain_db <= 0.0f) {
-        s_audio.config.mic_gain_db = 30.0f;
+        s_audio.config.mic_gain_db = 24.0f;
     }
     if (s_audio.config.volume <= 0 || s_audio.config.volume > 100) {
         s_audio.config.volume = 70;

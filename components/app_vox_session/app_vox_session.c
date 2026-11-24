@@ -89,6 +89,11 @@ static struct {
     int64_t squelch_since;
     int64_t last_diag_us;
     bool turn_done;
+    uint32_t voiced_frames; /* atomic: loud uplink frames sent (capture task) */
+    uint32_t voiced_base;   /* silent-model watchdog baselines, set at READY */
+    uint32_t transcripts_base;
+    uint32_t audio_base;
+    bool model_swapped;     /* the watchdog swaps at most once per boot */
     uint32_t mic_forward;   /* atomic: forward mic frames to Gemini */
     uint32_t speaking;      /* atomic: first audio of the turn already queued */
     uint32_t squelch;       /* atomic: drop audio of an interrupted turn */
@@ -249,6 +254,11 @@ static void on_gl(int type, int code)
     switch ((app_gemini_live_event_type_t)type) {
     case APP_GL_EVT_READY:
         if (open) {
+            app_gemini_live_stats_t stats;
+            app_gemini_live_get_stats(s.gl, &stats);
+            s.voiced_base = __atomic_load_n(&s.voiced_frames, __ATOMIC_ACQUIRE);
+            s.transcripts_base = stats.rx_input_transcripts;
+            s.audio_base = stats.rx_audio_chunks;
             __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
             enter(ST_LISTENING);
         }
@@ -309,10 +319,46 @@ static void log_diagnostics(int64_t now)
              (unsigned)gl.rx_input_transcripts);
 }
 
+/* A model that completes setup but never transcribes (gemini-3.8-live in the
+ * 2026-11-24 tests) defeats the setup-failure fallback. If the user has clearly
+ * spoken on this connection and no transcription arrived, reconnect once with the
+ * other configured model. Returns true when the conversation was reopened. */
+static bool check_silent_model(void)
+{
+    if (s.model_swapped || (s.state != ST_LISTENING && s.state != ST_PROCESSING)) {
+        return false;
+    }
+    const uint32_t voiced = __atomic_load_n(&s.voiced_frames, __ATOMIC_ACQUIRE) - s.voiced_base;
+    if (voiced < (uint32_t)CONFIG_VOX_SILENT_MODEL_VOICED_FRAMES) {
+        return false;
+    }
+    app_gemini_live_stats_t stats;
+    app_gemini_live_get_stats(s.gl, &stats);
+    if (stats.rx_input_transcripts != s.transcripts_base || stats.rx_audio_chunks != s.audio_base) {
+        return false; /* the model is listening or answering */
+    }
+    s.model_swapped = true;
+    ESP_LOGW(TAG, "model %s silent after %u voiced frames; switching model",
+             app_gemini_live_active_model(s.gl), (unsigned)voiced);
+    set_mic(false);
+    (void)app_gemini_live_disconnect(s.gl);
+    app_audio_flush_playback();
+    if (app_gemini_live_swap_model(s.gl) != ESP_OK) {
+        fail(ERR_LINK);
+        return true;
+    }
+    s.state = ST_CLOSED;
+    open_conversation();
+    return true;
+}
+
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
     log_diagnostics(now);
+    if (check_silent_model()) {
+        return;
+    }
     if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE) && now - s.squelch_since > SQUELCH_MAX_US) {
         /* The interrupted turn never reported completion: stop discarding audio. */
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
@@ -408,8 +454,18 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
 static void on_mic(const int16_t *pcm, size_t samples, void *ctx)
 {
     (void)ctx;
-    if (__atomic_load_n(&s.mic_forward, __ATOMIC_ACQUIRE)) {
-        (void)app_gemini_live_send_audio(s.gl, pcm, samples);
+    if (!__atomic_load_n(&s.mic_forward, __ATOMIC_ACQUIRE)) {
+        return;
+    }
+    if (app_gemini_live_send_audio(s.gl, pcm, samples) == ESP_OK) {
+        int peak = 0;
+        for (size_t i = 0; i < samples; ++i) {
+            const int v = pcm[i] < 0 ? -(int)pcm[i] : pcm[i];
+            peak = v > peak ? v : peak;
+        }
+        if (peak >= CONFIG_VOX_VOICED_PEAK_THRESHOLD) {
+            __atomic_add_fetch(&s.voiced_frames, 1U, __ATOMIC_RELEASE);
+        }
     }
 }
 

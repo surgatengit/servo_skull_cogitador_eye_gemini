@@ -68,6 +68,11 @@ esp_err_t app_gemini_live_send_audio_stream_end(app_gemini_live_handle_t handle)
 
 bool app_gemini_live_is_ready(app_gemini_live_handle_t handle);
 
+/** Make the other configured model the starting model of later connections
+ * (sticky until reboot). Call while disconnected; ESP_ERR_NOT_SUPPORTED without
+ * a fallback model. Session task only. */
+esp_err_t app_gemini_live_swap_model(app_gemini_live_handle_t handle);
+
 /** Cumulative counters since create (diagnostics, any task, lock-free). */
 typedef struct {
     uint32_t tx_messages;          /**< text frames sent (setup excluded) */
