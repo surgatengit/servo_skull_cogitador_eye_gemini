@@ -332,6 +332,13 @@ static void ws_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
         if (status > 0) {
             gl->last_http_status = status; /* counted when the attempt ends */
         }
+        if (status == 409 && gl->resume_handle[0]) {
+            /* 409 Conflict: the server still holds the session we tried to resume
+             * (seen in the Google AI Studio error chart after fast reconnects).
+             * Start a fresh session on the next attempt instead of colliding again. */
+            gl->resume_handle[0] = '\0';
+            ESP_LOGW(TAG, "resume rejected (409); next attempt opens a fresh session");
+        }
         break;
     }
     case WEBSOCKET_EVENT_DISCONNECTED:

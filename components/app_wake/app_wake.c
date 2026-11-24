@@ -23,6 +23,10 @@ static const char *TAG = "app_wake";
 #define WAKE_BUFFER_BYTES    (16000 * 2) /* 1 s of 16 kHz PCM */
 #define WAKE_POLL_MS         100
 #define WAKE_SETTLE_MS       1500
+#define WAKE_RETRY_MS        3000
+/* CO5300 panel transaction (8 lines x 480 px x 2 B = 7680 B) rounded up to the
+ * allocator granularity; see docs/INSTALL.md "Prueba 6". */
+#define WAKE_MIN_DISPLAY_DMA_BLOCK 8192
 
 /* Singleton. The wake task owns the detector instance and creates/destroys it
  * according to `desired`, so no other task touches WakeNet state. `desired` and
@@ -70,6 +74,16 @@ static bool create_detector(void)
         destroy_detector();
         return false;
     }
+    /* The panel needs a contiguous internal DMA bounce buffer per 7680-byte
+     * transfer. If the detector left no such block, give it back: a frozen eye is
+     * worse than a wake word that becomes available a few seconds later. */
+    const size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    if (largest < WAKE_MIN_DISPLAY_DMA_BLOCK) {
+        ESP_LOGW(TAG, "largest internal DMA block %u B < %u B after create; retrying later",
+                 (unsigned)largest, (unsigned)WAKE_MIN_DISPLAY_DMA_BLOCK);
+        destroy_detector();
+        return false;
+    }
     xStreamBufferReset(s_wake.stream);
     __atomic_store_n(&s_wake.listening, 1U, __ATOMIC_RELEASE);
     ESP_LOGI(TAG, "listening for \"Hola ESP\" (%s, %d samples/chunk, %d Hz)", s_wake.model_name,
@@ -94,7 +108,7 @@ static void wake_task(void *arg)
             }
             settle_ms = 0;
             if (!create_detector()) {
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                vTaskDelay(pdMS_TO_TICKS(WAKE_RETRY_MS));
                 continue;
             }
         } else if (!desired && s_wake.detector) {

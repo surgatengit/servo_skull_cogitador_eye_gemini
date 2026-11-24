@@ -19,10 +19,10 @@ menu "VOX M-01 Gemini Direct"
     config VOX_SILENT_MODEL_VOICED_FRAMES
         int "Voiced 40 ms frames without transcription before swapping model"
         range 25 1000
-        default 100
+        default 250
         help
             Watchdog for a model that completes setup but never answers: after
-            this many loud uplink frames (default 4 s of speech) with no input
+            this many loud uplink frames (default 10 s of speech) with no input
             transcription on the connection, reconnect with the other model.
 
     config VOX_VOICED_PEAK_THRESHOLD

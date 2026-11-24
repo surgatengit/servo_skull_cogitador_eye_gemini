@@ -9,6 +9,12 @@ CONFIG_ESP_IRIS_HEALTH_TIMEOUT_MS=45000
 # internal heap to 11 KB and the panel SPI queue failed with ESP_ERR_NO_MEM).
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+# The BSP keeps psram_dma_direct off, so every 7680-byte panel transaction takes
+# an internal DMA bounce buffer. Keep plain malloc() >4 KB in PSRAM and reserve a
+# larger internal pool for explicit DMA/internal requests (2026-11-24 wake test:
+# largest internal DMA block fell to 5.9 KB and the eye froze).
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
 
 # VOX M-01 wake word: only "Hola ESP" (WakeNet10, Spanish) is packed into the
 # "model" partition; no speech-command (MultiNet) models.

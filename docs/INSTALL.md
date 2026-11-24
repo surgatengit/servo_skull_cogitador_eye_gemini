@@ -159,6 +159,28 @@ Conclusiones:
   **Recomendación aguas arriba:** que los responsables del BSP evalúen `psram_dma_direct = true`
   para el CO5300 (elimina los búferes intermedios a cambio de algo de velocidad).
 
+### Prueba 7 (2026-11-24): 15 s, brillo cuantizado y diagnóstico de memoria
+
+| Momento | RAM DMA interna libre | Bloque contiguo mayor | Pantalla |
+|---|---|---|---|
+| Arranque, reposo con detector | 39 KB | 8 192 B | bien (al límite) |
+| Conversación (detector destruido) | 27,5 KB | 8–12 KB | bien |
+| Reposo tras una sesión, detector recreado | 40 KB | **5 888 B** | **congelada** (49 fallos) |
+
+- Cada transacción del panel (7 680 B) necesita un bloque interno DMA contiguo; el detector
+  recreado tras la sesión lo impide. El usuario lo vio así: «al parar con dos toques se queda la
+  animación bloqueada».
+- La vuelta a reposo a los 15 s funcionó. **El vigilante de modelo mudo saltó en falso** (100 tramas,
+  4 s de voz antes de la primera transcripción) y cambió a `gemini-3.8-live`, que **sí respondió**
+  esta vez (también se ve en el panel de Google AI Studio).
+- Errores de la API en Google AI Studio: todos `409 Conflict`, coincidiendo con reconexiones rápidas
+  con *handle* de reanudación mientras el servidor aún mantenía la sesión anterior.
+
+Correcciones (pendientes de instalar): `SPIRAM_MALLOC_ALWAYSINTERNAL` 16 → 4 KB y
+`SPIRAM_MALLOC_RESERVE_INTERNAL` 32 → 64 KB; el detector se devuelve y reintenta cada 3 s si deja el
+bloque DMA mayor por debajo de 8 KB; vigilante a 250 tramas (10 s); ante un 409 se descarta el *handle*
+y el siguiente intento abre una sesión nueva.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
