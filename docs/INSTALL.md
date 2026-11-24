@@ -181,6 +181,17 @@ Correcciones (pendientes de instalar): `SPIRAM_MALLOC_ALWAYSINTERNAL` 16 → 4 K
 bloque DMA mayor por debajo de 8 KB; vigilante a 250 tramas (10 s); ante un 409 se descarta el *handle*
 y el siguiente intento abre una sesión nueva.
 
+### Prueba 8 (2026-11-24): reserva DMA de 64 KB y malloc > 4 KB en PSRAM
+
+- **0 errores de pantalla** en 4 activaciones por «Hola ESP», cierres con toques y vueltas a reposo.
+- Bloque DMA interno contiguo mayor: **12 800 B** en reposo con detector (antes 8 192 → 5 888 B tras una
+  sesión) y 11–12 KB en conversación. La salvaguarda del detector no llegó a activarse.
+- Vuelta a reposo a los 15 s correcta; ningún falso cambio de modelo con el umbral de 250 tramas.
+- Carrera detectada en los registros de toques: tras interrumpir, el estado volvía a HABLANDO en ~10 ms
+  (un fragmento de audio que estaba esperando hueco en el búfer de reproducción) y hacía falta un
+  segundo toque. Corregido después: si el turno se interrumpió mientras ese fragmento esperaba, se vacía
+  el búfer y no se anuncia un turno nuevo.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

@@ -514,7 +514,9 @@ static void session_task(void *arg)
             case EV_AUDIO_START:
                 /* No audioStreamEnd here: the server already closed the user's turn,
                  * and the send collided with the incoming audio (ws-client lock). */
-                if (s.state == ST_LISTENING || s.state == ST_PROCESSING) {
+                /* Stale start from a turn the user just interrupted: ignore it. */
+                if ((s.state == ST_LISTENING || s.state == ST_PROCESSING) &&
+                        !__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE)) {
                     enter(ST_SPEAKING);
                 }
                 break;
@@ -544,6 +546,12 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
             return;
         }
         (void)app_audio_play(event->pcm, event->samples, PLAY_TIMEOUT_MS);
+        /* A tap may interrupt while this chunk waited for ring space: drop what it
+         * queued and never report it as the start of a new turn. */
+        if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE)) {
+            app_audio_flush_playback();
+            return;
+        }
         if (!__atomic_exchange_n(&s.speaking, 1U, __ATOMIC_ACQ_REL)) {
             post(EV_AUDIO_START, 0, 0);
         }
