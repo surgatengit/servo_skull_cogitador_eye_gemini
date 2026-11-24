@@ -51,6 +51,9 @@ static struct {
     uint32_t mic_enabled;
     int64_t last_audio_us;
     uint32_t level;
+    uint32_t mic_frames;      /* diagnostics */
+    uint32_t mic_peak;
+    uint32_t mic_slot;
 } s_audio;
 
 static esp_err_t codec_err(int ret, const char *what)
@@ -84,6 +87,18 @@ static void capture_task(void *arg)
         }
         const size_t n = audio_fir_decimate(&s_audio.decimator, s_audio.capture_mono,
                                             CAPTURE_FRAMES, s_audio.mic_out);
+        /* Diagnostics: frame counter and running peak (cleared by the reader). */
+        uint32_t peak = 0;
+        for (size_t i = 0; i < n; ++i) {
+            const uint32_t v = (uint32_t)abs(s_audio.mic_out[i]);
+            peak = v > peak ? v : peak;
+        }
+        __atomic_add_fetch(&s_audio.mic_frames, 1U, __ATOMIC_RELAXED);
+        uint32_t prev = __atomic_load_n(&s_audio.mic_peak, __ATOMIC_RELAXED);
+        while (peak > prev && !__atomic_compare_exchange_n(&s_audio.mic_peak, &prev, peak, true,
+                                                           __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        }
+        __atomic_store_n(&s_audio.mic_slot, (uint32_t)slot, __ATOMIC_RELAXED);
         if (__atomic_load_n(&s_audio.mic_enabled, __ATOMIC_ACQUIRE) && n > 0) {
             s_audio.config.on_mic(s_audio.mic_out, n, s_audio.config.ctx);
         }
@@ -295,4 +310,15 @@ bool app_audio_is_playing(void)
 uint8_t app_audio_output_level(void)
 {
     return (uint8_t)__atomic_load_n(&s_audio.level, __ATOMIC_RELAXED);
+}
+
+void app_audio_get_mic_stats(app_audio_mic_stats_t *out)
+{
+    if (!out) {
+        return;
+    }
+    out->frames = __atomic_load_n(&s_audio.mic_frames, __ATOMIC_RELAXED);
+    out->peak = __atomic_exchange_n(&s_audio.mic_peak, 0U, __ATOMIC_RELAXED);
+    out->slot = __atomic_load_n(&s_audio.mic_slot, __ATOMIC_RELAXED);
+    out->enabled = __atomic_load_n(&s_audio.mic_enabled, __ATOMIC_RELAXED) != 0;
 }

@@ -60,6 +60,7 @@ struct app_gemini_live {
     int failures;            /* connection attempts ended before setupComplete */
     bool got_setup;          /* setupComplete seen on the current connection */
     int last_http_status;    /* handshake status of the latest failed attempt */
+    app_gemini_live_stats_t stats; /* diagnostics; updated with __atomic builtins */
 
     char *rx;
     size_t rx_len;
@@ -156,6 +157,7 @@ static void handle_server_content(struct app_gemini_live *gl, const cJSON *conte
     const cJSON *input = cJSON_GetObjectItemCaseSensitive(content, "inputTranscription");
     const cJSON *input_text = cJSON_GetObjectItemCaseSensitive(input, "text");
     if (cJSON_IsString(input_text) && input_text->valuestring[0]) {
+        __atomic_add_fetch(&gl->stats.rx_input_transcripts, 1U, __ATOMIC_RELAXED);
         const app_gemini_live_event_t ev = { .type = APP_GL_EVT_INPUT_TRANSCRIPT,
                                              .text = input_text->valuestring };
         gl->on_event(&ev, gl->ctx);
@@ -183,6 +185,7 @@ static void handle_server_content(struct app_gemini_live *gl, const cJSON *conte
             ESP_LOGW(TAG, "audio chunk rejected (base64 %u bytes)", (unsigned)len);
             continue;
         }
+        __atomic_add_fetch(&gl->stats.rx_audio_chunks, 1U, __ATOMIC_RELAXED);
         const app_gemini_live_event_t ev = {
             .type = APP_GL_EVT_AUDIO,
             .pcm = (const int16_t *)gl->pcm,
@@ -197,6 +200,7 @@ static void handle_server_content(struct app_gemini_live *gl, const cJSON *conte
 
 static void handle_message(struct app_gemini_live *gl, esp_websocket_client_handle_t client)
 {
+    __atomic_add_fetch(&gl->stats.rx_messages, 1U, __ATOMIC_RELAXED);
     cJSON *root = cJSON_ParseWithLength(gl->rx, gl->rx_len);
     if (!root) {
         ESP_LOGW(TAG, "unparseable server message (%u bytes)", (unsigned)gl->rx_len);
@@ -490,7 +494,27 @@ static esp_err_t send_locked(struct app_gemini_live *gl, const char *text, size_
     }
     const int sent = esp_websocket_client_send_text(gl->client, text, (int)len,
                                                     pdMS_TO_TICKS(GL_SEND_TIMEOUT_MS));
-    return sent < 0 ? ESP_FAIL : ESP_OK;
+    if (sent < 0) {
+        if (__atomic_add_fetch(&gl->stats.tx_failures, 1U, __ATOMIC_RELAXED) == 1U) {
+            ESP_LOGW(TAG, "first send failure (%u bytes)", (unsigned)len);
+        }
+        return ESP_FAIL;
+    }
+    __atomic_add_fetch(&gl->stats.tx_messages, 1U, __ATOMIC_RELAXED);
+    return ESP_OK;
+}
+
+void app_gemini_live_get_stats(app_gemini_live_handle_t gl, app_gemini_live_stats_t *out)
+{
+    if (!gl || !out) {
+        return;
+    }
+    out->tx_messages = __atomic_load_n(&gl->stats.tx_messages, __ATOMIC_RELAXED);
+    out->tx_failures = __atomic_load_n(&gl->stats.tx_failures, __ATOMIC_RELAXED);
+    out->tx_not_ready = __atomic_load_n(&gl->stats.tx_not_ready, __ATOMIC_RELAXED);
+    out->rx_messages = __atomic_load_n(&gl->stats.rx_messages, __ATOMIC_RELAXED);
+    out->rx_audio_chunks = __atomic_load_n(&gl->stats.rx_audio_chunks, __ATOMIC_RELAXED);
+    out->rx_input_transcripts = __atomic_load_n(&gl->stats.rx_input_transcripts, __ATOMIC_RELAXED);
 }
 
 esp_err_t app_gemini_live_send_audio(app_gemini_live_handle_t gl, const int16_t *pcm,
@@ -500,6 +524,7 @@ esp_err_t app_gemini_live_send_audio(app_gemini_live_handle_t gl, const int16_t 
         return ESP_ERR_INVALID_ARG;
     }
     if (!gl->ready) {
+        __atomic_add_fetch(&gl->stats.tx_not_ready, 1U, __ATOMIC_RELAXED);
         return ESP_ERR_INVALID_STATE;
     }
     xSemaphoreTake(gl->lock, portMAX_DELAY);

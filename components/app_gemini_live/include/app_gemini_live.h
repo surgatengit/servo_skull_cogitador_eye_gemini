@@ -68,6 +68,17 @@ esp_err_t app_gemini_live_send_audio_stream_end(app_gemini_live_handle_t handle)
 
 bool app_gemini_live_is_ready(app_gemini_live_handle_t handle);
 
+/** Cumulative counters since create (diagnostics, any task, lock-free). */
+typedef struct {
+    uint32_t tx_messages;          /**< text frames sent (setup excluded) */
+    uint32_t tx_failures;          /**< send_text errors/timeouts */
+    uint32_t tx_not_ready;         /**< audio frames dropped before setupComplete */
+    uint32_t rx_messages;          /**< complete server messages */
+    uint32_t rx_audio_chunks;      /**< inlineData parts decoded */
+    uint32_t rx_input_transcripts; /**< inputTranscription updates */
+} app_gemini_live_stats_t;
+void app_gemini_live_get_stats(app_gemini_live_handle_t handle, app_gemini_live_stats_t *out);
+
 /** Model currently used for setup (valid until the next connect). */
 const char *app_gemini_live_active_model(app_gemini_live_handle_t handle);
 

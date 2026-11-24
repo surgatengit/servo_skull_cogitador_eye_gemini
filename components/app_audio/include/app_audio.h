@@ -47,6 +47,16 @@ bool app_audio_is_playing(void);
 /** Smoothed output loudness 0..100, lock-free (for the eye). */
 uint8_t app_audio_output_level(void);
 
+/** Capture diagnostics. `peak` is the largest |sample| of the 16 kHz uplink since
+ * the previous call (reading clears it). Any task, lock-free. */
+typedef struct {
+    uint32_t frames;   /**< 40 ms frames captured since start */
+    uint32_t peak;     /**< 0..32768 */
+    uint32_t slot;     /**< I2S slot used (0 left, 1 right) */
+    bool enabled;      /**< uplink gate */
+} app_audio_mic_stats_t;
+void app_audio_get_mic_stats(app_audio_mic_stats_t *out);
+
 #ifdef __cplusplus
 }
 #endif

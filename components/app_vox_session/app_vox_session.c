@@ -2,6 +2,7 @@
 
 #include "app_vox_session.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "app_audio.h"
@@ -27,6 +28,7 @@ static const char *TAG = "vox_session";
 #define SPEAKING_STALL_US       (8 * 1000 * 1000)
 #define CONNECTING_TIMEOUT_US   (45 * 1000 * 1000)
 #define SQUELCH_MAX_US          (10 * 1000 * 1000)
+#define DIAG_PERIOD_US          (5 * 1000 * 1000)
 #define PLAY_TIMEOUT_MS         1500
 
 static const char PERSONA[] =
@@ -85,6 +87,7 @@ static struct {
     int64_t speaking_since;
     int64_t connecting_since;
     int64_t squelch_since;
+    int64_t last_diag_us;
     bool turn_done;
     uint32_t mic_forward;   /* atomic: forward mic frames to Gemini */
     uint32_t speaking;      /* atomic: first audio of the turn already queued */
@@ -285,9 +288,31 @@ static void on_gl(int type, int code)
     }
 }
 
+/* One line every DIAG_PERIOD_US while a conversation is open: enough to tell a
+ * silent microphone, failing sends and a silent server apart. */
+static void log_diagnostics(int64_t now)
+{
+    if (s.state == ST_CLOSED || s.state == ST_ERROR || now - s.last_diag_us < DIAG_PERIOD_US) {
+        return;
+    }
+    s.last_diag_us = now;
+    app_audio_mic_stats_t mic;
+    app_audio_get_mic_stats(&mic);
+    app_gemini_live_stats_t gl;
+    app_gemini_live_get_stats(s.gl, &gl);
+    const float peak_dbfs = mic.peak ? 20.0f * log10f((float)mic.peak / 32768.0f) : -96.0f;
+    ESP_LOGI(TAG, "diag st=%d mic{frames=%u peak=%.0f dBFS slot=%u on=%d} "
+             "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u}",
+             (int)s.state, (unsigned)mic.frames, (double)peak_dbfs, (unsigned)mic.slot,
+             (int)mic.enabled, (unsigned)gl.tx_messages, (unsigned)gl.tx_failures,
+             (unsigned)gl.tx_not_ready, (unsigned)gl.rx_messages, (unsigned)gl.rx_audio_chunks,
+             (unsigned)gl.rx_input_transcripts);
+}
+
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
+    log_diagnostics(now);
     if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE) && now - s.squelch_since > SQUELCH_MAX_US) {
         /* The interrupted turn never reported completion: stop discarding audio. */
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
