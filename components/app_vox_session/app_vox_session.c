@@ -8,7 +8,9 @@
 #include "app_audio.h"
 #include "app_gemini_live.h"
 #include "app_secrets.h"
+#include "app_wake.h"
 #include "app_wifi.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -30,6 +32,8 @@ static const char *TAG = "vox_session";
 #define SQUELCH_MAX_US          (10 * 1000 * 1000)
 #define DIAG_PERIOD_US          (5 * 1000 * 1000)
 #define PLAY_TIMEOUT_MS         1500
+#define IDLE_TIMEOUT_US         ((int64_t)CONFIG_VOX_IDLE_TIMEOUT_S * 1000 * 1000)
+#define PREROLL_FRAMES          (CONFIG_VOX_PREROLL_MS / 40)   /* 40 ms uplink frames */
 
 static const char PERSONA[] =
     "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
@@ -65,6 +69,7 @@ typedef enum {
     EV_SECRETS,
     EV_GL,
     EV_AUDIO_START,
+    EV_WAKE,
 } event_kind_t;
 
 typedef struct {
@@ -97,6 +102,17 @@ static struct {
     uint32_t mic_forward;   /* atomic: forward mic frames to Gemini */
     uint32_t speaking;      /* atomic: first audio of the turn already queued */
     uint32_t squelch;       /* atomic: drop audio of an interrupted turn */
+    /* Wake word and inactivity. */
+    bool wake_available;
+    int64_t last_activity_us;
+    uint32_t wake_feed;     /* atomic: idle mic frames go to app_wake (capture task) */
+    /* Pre-roll after "Hola ESP": the capture task writes frames while connecting;
+     * the session task drains them at READY after clearing preroll_on and waiting
+     * for preroll_busy to drop (single writer, single reader). */
+    int16_t *preroll;       /* PREROLL_FRAMES * APP_AUDIO_MIC_FRAME, PSRAM */
+    uint32_t preroll_count; /* atomic: frames written (monotonic) */
+    uint32_t preroll_on;    /* atomic */
+    uint32_t preroll_busy;  /* atomic: writer inside a frame copy */
 } s;
 
 static void post(event_kind_t kind, int value, int code)
@@ -137,10 +153,59 @@ static const char *status_for(session_error_t err)
     }
 }
 
+/* The capture callback runs while any consumer needs audio: Gemini uplink,
+ * local wake-word listening or the post-wake pre-roll. */
+static void update_audio_gate(void)
+{
+    const bool on = __atomic_load_n(&s.mic_forward, __ATOMIC_ACQUIRE) ||
+                    __atomic_load_n(&s.wake_feed, __ATOMIC_ACQUIRE) ||
+                    __atomic_load_n(&s.preroll_on, __ATOMIC_ACQUIRE);
+    app_audio_set_mic_enabled(on);
+}
+
 static void set_mic(bool on)
 {
     __atomic_store_n(&s.mic_forward, on ? 1U : 0U, __ATOMIC_RELEASE);
-    app_audio_set_mic_enabled(on);
+    update_audio_gate();
+}
+
+/* Local "Hola ESP" listening only while the conversation is closed: no WebSocket
+ * exists then, and nothing leaves the device. */
+static void set_wake_listening(bool on)
+{
+    on = on && s.wake_available;
+    __atomic_store_n(&s.wake_feed, on ? 1U : 0U, __ATOMIC_RELEASE);
+    app_wake_set_active(on);
+    update_audio_gate();
+}
+
+static void set_preroll(bool on)
+{
+    if (on) {
+        __atomic_store_n(&s.preroll_count, 0U, __ATOMIC_RELEASE);
+    }
+    __atomic_store_n(&s.preroll_on, (on && s.preroll) ? 1U : 0U, __ATOMIC_RELEASE);
+    update_audio_gate();
+}
+
+/* Send the frames captured since "Hola ESP" before live audio (session task). */
+static void flush_preroll(void)
+{
+    if (!__atomic_load_n(&s.preroll_on, __ATOMIC_ACQUIRE)) {
+        return;
+    }
+    __atomic_store_n(&s.preroll_on, 0U, __ATOMIC_RELEASE);
+    while (__atomic_load_n(&s.preroll_busy, __ATOMIC_ACQUIRE)) {
+        vTaskDelay(1);
+    }
+    const uint32_t count = __atomic_load_n(&s.preroll_count, __ATOMIC_ACQUIRE);
+    const uint32_t n = count < PREROLL_FRAMES ? count : PREROLL_FRAMES;
+    for (uint32_t i = 0; i < n; ++i) {
+        const uint32_t slot = (count - n + i) % PREROLL_FRAMES;
+        (void)app_gemini_live_send_audio(s.gl, &s.preroll[slot * APP_AUDIO_MIC_FRAME],
+                                         APP_AUDIO_MIC_FRAME);
+    }
+    ESP_LOGI(TAG, "sent %u pre-roll frames (%u ms)", (unsigned)n, (unsigned)(n * 40));
 }
 
 static void enter(session_state_t st)
@@ -150,9 +215,14 @@ static void enter(session_state_t st)
     }
     ESP_LOGI(TAG, "state %d -> %d", (int)s.state, (int)st);
     s.state = st;
+    s.last_activity_us = esp_timer_get_time();
     if (st != ST_ERROR) {
         s.error = ERR_NONE;
     }
+    if (st != ST_CONNECTING) {
+        set_preroll(false);
+    }
+    set_wake_listening(st == ST_CLOSED);
     set_mic(st == ST_LISTENING || st == ST_PROCESSING);
     if (st == ST_CONNECTING) {
         s.connecting_since = esp_timer_get_time();
@@ -223,6 +293,8 @@ static void open_conversation(void)
 
 static void on_tap(void)
 {
+    ESP_LOGI(TAG, "tap in state %d", (int)s.state);
+    s.last_activity_us = esp_timer_get_time();
     switch (s.state) {
     case ST_CLOSED:
         open_conversation();
@@ -260,15 +332,18 @@ static void on_gl(int type, int code)
             s.transcripts_base = stats.rx_input_transcripts;
             s.audio_base = stats.rx_audio_chunks;
             __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
+            flush_preroll(); /* the question spoken right after "Hola ESP" goes first */
             enter(ST_LISTENING);
         }
         break;
     case APP_GL_EVT_INPUT_TRANSCRIPT:
+        s.last_activity_us = esp_timer_get_time();
         if (s.state == ST_LISTENING) {
             enter(ST_PROCESSING);
         }
         break;
     case APP_GL_EVT_TURN_COMPLETE:
+        s.last_activity_us = esp_timer_get_time();
         s.turn_done = true;
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
         if (s.state == ST_PROCESSING) {
@@ -359,6 +434,12 @@ static void on_tick(void)
     if (check_silent_model()) {
         return;
     }
+    if (s.state == ST_LISTENING && !app_audio_is_playing() &&
+            now - s.last_activity_us > IDLE_TIMEOUT_US) {
+        ESP_LOGI(TAG, "%d s without activity; back to idle", CONFIG_VOX_IDLE_TIMEOUT_S);
+        close_conversation();
+        return;
+    }
     if (__atomic_load_n(&s.squelch, __ATOMIC_ACQUIRE) && now - s.squelch_since > SQUELCH_MAX_US) {
         /* The interrupted turn never reported completion: stop discarding audio. */
         __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
@@ -410,9 +491,20 @@ static void session_task(void *arg)
                 on_gl(ev.value, ev.code);
                 break;
             case EV_AUDIO_START:
+                /* No audioStreamEnd here: the server already closed the user's turn,
+                 * and the send collided with the incoming audio (ws-client lock). */
                 if (s.state == ST_LISTENING || s.state == ST_PROCESSING) {
                     enter(ST_SPEAKING);
-                    (void)app_gemini_live_send_audio_stream_end(s.gl);
+                }
+                break;
+            case EV_WAKE:
+                if (s.state == ST_CLOSED) {
+                    ESP_LOGI(TAG, "\"Hola ESP\" detected; opening conversation");
+                    if (s.config.ui.acknowledge) {
+                        s.config.ui.acknowledge(s.config.ui.ui);
+                    }
+                    set_preroll(true);
+                    open_conversation();
                 }
                 break;
             }
@@ -451,10 +543,29 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
 }
 
 /* Capture task: forward 40 ms frames while listening. */
+/* Wake task: never block. */
+static void on_wake(void *ctx)
+{
+    (void)ctx;
+    post(EV_WAKE, 0, 0);
+}
+
 static void on_mic(const int16_t *pcm, size_t samples, void *ctx)
 {
     (void)ctx;
     if (!__atomic_load_n(&s.mic_forward, __ATOMIC_ACQUIRE)) {
+        if (__atomic_load_n(&s.preroll_on, __ATOMIC_ACQUIRE) && samples == APP_AUDIO_MIC_FRAME) {
+            __atomic_store_n(&s.preroll_busy, 1U, __ATOMIC_RELEASE);
+            if (__atomic_load_n(&s.preroll_on, __ATOMIC_ACQUIRE)) {
+                const uint32_t n = __atomic_load_n(&s.preroll_count, __ATOMIC_RELAXED);
+                memcpy(&s.preroll[(n % PREROLL_FRAMES) * APP_AUDIO_MIC_FRAME], pcm,
+                       samples * sizeof(int16_t));
+                __atomic_store_n(&s.preroll_count, n + 1U, __ATOMIC_RELEASE);
+            }
+            __atomic_store_n(&s.preroll_busy, 0U, __ATOMIC_RELEASE);
+        } else if (__atomic_load_n(&s.wake_feed, __ATOMIC_ACQUIRE)) {
+            app_wake_feed(pcm, samples);
+        }
         return;
     }
     if (app_gemini_live_send_audio(s.gl, pcm, samples) == ESP_OK) {
@@ -538,6 +649,15 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         ESP_LOGE(TAG, "audio unavailable (%s)", esp_err_to_name(err));
         goto fail_gl;
     }
+#if CONFIG_VOX_WAKE_WORD
+    /* Optional: without the model partition VOX keeps working with touch only. */
+    s.preroll = heap_caps_calloc((size_t)PREROLL_FRAMES * APP_AUDIO_MIC_FRAME, sizeof(int16_t),
+                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s.wake_available = app_wake_init(on_wake, NULL) == ESP_OK;
+    if (!s.wake_available) {
+        ESP_LOGW(TAG, "wake word unavailable; touch only");
+    }
+#endif
     if (xTaskCreatePinnedToCore(session_task, "vox_session", SESSION_TASK_STACK, NULL,
                                 SESSION_TASK_PRIO, NULL, SESSION_TASK_CORE) != pdPASS) {
         /* Audio tasks keep running on silence; nothing else references gl yet. */
@@ -548,7 +668,9 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     if (s.config.ui.set_view) {
         s.config.ui.set_view(s.config.ui.ui, APP_VOX_VIEW_IDLE);
     }
-    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s); tap to talk", primary, fallback);
+    set_wake_listening(true); /* starts CLOSED: arm local listening */
+    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s); tap%s to talk", primary, fallback,
+             s.wake_available ? " or say \"Hola ESP\"" : "");
     return ESP_OK;
 
 fail_gl:

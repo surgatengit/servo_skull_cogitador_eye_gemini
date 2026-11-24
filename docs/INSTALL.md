@@ -7,6 +7,13 @@ Estado: **v1.0 (2026-11-24)**. Verificado sobre el código del espacio de trabaj
 Regla general: solo `python mosaico.py` toca el dispositivo. Nunca `idf.py flash`,
 `esptool` en escritura, borrado completo de la flash ni cambios de particiones o eFuses.
 
+> **Versión 1.1.0 («Hola ESP»):** cambia la tabla de la región de aplicación. `main_app` pasa a
+> 12 224 K y se añade `model` (data/spiffs, 1 MiB en `0xE00000`) con `srmodels.bin` (~418 KB).
+> El paquete tiene **cuatro** componentes: tabla, aplicación, `ui_apps` y `model`. Siguen intactos el
+> prefijo inmutable, `nvs` (clave y override de modelo) y la NAND. Para volver a ESP-Claw
+> (Mis Ideas → 100000), Vibe Mode reescribe su propia tabla, y `model` queda dentro del `main_app`
+> de ESP-Claw. Requiere `system-update`; `app-update` no sirve porque cambia la tabla.
+
 ## 1. Qué escribe `iris system-update`
 
 El paquete `.irisfw` lo genera `mosaico-tools/tools/prepare_system_update.py` y contiene

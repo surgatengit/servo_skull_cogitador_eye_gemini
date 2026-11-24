@@ -55,6 +55,9 @@ esp_gsp_err_t app_vox_eye_create(esp_gsp_handle_t ui, const app_vox_eye_config_t
 /** Request a visual state from any task; applied on the next animation tick. */
 void app_vox_eye_set_state(app_vox_eye_handle_t handle, app_vox_eye_state_t state);
 
+/** Request an acknowledgement blink (e.g. wake word heard) from any task. */
+void app_vox_eye_blink(app_vox_eye_handle_t handle);
+
 /** Set the bottom status line (uppercase Spanish, digits, " -·.:/"); NULL or "" hides it.
  * Callable from any application task; the GSP setter is queued. */
 esp_gsp_err_t app_vox_eye_set_status(app_vox_eye_handle_t handle, const char *utf8);

@@ -23,6 +23,7 @@ typedef enum {
 typedef struct {
     void (*set_view)(void *ui, app_vox_view_t view);
     void (*set_status)(void *ui, const char *text);   /**< "" hides the line */
+    void (*acknowledge)(void *ui);                    /**< optional: wake word heard */
     void *ui;
 } app_vox_session_ui_t;
 

@@ -9,3 +9,7 @@ CONFIG_ESP_IRIS_HEALTH_TIMEOUT_MS=45000
 # internal heap to 11 KB and the panel SPI queue failed with ESP_ERR_NO_MEM).
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+
+# VOX M-01 wake word: only "Hola ESP" (WakeNet10, Spanish) is packed into the
+# "model" partition; no speech-command (MultiNet) models.
+CONFIG_SR_WN_WN10_ES_HOLAESP=y

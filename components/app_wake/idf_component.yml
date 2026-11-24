@@ -1,0 +1,4 @@
+dependencies:
+  idf: ">=6.2"
+  # 2.6.1 fixes WakeNet10 kernels; 2.6.2 ships wn10_es_holaesp and lib/esp32s31.
+  espressif/esp-sr: "==2.6.2"

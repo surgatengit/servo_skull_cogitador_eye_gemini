@@ -51,6 +51,7 @@ struct app_vox_eye {
     app_vox_eye_config_t config;
     void *timer;
     volatile int32_t requested_state;
+    volatile int32_t blink_request; /* set by any task, consumed by the timer */
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -289,6 +290,12 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     apply_colors(eye, glow_gain);
 
     /* Eyelids. */
+    if (eye->blink_request) {
+        eye->blink_request = 0;
+        if (!eye->blinking) {
+            eye->blink_wait_ticks = 0;
+        }
+    }
     step_blink(eye);
     const int32_t lid = (int32_t)lroundf(blink_closure(eye) * LID_TRAVEL);
     if (lid != eye->last_lid) {
@@ -370,6 +377,13 @@ void app_vox_eye_set_state(app_vox_eye_handle_t handle, app_vox_eye_state_t stat
 {
     if (handle && state >= APP_VOX_EYE_IDLE && state < APP_VOX_EYE_STATE_COUNT) {
         handle->requested_state = (int32_t)state;
+    }
+}
+
+void app_vox_eye_blink(app_vox_eye_handle_t handle)
+{
+    if (handle) {
+        handle->blink_request = 1;
     }
 }
 

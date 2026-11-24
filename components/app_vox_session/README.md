@@ -9,17 +9,24 @@ supplied by `main`. Depends on `app_audio`, `app_gemini_live`, `app_secrets` and
 
 | State | View (eye) | Mic | Entered by |
 |---|---|---|---|
-| CLOSED | idle (cyan) | off | boot, tap to close |
-| CONNECTING | processing (amber) | off | tap to open, link lost (auto-resume) |
+| CLOSED | idle (cyan) | local only: "Hola ESP" (`app_wake`) | boot, tap to close, 30 s idle |
+| CONNECTING | processing (amber) | off (pre-roll after wake word) | tap or "Hola ESP" to open, link lost (auto-resume) |
 | LISTENING | listening (red) | on | `setupComplete`, end of VOX speech, tap during speech |
 | PROCESSING | processing (amber) | on | first input transcription |
-| SPEAKING | speaking (green) | off (+`audioStreamEnd`) | first model audio of a turn |
+| SPEAKING | speaking (green) | off | first model audio of a turn |
 | ERROR | error (violet) + status | off | no Wi-Fi, no key, repeated link failures |
 
 Taps: CLOSED → open; SPEAKING → interrupt (flush playback, drop the rest of
 the turn, listen again); any other state → close. Leaving SPEAKING needs
 `turnComplete` plus the playback ring drained (300 ms tail), or 8 s without audio.
-PROCESSING falls back to LISTENING after 15 s without a reply.
+PROCESSING falls back to LISTENING after 15 s without a reply. Taps are logged.
+
+Wake word (Kconfig `VOX_WAKE_WORD`): while CLOSED, mic frames go only to `app_wake`;
+no WebSocket exists and nothing leaves the device. A detection blinks the eye,
+starts the pre-roll (`VOX_PREROLL_MS`, 2 s, PSRAM) and opens the conversation; the
+pre-roll frames are sent right after `setupComplete`, before live audio. LISTENING
+with no transcription, model audio, turn or tap for `VOX_IDLE_TIMEOUT_S` (30 s)
+closes the conversation and re-arms local listening.
 
 ## Contract
 

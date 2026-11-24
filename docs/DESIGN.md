@@ -207,14 +207,21 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
    Se corrigieron la RAM interna de la pantalla y el modelo; detalles en [INSTALL.md](INSTALL.md).
 4. Ajustes: ganancia del micrófono de 30 a 24 dB (saturaba), vigilante de modelo mudo,
    y después latencia, VAD, pruebas de larga duración y reanudación.
-5. **Activación por voz «Hola ESP»** (sección 7).
+5. **Activación por voz «Hola ESP»** (sección 7): implementada en la versión 1.1.0
+   (rama `feat/wake-word`), compilada y simulada; **pendiente de instalar y validar en el hardware**.
 6. AEC por software y conversación full-duplex.
 
-## 7. Fase siguiente: activación por voz «Hola ESP» (requisito, no implementado)
+## 7. Activación por voz «Hola ESP» (implementada en 1.1.0, pendiente de validación física)
 
-Estado: **requisito aprobado y verificado; se implementará después de la primera prueba física.**
-Se aplaza a propósito: cambia la tabla de particiones, añade dependencias y aumenta el
-tamaño, la PSRAM y la CPU. Eso invalidaría la línea base de la primera prueba de Gemini Direct.
+Estado: **implementada** (componente `app_wake`, sesión, partición `model`, paquete de System Update).
+Compila con esp-sr 2.6.2 (app 2,51 MB, `srmodels.bin` 427 911 B) y el preparador oficial acepta el
+paquete con la partición `model`. Queda validar en el dispositivo: que Vibe Mode acepte la tabla
+nueva, la tasa de aciertos y falsos disparos, la memoria y el pre-roll.
+
+Implementación respecto al plan de 7.4: el detector se crea al entrar en reposo y se destruye al
+abrir la conversación (no compite por RAM interna con el TLS); el plazo de 30 s se aplica a todas las
+sesiones, se abran por voz o por toque; y ya no se envía `audioStreamEnd` al empezar a hablar el modelo,
+porque chocaba con el audio entrante.
 
 ### 7.1 Requisitos
 

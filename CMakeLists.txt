@@ -13,12 +13,22 @@ list(APPEND EXTRA_COMPONENT_DIRS
     "${MOSAICO_UTILS_ROOT}/mosaico-tools/components/esp_mosaico_gsp_bundle"
     "${MOSAICO_UTILS_ROOT}/mosaico-tools/components/esp_mosaico_gsp_iris")
 include("${MOSAICO_UTILS_ROOT}/mosaico-tools/cmake/mosaico_idf_project.cmake")
-project(servocraneo_gemini_direct VERSION 1.0.0)
+project(servocraneo_gemini_direct VERSION 1.1.0)
 # Normal applications update only through retained Vibe Mode and never install
 # their own bootloader. Mirror mosaico-tools' game wrapper: keep the immutable
 # base bootloader out of the default build; explicit bootloader/flash targets
 # retain IDF's normal dependencies and size checks. Remove to restore IDF default.
 if(TARGET bootloader)
     set_property(TARGET bootloader PROPERTY EXCLUDE_FROM_ALL TRUE)
+endif()
+# esp-sr only flashes srmodels.bin through `idf.py flash`, which this workspace
+# never uses. Ship the "Hola ESP" model image in the System Update bundle instead,
+# targeting the application-owned "model" data partition.
+if(TARGET srmodels_bin)
+    idf_build_get_property(vox_build_dir BUILD_DIR)
+    set_property(GLOBAL APPEND PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_LABELS model)
+    set_property(GLOBAL PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_model_IMAGE
+        "${vox_build_dir}/srmodels/srmodels.bin")
+    set_property(GLOBAL PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_model_TARGET srmodels_bin)
 endif()
 include("${MOSAICO_UTILS_ROOT}/mosaico-tools/cmake/system_update.cmake")

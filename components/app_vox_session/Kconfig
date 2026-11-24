@@ -40,6 +40,31 @@ menu "VOX M-01 Gemini Direct"
         string "Speech language (BCP-47)"
         default "es-ES"
 
+    config VOX_WAKE_WORD
+        bool "Wake on \"Hola ESP\" (local WakeNet10, wn10_es_holaesp)"
+        default y
+        help
+            Listen locally for "Hola ESP" while the conversation is closed. No
+            WebSocket is open and no audio leaves the device while idle. Needs the
+            "model" partition with the esp-sr model image; without it VOX keeps
+            working with touch only.
+
+    config VOX_IDLE_TIMEOUT_S
+        int "Seconds without activity before returning to idle"
+        range 10 600
+        default 30
+        help
+            While listening, close the conversation after this time with no user
+            transcription, model audio, turn or tap.
+
+    config VOX_PREROLL_MS
+        int "Audio kept after the wake word while connecting (ms)"
+        range 400 4000
+        default 2000
+        help
+            Frames captured between "Hola ESP" and setupComplete are sent first so
+            the question spoken right after the wake word is not lost.
+
     config VOX_SPEAKER_VOLUME
         int "Speaker volume (0-100)"
         range 1 100

@@ -40,6 +40,11 @@ static void ui_set_status(void *ui, const char *text)
     (void)app_vox_eye_set_status((app_vox_eye_handle_t)ui, text);
 }
 
+static void ui_acknowledge(void *ui)
+{
+    app_vox_eye_blink((app_vox_eye_handle_t)ui);
+}
+
 static void eye_tapped(void *ctx)
 {
     (void)ctx;
@@ -116,6 +121,7 @@ void app_main(void)
         .ui = {
             .set_view = eye_ready ? ui_set_view : NULL,
             .set_status = eye_ready ? ui_set_status : NULL,
+            .acknowledge = eye_ready ? ui_acknowledge : NULL,
             .ui = application.eye,
         },
     };
