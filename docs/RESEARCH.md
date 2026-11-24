@@ -98,16 +98,15 @@ Recomendación: la opción 2 en una rama de prueba y la 1 en paralelo. Medir `la
 
 **Riesgos:**
 
-1. **USB.** El driver del BSP desactiva el pad de USB Serial/JTAG (GPIO33 = D2 de la cámara) entre
-   `mosaico_camera_new()` y `mosaico_camera_del()` (`mosaico_camera.c`, `camera_hardware_claim` y
-   `camera_hardware_release`).
-   - La guía oficial dice que la consola del Type-C «no se ve afectada».
-   - Hay que **verificar qué USB usa `mosaico.py iris`** en este equipo (COM7/COM6). Se puede hacer
-     con una prueba de solo lectura antes de nada.
-   - Con capturas bajo demanda creando y borrando la cámara cada vez, el USB solo se pierde durante
-     la foto.
-   - openai pasó la consola a USB-OTG HS (`usb_hs_console`) para evitarlo. Eso cambiaría nuestro canal
-     de instalación y no se propone por ahora.
+1. **USB: resuelto en la fase 0.** El driver del BSP desactiva el pad de USB Serial/JTAG
+   (GPIO33 = D2 de la cámara) entre `mosaico_camera_new()` y `mosaico_camera_del()`, pero **VOX no usa
+   ese USB**:
+   - `iris` funciona por el USB-OTG con TinyUSB: `ESP_IRIS_TRANSPORT_USB` con 2 CDC; COM7 control y
+     COM6 datos, `VID_303A&PID_4002`;
+   - la consola va por UART;
+   - el USB Serial/JTAG ni siquiera aparece en Windows.
+
+   Coincide con la guía oficial: la consola del Type-C «no se ve afectada».
 2. **DMA.** La captura y el JPEG usan DMA interna. Hay que hacer antes el arreglo de la sección 2, o
    como mínimo medir `largest=` con la cámara abierta.
 3. GPIO14 (D4) también selecciona la dirección de la EEPROM izquierda: mientras la cámara está
@@ -137,7 +136,7 @@ experimental.
 centroide (x, y) se puede traducir a la posición del iris con suavizado. No hay servo, solo ojo.
 
 **Obstáculo importante: la cámara tendría que quedarse abierta.** Eso implica:
-- USB Serial/JTAG apagado mientras dure el seguimiento (sección 3, riesgo 1);
+- USB Serial/JTAG apagado mientras dure el seguimiento (no afecta a `iris`, que usa USB-OTG: fase 0);
 - DMA y PSRAM ocupadas de forma continua;
 - LED rojo encendido;
 - más consumo, con una batería de solo 65 mAh.
@@ -277,12 +276,19 @@ Cada fase va en su propia rama, con compilación, simulador si aplica, autorizac
 - **M5Gemini**: solo ideas.
 - Los modelos ESP-DL y los componentes de Espressif tienen sus propias licencias.
 
+## 9.1 Resultados de la fase 0 (2026-11-25, solo lectura)
+
+| Verificación | Resultado |
+|---|---|
+| USB de `iris` | **USB-OTG con TinyUSB**, no USB Serial/JTAG. Windows ve `VID_303A&PID_4002` compuesto (serie `1C2904D11390`) con COM7 (MI_00, control) y COM6 (MI_02, datos). `sdkconfig`: `ESP_IRIS_TRANSPORT_USB=y`, `TINYUSB_CDC_COUNT=2`, consola en UART0, sin consola secundaria en USB Serial/JTAG. **La cámara no corta la instalación ni los logs**: el riesgo principal de las fases 2 y 6 desaparece (salvo comprobarlo con la cámara activa) |
+| Versión del módulo de cámara | Pendiente de que el propietario mire la serigrafía (V1.2 = OV3640; V1.4 = SC101IOT). El firmware actual no inicializa la cámara y no puede leerla |
+| Batería y alimentación (BQ27220) | **No se puede leer sin escribir en el dispositivo**: VOX no inicializa el indicador e `iris device-status` no informa de batería. Hace falta una compilación de diagnóstico que escriba `bsp_battery_read()` en la línea `diag`, con instalación autorizada. Se propone como primer paso de la fase 4 |
+
 ## 10. No verificado
 
 - Que `trans_queue_depth = 2` baste con nuestras reservas propias (WakeNet, TLS). openai solo lo midió
   en sesiones cortas. Medir en el dispositivo.
-- Qué puerto USB usa `iris` y si la cámara lo corta realmente: la guía y el driver parecen
-  contradecirse.
+- ~~Qué puerto USB usa `iris`~~: verificado en la fase 0 (USB-OTG con TinyUSB; la cámara no lo afecta).
 - Detalles internos sin comprobar:
   - el comportamiento de interrupción de openai (no se leyó entero `live_esp32.cpp`, 69 KB);
   - el coste de CPU del seguimiento de jamiryo;
