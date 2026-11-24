@@ -105,6 +105,7 @@ static struct {
     /* Wake word and inactivity. */
     bool wake_available;
     int64_t last_activity_us;
+    uint32_t voiced_seen;   /* voiced_frames value at the last idle check */
     uint32_t wake_feed;     /* atomic: idle mic frames go to app_wake (capture task) */
     /* Pre-roll after "Hola ESP": the capture task writes frames while connecting;
      * the session task drains them at READY after clearing preroll_on and waiting
@@ -446,6 +447,13 @@ static void on_tick(void)
     log_diagnostics(now);
     if (check_silent_model()) {
         return;
+    }
+    /* Local voice counts as activity at once: Gemini's transcription arrives later,
+     * and a short timeout must never close the conversation mid-sentence. */
+    const uint32_t voiced = __atomic_load_n(&s.voiced_frames, __ATOMIC_ACQUIRE);
+    if (voiced != s.voiced_seen) {
+        s.voiced_seen = voiced;
+        s.last_activity_us = now;
     }
     if (s.state == ST_LISTENING && !app_audio_is_playing() &&
             now - s.last_activity_us > IDLE_TIMEOUT_US) {

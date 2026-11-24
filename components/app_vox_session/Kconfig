@@ -54,8 +54,10 @@ menu "VOX M-01 Gemini Direct"
         range 10 600
         default 30
         help
-            While listening, close the conversation after this time with no user
-            transcription, model audio, turn or tap.
+            While listening, close the conversation after this time with no local
+            voice (uplink frames above VOX_VOICED_PEAK_THRESHOLD), user
+            transcription, model audio, turn or tap. Counted from the end of
+            VOX's speech.
 
     config VOX_PREROLL_MS
         int "Audio kept after the wake word while connecting (ms)"
