@@ -219,7 +219,28 @@ Rama `feat/google-search`; diseño en [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Inst
   - `app_wake: listening for "Hola ESP"`;
   - en reposo, `diag st=0 … largest=12288`, igual que en 1.1.0.
 
-**Prueba de voz:** pendiente (puntos 2–8).
+**Primera prueba de voz:** el propietario notó VOX **muy lento**. Los logs de esa conversación se
+perdieron (`log_dropped_bytes`: el búfer del dispositivo no los retuvo) y una captura en directo
+posterior no registró ninguna conversación de 1.2.0, así que no hay medida de latencia.
+Causa probable: la frase añadida a la personalidad («busca ante hechos actuales y cita la fuente»)
+empujaba a buscar y a alargar las respuestas.
+
+**Búsqueda discreta (2026-11-25, autorizada; commit `10a6eaf`):**
+
+- Cambios: VOX responde de inmediato, busca solo si se le pide o ante un dato reciente que desconoce,
+  y no cita fuentes ni muestra nada en pantalla (`VOX_SHOW_SEARCH_SOURCES=n`).
+- `iris system-update` correcto en 42 s.
+- Después:
+  - mismo Device ID, `firmware_mode=normal`, `app_version=1.2.0`;
+  - Boot ID `6174699672841644746`, firmware `66658c0065a5…`, `crash_count=0`.
+- Logs de arranque: `search on`, «Hola ESP» escuchando y `largest=12288` en reposo.
+
+**Prueba de voz de la búsqueda discreta:** pendiente. Hay que comprobar:
+
+- una pregunta sencilla, que debe responder al instante;
+- «¿Cuál es la última película de Nolan?»;
+- «Busca…»;
+- el toque para interrumpir y el reposo a los 15 s.
 
 1. Arranque: `device-status` con `app_version=1.2.0` y `crash_count=0`. En los logs aparece
    `VOX M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
