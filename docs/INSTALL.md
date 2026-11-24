@@ -200,10 +200,26 @@ y el siguiente intento abre una sesión nueva.
   de los 7 680 B por transacción; margen ajustado, vigilado por el diagnóstico).
 - **«Hola ESP» (1.1.0) queda validado en el hardware.** Etiqueta Git `v1.1.0` (versión estable).
 
-### Prueba 10 (pendiente de autorización): 1.2.0 con Google Search
+### Prueba 10: 1.2.0 con Google Search
 
 Rama `feat/google-search`; diseño en [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Instalación con
 `iris system-update`, como siempre. No cambian ni las particiones ni la clave.
+
+**Instalación (2026-11-25, autorizada por el propietario):**
+
+- Antes: `app_version=1.1.0`, firmware `386d32ec304e…`, `crash_count=0`.
+- `iris system-update` (commit `5495f7e`) correcto en 37 s. El paquete escribió la tabla de
+  particiones, la app (2 512 688 B), `ui_apps` y `model`.
+- Después:
+  - mismo Device ID, `firmware_mode=normal`, `app_version=1.2.0`;
+  - Boot ID nuevo, `15367548457134334378`;
+  - firmware `84d60693d603…`, `crash_count=0`.
+- Logs de arranque:
+  - `VOX M-01 ready (model gemini-3.1-flash-live-preview, fallback gemini-3.8-live, search on)`;
+  - `app_wake: listening for "Hola ESP"`;
+  - en reposo, `diag st=0 … largest=12288`, igual que en 1.1.0.
+
+**Prueba de voz:** pendiente (puntos 2–8).
 
 1. Arranque: `device-status` con `app_version=1.2.0` y `crash_count=0`. En los logs aparece
    `VOX M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
