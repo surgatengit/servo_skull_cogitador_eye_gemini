@@ -107,6 +107,24 @@ Su código Ideas es 100000; sus datos en la NAND, el Wi-Fi y Vibe Mode se conser
   (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`, `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP`), búferes del WebSocket
   de 16 a 4 KB, y búferes de audio y de envío en PSRAM. La tabla de particiones no cambia.
 
+### Pruebas 2–4 (2026-11-24): memoria, diagnóstico y modelo
+
+| Prueba | Firmware / modelo | Resultado |
+|---|---|---|
+| 2 | Corrección de memoria / `gemini-3.8-live` | Pantalla arreglada: 0 errores, RAM interna mínima **40,6 KB** (antes 11,5 KB). Pero 0 turnos: Gemini no transcribe |
+| 3 | + diagnóstico / `gemini-3.8-live` | Micrófono correcto (25 tramas/s, picos −3…−11 dBFS hablando, −42 dBFS en silencio); **734 tramas enviadas sin fallos**; el servidor solo devuelve 3 mensajes iniciales: **ni transcripción ni audio** |
+| 4 | Igual / **`gemini-3.1-flash-live-preview`** (RPC `set_model` + `iris restart`) | **Funciona:** 6 turnos completos, 5 transcripciones, 326 fragmentos de audio, una reanudación automática tras un corte, 7 envíos fallidos de 1 880 |
+
+Conclusiones:
+
+- **`gemini-3.8-live` no procesa el audio por WebSocket directo** (coincide con los informes del foro de Google).
+  El dispositivo usa ahora `gemini-3.1-flash-live-preview` mediante el override guardado en NVS.
+  El paso automático al modelo alternativo no se activó porque 3.8 completa `setupComplete` y luego calla;
+  solo se detectaban fallos de conexión.
+- **El micrófono satura:** picos de 0 dBFS al hablar y por el eco del altavoz mientras VOX habla.
+  Bajar la ganancia de 30 dB.
+- Hay cortes de transporte esporádicos (código 0) que se recuperan con `sessionResumption`.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
