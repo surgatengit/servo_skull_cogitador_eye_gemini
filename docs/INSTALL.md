@@ -261,7 +261,16 @@ disponible.
 - `tools/test_live_setup.py`: el propietario lo ejecuta en el PC con su clave para ver qué
   variante del `setup` acepta Google y con qué motivo rechaza las demás.
 
-Pendiente de la búsqueda discreta, cuando se encuentre un `setup` aceptado:
+**Instalación sin búsqueda (2026-11-25, autorizada; commit `dae739e`):**
+
+- `iris system-update` correcto en 49 s.
+- Después:
+  - mismo Device ID, `app_version=1.2.0`;
+  - Boot ID `5146913244462897174`, firmware `42ff0083c79c…`, `crash_count=0`.
+- Logs de arranque: `search off`, «Hola ESP» escuchando y `largest=12288` en reposo.
+- Prueba de voz: pendiente. Depende de que la cuota general del plan gratuito esté disponible.
+
+Pendiente de la búsqueda discreta, si se activa con cuota disponible:
 
 - una pregunta sencilla, que debe responder al instante;
 - «¿Cuál es la última película de Nolan?»;
