@@ -22,8 +22,11 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
 >
 > - En la prueba 10, el servidor cerró con código 1011 todos los `setup` que declaraban
 >   `googleSearch`, con los dos modelos, y VOX no podía conectar.
-> - `VOX_GOOGLE_SEARCH=n` hasta encontrar una variante aceptada con `tools/test_live_setup.py`
->   (detalles en INSTALL.md, prueba 10).
+> - Causa: según `tools/test_live_setup.py`, la **cuota del plan gratuito está excedida** en los
+>   dos modelos.
+> - Decisión del propietario: búsqueda **opcional, desactivada por defecto** (`VOX_GOOGLE_SEARCH=n`).
+>   Para usarla hay que recompilar con `=y` y tener cuota disponible (detalles en INSTALL.md,
+>   prueba 10).
 >
 > **Decisión del propietario tras la prueba 10 (2026-11-25): búsqueda discreta.** Gemini responde
 > de inmediato con lo que sabe y solo busca cuando el operador se lo pide («busca…») o cuando

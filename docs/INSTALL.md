@@ -246,7 +246,15 @@ empujaba a buscar y a alargar las respuestas.
 - La primera prueba «lenta» fue con toda seguridad este mismo fallo: nunca hubo una sesión 1.2.0
   con búsqueda.
 
-**Corrección provisional:**
+**Causa (2026-11-25, `tools/test_live_setup.py` ejecutado por el propietario):** el servidor
+responde que se ha **excedido la cuota** con los dos modelos. El propietario usa el **plan
+gratuito**.
+
+**Decisión del propietario:** la búsqueda queda **opcional y desactivada por defecto**
+(`VOX_GOOGLE_SEARCH=n`). Para activarla hay que recompilar con `VOX_GOOGLE_SEARCH=y` y tener cuota
+disponible.
+
+**Corrección:**
 
 - `VOX_GOOGLE_SEARCH` desactivado por defecto: VOX conecta como en 1.1.0 y conserva el resto de 1.2.0.
 - El cliente registra ahora `server close reason: …` en las tramas de cierre.
