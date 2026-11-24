@@ -5,8 +5,9 @@ conversa por voz con **Gemini Live directamente por WebSocket seguro y Wi-Fi**,
 sin Windows ni servicios intermedios. Aplicación nativa ESP-IDF (ESP32-S31)
 creada con la plantilla Hello World de `mosaico.py` y GSP 1.5.1.
 
+**Estado actual y cómo retomar: [docs/HANDOFF.md](docs/HANDOFF.md).**
 Diseño, requisitos y decisiones: [docs/DESIGN.md](docs/DESIGN.md).
-Instalación, restauración y auditoría de seguridad: [docs/INSTALL.md](docs/INSTALL.md).
+Instalación, restauración, auditoría de seguridad y pruebas físicas: [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Componentes
 
@@ -16,6 +17,7 @@ Instalación, restauración y auditoría de seguridad: [docs/INSTALL.md](docs/IN
 | [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, reanudación) |
 | [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
+| [`app_wake`](components/app_wake/README.md) | «Hola ESP» local (ESP-SR WakeNet10 `wn10_es_holaesp`), solo en reposo |
 | [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |
 | [`app_secrets`](components/app_secrets/README.md) | Clave de API en NVS propio + RPC privada de provisión |
 | [`app_config`](components/app_config/README.md), [`app_display`](components/app_display/README.md) | Plantilla: lectura de Wi-Fi compartido y pantalla CO5300 |
@@ -44,6 +46,10 @@ usan el bootloader retenido de Vibe Mode.
 3. Copiar `.env.example` a `.env` (ignorado por Git) o exportar `GEMINI_API_KEY`, y ejecutar
    `python tools/provision_key.py` por USB. La clave se guarda en el NVS del dispositivo;
    nunca va en el código, los binarios ni GitHub.
-4. Tocar la pantalla: el ojo pasa a rojo (escuchando) y VOX responde en verde.
+4. Decir **«Hola ESP»** o tocar la pantalla: ámbar mientras conecta, rojo escuchando, verde cuando
+   VOX responde. Un toque mientras habla lo interrumpe; otro toque cierra. Vuelve al reposo (cian)
+   tras 15 s sin actividad.
+
+`app-update` no sirve en este dispositivo (`recovery_required`); usa siempre `system-update`.
 
 Nunca subas `.env`, claves, tokens, `sdkconfig` ni binarios (`.gitignore` los excluye).

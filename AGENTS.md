@@ -1,7 +1,12 @@
 # Application development
 
+**VOX M-01 GEMINI DIRECT:** read [docs/HANDOFF.md](docs/HANDOFF.md) first. It holds the
+current state, the owner's working rules (no device writes without explicit approval,
+install with `iris system-update`, never `recover`), the known pitfalls (panel DMA
+bounce buffers, regenerating `build/sdkconfig`) and the next steps.
+
 Read the owning component and its README before editing. Keep `main` as the
-device composition root and `app_hello` portable between device and PC.
+device composition root and `app_vox_eye` portable between device and PC.
 
 For Wi-Fi credentials and other user-provisioned shared configuration, default
 to Vibe Mode's shared information through the public `mosaico_shared_get()` API.

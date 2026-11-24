@@ -1,6 +1,7 @@
 # VOX M-01 GEMINI DIRECT — diseño del cliente Gemini Live nativo
 
-Estado: **v0.2 (2026-11-24)**. Decisiones técnicas aprobadas por el propietario.
+Estado: **v1.1 (2026-11-24)**. Decisiones técnicas aprobadas por el propietario; versión 1.1.0
+validada en el hardware. Para retomar el desarrollo, empieza por [HANDOFF.md](HANDOFF.md).
 Ámbito: solo este proyecto (`projects/servocraneo_gemini_direct/` dentro de un
 espacio de trabajo `esp-mosaico-vibe`). Sin Windows, sin puentes ni servicios
 intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Live por Wi-Fi.
@@ -207,11 +208,11 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
    Se corrigieron la RAM interna de la pantalla y el modelo; detalles en [INSTALL.md](INSTALL.md).
 4. Ajustes: ganancia del micrófono de 30 a 24 dB (saturaba), vigilante de modelo mudo,
    y después latencia, VAD, pruebas de larga duración y reanudación.
-5. **Activación por voz «Hola ESP»** (sección 7): implementada en la versión 1.1.0
-   (rama `feat/wake-word`), compilada y simulada; **pendiente de instalar y validar en el hardware**.
-6. AEC por software y conversación full-duplex.
+5. ✅ **Activación por voz «Hola ESP»** (sección 7): versión 1.1.0, validada en el hardware
+   (INSTALL.md, pruebas 6–9), fusionada en `main`.
+6. AEC por software y conversación full-duplex (siguiente fase; ver HANDOFF.md §6).
 
-## 7. Activación por voz «Hola ESP» (implementada en 1.1.0, pendiente de validación física)
+## 7. Activación por voz «Hola ESP» (implementada y validada en 1.1.0)
 
 Estado: **implementada** (componente `app_wake`, sesión, partición `model`, paquete de System Update).
 Compila con esp-sr 2.6.2 (app 2,51 MB, `srmodels.bin` 427 911 B) y el preparador oficial acepta el
