@@ -81,6 +81,19 @@ Lectura con `iris list` y `iris device-status` por USB, sin escrituras ni reinic
 Conclusión: ESP-Claw es la aplicación que arranca hoy y **será sustituida** en `main_app`.
 Su código Ideas es 100000; sus datos en la NAND, el Wi-Fi y Vibe Mode se conservan.
 
+### Instalación de VOX 1.0.0 (2026-11-24, autorizada)
+
+| Evidencia | Valor |
+|---|---|
+| Operación | `iris system-update`, operation `17e90e9e8ac14518b4dcb5b58bf26d20`, `status: succeeded`, `validated: true`, `healthy: true` |
+| Componentes escritos | Tabla `0x8000` (sha `3c26b245…`), aplicación `0x210000` (2 040 192 B, sha `b92d1c0a…`), `ui_apps` `0xF00000` (17 744 B) |
+| Bootloader | Sin cambios (`46ebaa95…` antes y después) |
+| Boot IDs | ESP-Claw `5011400773332120379` → Vibe Mode (escritor) `7763685529854875385` → VOX `14452938182979607246` |
+| Estado en vivo | `normal`, `servocraneo_gemini_direct` 1.0.0, firmware sha `d82574ec…` (igual al ELF), `crash_count 0` |
+| Arranque | `app_secrets` (clave ausente), GSP 480×480 en marcha, audio 48/16/24 kHz, sesión con `gemini-3.8-live`, Wi-Fi conectado en 8,4 s |
+| Memoria | RAM interna libre 101 KB (mínimo 52 KB); PSRAM 29,8 MB libres de 31,6 MB |
+| Pantalla | `iris screenshot`: ojo cian en reposo y parpadeos. Una captura muestra un desgarro horizontal del iris en movimiento; queda por confirmar en la pantalla física |
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
