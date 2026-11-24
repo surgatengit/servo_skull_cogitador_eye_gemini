@@ -52,7 +52,7 @@ menu "VOX M-01 Gemini Direct"
     config VOX_IDLE_TIMEOUT_S
         int "Seconds without activity before returning to idle"
         range 10 600
-        default 30
+        default 15
         help
             While listening, close the conversation after this time with no local
             voice (uplink frames above VOX_VOICED_PEAK_THRESHOLD), user

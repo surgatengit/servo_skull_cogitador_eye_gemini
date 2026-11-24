@@ -9,7 +9,7 @@ supplied by `main`. Depends on `app_audio`, `app_gemini_live`, `app_secrets` and
 
 | State | View (eye) | Mic | Entered by |
 |---|---|---|---|
-| CLOSED | idle (cyan) | local only: "Hola ESP" (`app_wake`) | boot, tap to close, 30 s idle |
+| CLOSED | idle (cyan) | local only: "Hola ESP" (`app_wake`) | boot, tap to close, 15 s idle |
 | CONNECTING | processing (amber) | off (pre-roll after wake word) | tap or "Hola ESP" to open, link lost (auto-resume) |
 | LISTENING | listening (red) | on | `setupComplete`, end of VOX speech, tap during speech |
 | PROCESSING | processing (amber) | on | first input transcription |
@@ -25,7 +25,7 @@ Wake word (Kconfig `VOX_WAKE_WORD`): while CLOSED, mic frames go only to `app_wa
 no WebSocket exists and nothing leaves the device. A detection blinks the eye,
 starts the pre-roll (`VOX_PREROLL_MS`, 2 s, PSRAM) and opens the conversation; the
 pre-roll frames are sent right after `setupComplete`, before live audio. LISTENING
-with no transcription, model audio, turn or tap for `VOX_IDLE_TIMEOUT_S` (30 s)
+with no local voice, transcription, model audio, turn or tap for `VOX_IDLE_TIMEOUT_S` (15 s)
 closes the conversation and re-arms local listening.
 
 ## Contract

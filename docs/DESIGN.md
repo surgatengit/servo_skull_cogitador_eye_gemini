@@ -219,7 +219,7 @@ paquete con la partición `model`. Queda validar en el dispositivo: que Vibe Mod
 nueva, la tasa de aciertos y falsos disparos, la memoria y el pre-roll.
 
 Implementación respecto al plan de 7.4: el detector se crea al entrar en reposo y se destruye al
-abrir la conversación (no compite por RAM interna con el TLS); el plazo de 30 s se aplica a todas las
+abrir la conversación (no compite por RAM interna con el TLS); el plazo de inactividad (15 s, decidido por el propietario el 2026-11-24) se aplica a todas las
 sesiones, se abran por voz o por toque; y ya no se envía `audioStreamEnd` al empezar a hablar el modelo,
 porque chocaba con el audio entrante.
 
@@ -230,12 +230,12 @@ porque chocaba con el audio entrante.
 | Palabra de activación | «Hola ESP», modelo preentrenado de Espressif `wn10_es_holaesp` (ESP-SR, WakeNet10). Sin palabra personalizada |
 | Procesamiento | 100 % local en el ESP-Mosaico. En reposo **no hay WebSocket abierto** y no sale ningún audio a Gemini ni a la red |
 | Tras la activación | Se abre la sesión Gemini Live; Gemini gestiona las pausas y los turnos (VAD del servidor), como con el toque |
-| Vuelta al reposo | Tras **30 s de inactividad** se cierra la sesión y se vuelve a la escucha local |
+| Vuelta al reposo | Tras **15 s de inactividad** (antes 30 s; reducido a petición del propietario) se cierra la sesión y se vuelve a la escucha local |
 | Alternativa | Se conserva el despertar por toque; el toque sigue abriendo, cerrando e interrumpiendo como hoy |
 | Ojo | En reposo, cian (con escucha local activa); al detectar «Hola ESP», parpadeo de confirmación y ámbar mientras conecta |
 
 «Inactividad» significa que no llega ninguna transcripción del usuario ni audio del modelo,
-no hay ningún toque y no hay reproducción en curso. Cada uno de esos eventos reinicia el plazo de 30 s.
+no hay ningún toque y no hay reproducción en curso. Cada uno de esos eventos, y también la voz detectada localmente, reinicia el plazo de 15 s.
 El plazo no corre mientras VOX habla.
 
 ### 7.2 Compatibilidad verificada (2026-11-24)
@@ -285,7 +285,7 @@ que este proyecto no usa. Plan:
   la conversación está abierta, para evitar disparos con el altavoz y ahorrar CPU.
 - Pre-roll: se guardan los ~2 s posteriores a «Hola ESP» y se envían a Gemini al recibir
   `setupComplete`, para no perder la pregunta mientras conecta.
-- Temporizador de inactividad de 30 s en la sesión (Kconfig `VOX_IDLE_TIMEOUT_S`), con un evento
+- Temporizador de inactividad de 15 s en la sesión (Kconfig `VOX_IDLE_TIMEOUT_S`), con un evento
   de cierre limpio. Kconfig `VOX_WAKE_WORD` para activarlo o desactivarlo.
 
 ### 7.5 Riesgos y validación pendiente
