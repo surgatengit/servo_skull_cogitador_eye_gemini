@@ -122,6 +122,11 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
 
 ## 6. Pendiente y siguientes pasos
 
+Plan de evolución por fases (cámara, seguimiento, AEC, herramientas, memoria, alimentación) a partir
+de cuatro proyectos de referencia: [RESEARCH.md](RESEARCH.md). Lo más urgente es su sección 2:
+`trans_queue_depth = 2` en la pantalla, el arreglo de openai-live-esp32 para la DMA en este mismo
+hardware.
+
 0. **Estado 2026-11-25:** 1.2.0 con búsqueda desactivada (`VOX_GOOGLE_SEARCH=n`) instalada y
    validada por voz (INSTALL.md, prueba 10). Falta fusionar en `main` y etiquetar `v1.2.0` cuando
    lo pida el propietario. Lo que sigue en este punto 0 es el plan original para la búsqueda, que

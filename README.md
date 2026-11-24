@@ -10,6 +10,7 @@ Diseño, requisitos y decisiones: [docs/DESIGN.md](docs/DESIGN.md).
 Instalación, restauración, auditoría de seguridad y pruebas físicas: [docs/INSTALL.md](docs/INSTALL.md).
 Google Search nativo (1.2.0: fuentes, cuotas, costes y pensamiento): [docs/GOOGLE_SEARCH.md](docs/GOOGLE_SEARCH.md).
 Ampliaciones futuras (cámara, Extended Thinking, base magnética): [docs/ROADMAP.md](docs/ROADMAP.md).
+Investigación de proyectos de referencia y propuesta por fases: [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ## Componentes
 
