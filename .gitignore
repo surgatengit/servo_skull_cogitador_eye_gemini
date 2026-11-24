@@ -70,6 +70,8 @@ sdkconfig.*.local
 sdkconfig.local*
 .iris/
 iris-evidence/
+# ESP-Iris Gateway state: device logs, screenshots, operation records (payload hashes)
+.gateway/
 
 # Editors and operating systems
 .idea/
