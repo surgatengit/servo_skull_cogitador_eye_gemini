@@ -388,6 +388,14 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
 - La prueba del arranque intenta A (1280×720 explícito, que resulta en 15 fps) y, si falla, B (formato
   por defecto, 25 fps).
 
+**Diagnóstico 2 (firmware `7e7d15594342…`):** con `esp_video` 2.5.0 fallan **los dos formatos**
+(A, 15 fps, y B, 25 fps), también en reposo. No es la versión ni el formato.
+
+**Diagnóstico 3 (commit siguiente):**
+
+- Tras STREAMON se cuentan los cambios de nivel en PCLK, VSYNC, DE y D0: ¿envía el sensor?
+- Prueba C: igual que A, pero con el micrófono y WakeNet parados.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

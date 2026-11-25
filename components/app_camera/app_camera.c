@@ -5,6 +5,8 @@
 
 #include <string.h>
 
+#include "bsp/subboard.h"
+#include "driver/gpio.h"
 #include "driver/jpeg_encode.h"
 #include "driver/ppa.h"
 #include "esp_cache.h"
@@ -66,6 +68,46 @@ static struct {
 } s;
 
 static bool s_sensor_default_format;
+
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+/* Diagnostic (test 12): count level changes on the DVP control lines for a short
+ * busy window after STREAMON. Toggling PCLK/VSYNC means the sensor streams and the
+ * capture path drops the data; flat lines mean the sensor sends nothing. */
+static void probe_dvp_lines(void)
+{
+    static const struct {
+        const char *name;
+        gpio_num_t left_gpio;
+    } lines[] = {
+        { "PCLK", GPIO_NUM_17 }, { "VSYNC", GPIO_NUM_55 }, { "DE", GPIO_NUM_19 }, { "D0", GPIO_NUM_16 },
+    };
+    enum { LINE_COUNT = sizeof(lines) / sizeof(lines[0]), SAMPLES = 500000 };
+    gpio_num_t io[LINE_COUNT];
+    int last[LINE_COUNT];
+    uint32_t edges[LINE_COUNT] = { 0 };
+    uint32_t highs[LINE_COUNT] = { 0 };
+    for (int i = 0; i < LINE_COUNT; ++i) {
+        io[i] = bsp_subboard_map_gpio(BSP_SUBBOARD_SLOT_LEFT, lines[i].left_gpio);
+        last[i] = gpio_get_level(io[i]);
+    }
+    const int64_t start = esp_timer_get_time();
+    for (int n = 0; n < SAMPLES; ++n) {
+        for (int i = 0; i < LINE_COUNT; ++i) {
+            const int v = gpio_get_level(io[i]);
+            highs[i] += (uint32_t)v;
+            if (v != last[i]) {
+                edges[i]++;
+                last[i] = v;
+            }
+        }
+    }
+    const uint32_t us = (uint32_t)(esp_timer_get_time() - start);
+    for (int i = 0; i < LINE_COUNT; ++i) {
+        ESP_LOGI(TAG, "probe %s (GPIO%d): %lu edges, high %lu/%d in %lu us", lines[i].name, (int)io[i],
+                 (unsigned long)edges[i], (unsigned long)highs[i], SAMPLES, (unsigned long)us);
+    }
+}
+#endif
 
 void app_camera_use_sensor_default_format(bool use_default)
 {
@@ -169,6 +211,11 @@ static esp_err_t grab_converted_frame(void)
     if (err == ESP_OK) {
         err = mosaico_camera_start_stream(camera);
     }
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+    if (err == ESP_OK) {
+        probe_dvp_lines();
+    }
+#endif
     if (err == ESP_OK && SETTLE_FRAMES > 0) {
         err = mosaico_camera_discard_frames(camera, SETTLE_FRAMES); /* auto exposure */
     }

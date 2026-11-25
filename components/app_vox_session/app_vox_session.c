@@ -732,6 +732,16 @@ static void camera_boot_test(int64_t now)
             app_camera_use_sensor_default_format(false);
         }
     }
+    if (err != ESP_OK) {
+        /* C: same as A with the audio pipeline idle (no I2S capture, no WakeNet). */
+        set_wake_listening(false);
+        app_audio_set_mic_enabled(false);
+        vTaskDelay(pdMS_TO_TICKS(200));
+        ESP_LOGI(TAG, "camera boot test C: explicit 1280x720 UYVY, audio stopped");
+        err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+        ESP_LOGI(TAG, "camera boot test C: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+        set_wake_listening(s.state == ST_CLOSED);
+    }
 }
 #endif
 
