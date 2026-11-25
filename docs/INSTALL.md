@@ -519,6 +519,23 @@ Al leer el código salió que la premisa era falsa:
 - Se retira el diagnóstico 5.
 - Se mantienen los 25 fps y el USB Serial/JTAG desactivado, igual que los ejemplos oficiales.
 
+**Con el arreglo oficial `b60f5d8` (2026-11-25, firmware `e99925eb830e…`):**
+
+- **Justo tras la instalación** (reinicio por software hecho por Vibe Mode): las fotos siguen fallando
+  (`VIDIOC_DQBUF`).
+- **Tras apagar y encender** (arranque en frío): **4 fotos seguidas correctas**.
+  - Cada una: `still 240x320 JPEG 12–16 KB (q80)` en unos 0,7 s, enviada a Gemini y guardada
+    (`still saved in slot 0…3; 4 stored`).
+  - Sin errores; `largest=` entre 55 296 y 63 488 B.
+- Interpretación (por confirmar):
+  - El firmware anterior, con la polaridad de PWDN equivocada, dejó el sensor en mal estado.
+  - El reinicio por software no corta la alimentación del módulo, así que solo el arranque en frío lo
+    limpió.
+  - El README del componente avisa de que un reinicio por software puede dejar la cámara en mal estado.
+- Pendiente:
+  - un reinicio por software con esta versión (`iris restart`) seguido de una foto;
+  - comprobar la galería en el dispositivo.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
