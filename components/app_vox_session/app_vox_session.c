@@ -717,10 +717,21 @@ static void camera_boot_test(int64_t now)
         return;
     }
     done = true;
-    ESP_LOGI(TAG, "camera boot test: taking one still while idle");
     app_camera_still_t still;
-    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
-    ESP_LOGI(TAG, "camera boot test: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+    ESP_LOGI(TAG, "camera boot test A: explicit 1280x720 UYVY");
+    esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    ESP_LOGI(TAG, "camera boot test A: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+    if (err != ESP_OK) {
+        /* B: sensor default format (Kconfig: SC101IOT 1280x720 25 fps). If only B
+         * works, keep it for conversations too. */
+        app_camera_use_sensor_default_format(true);
+        ESP_LOGI(TAG, "camera boot test B: sensor default format");
+        err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+        ESP_LOGI(TAG, "camera boot test B: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+        if (err != ESP_OK) {
+            app_camera_use_sensor_default_format(false);
+        }
+    }
 }
 #endif
 

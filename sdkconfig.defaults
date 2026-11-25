@@ -45,10 +45,7 @@ CONFIG_LV_USE_CLIB_SPRINTF=y
 
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_SPEED_250M=y
-# 1.4.0 (camera): code runs from flash, not PSRAM, so the DVP camera DMA does not
-# compete with instruction fetches for PSRAM bandwidth. Same as the BSP camera
-# examples that use Wi-Fi (wifi_http_cam, camera_lcd_preview).
-# CONFIG_SPIRAM_XIP_FROM_PSRAM is not set
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
 CONFIG_SPIRAM_MEMTEST=n
 
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=20480
@@ -58,3 +55,7 @@ CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
 CONFIG_APP_PROJECT_VER="1.4.0"
 
 CONFIG_TINYUSB_CDC_COUNT=2
+
+# Camera (1.4.0): the BSP camera component enables the SC101IOT 1280x720 25 fps
+# format; make it the sensor default (used when no size is requested).
+CONFIG_CAMERA_SC101IOT_DVP_DEFAULT_FMT_YUV422_1280X720_25FPS=y

@@ -65,6 +65,13 @@ static struct {
     size_t jpeg_size;
 } s;
 
+static bool s_sensor_default_format;
+
+void app_camera_use_sensor_default_format(bool use_default)
+{
+    s_sensor_default_format = use_default;
+}
+
 static esp_err_t ensure_buffers(void)
 {
     if (s.rgb && s.jpeg) {
@@ -145,8 +152,10 @@ static esp_err_t grab_converted_frame(void)
     cfg.frame_timeout_ms = FRAME_TIMEOUT_MS;
     /* Both modules support 1280x720 UYVY (SC101IOT default; the OV3640 default
      * is RGB565 640x480, which the PPA path below does not take). */
-    cfg.width = CAPTURE_W;
-    cfg.height = CAPTURE_H;
+    if (!s_sensor_default_format) {
+        cfg.width = CAPTURE_W;
+        cfg.height = CAPTURE_H;
+    }
     cfg.pixel_format = V4L2_PIX_FMT_UYVY;
     mosaico_camera_handle_t camera = NULL;
     esp_err_t err = mosaico_camera_new(&cfg, &camera);
@@ -237,6 +246,12 @@ esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)
 }
 
 #else /* !CONFIG_VOX_CAMERA */
+
+void app_camera_use_sensor_default_format(bool use_default)
+{
+    (void)use_default;
+}
+
 
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)
 {

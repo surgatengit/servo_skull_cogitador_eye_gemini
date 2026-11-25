@@ -376,6 +376,18 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
   registra y no se envía.
 - Coste: unos 19 KB más de RAM interna, porque los búferes de ESP-Iris dejan la PSRAM.
 
+**Diagnóstico 1 (firmware `bc4aab0b28d9…`):** con el código desde flash, la foto de prueba del
+arranque, sin conversación, **también falla** (`VIDIOC_DQBUF` tras 2 s). No es contención de PSRAM, así
+que se revierte. Tampoco hay conflicto de pines con el BSP ni con VOX.
+
+**Diagnóstico 2 (commit siguiente):** el resolvedor eligió `esp_video` 2.6.0 / `esp_cam_sensor` 2.7.0,
+mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
+
+- Se fija `esp_video==2.5.0` (trae `esp_cam_sensor` 2.6.0).
+- El formato por defecto del SC101IOT pasa a 1280×720 a 25 fps, el que activa el BSP.
+- La prueba del arranque intenta A (1280×720 explícito, que resulta en 15 fps) y, si falla, B (formato
+  por defecto, 25 fps).
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
