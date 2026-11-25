@@ -144,8 +144,12 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
     basta**.
   - Causa más probable: el sensor no se apaga en un reinicio por software (mismo `VCC_3V3` que la
     pantalla, reloj propio, sin pin de reset) y `esp_video` nunca le manda un reset; `esp32-camera` sí
-    lo hace siempre. `app_camera` ahora envía `ESP_CAM_SENSOR_IOC_SW_RESET` y reescribe el formato
-    antes de cada foto (`VOX_CAMERA_SENSOR_RESET`). Validación pendiente.
+    lo hace siempre. El reset por SCCB solo no bastó tras `iris restart`.
+  - El esquemático oficial V1.4 tiene `CAM_RESET` en GPIO53 (activo a nivel bajo) y el driver lo
+    ignora. `app_camera` ahora da un pulso en `CAM_RESET`, después el reset por SCCB y reescribe el
+    formato antes de cada foto (`VOX_CAMERA_SENSOR_RESET`). Validación pendiente.
+  - Si no basta: el reinicio del S31 no resetea los DMA (`IDF-14841`); siguiente paso, parar los
+    canales AXI-DMA en el manejador de apagado, como hace el P4.
 - **Componente de cámara con el arreglo oficial de PWDN `b60f5d8` (prueba 13).** Con el de nuestro
   BSP `5f88b91`, el driver genérico manejaba CAM_PWDN con una polaridad equivocada para el módulo, y
   el sensor respondía pero no entregaba fotogramas. Detalle en `third_party/esp-mosaico-bsp/VOX_FORK.md`.

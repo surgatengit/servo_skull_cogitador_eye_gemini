@@ -560,7 +560,23 @@ Al leer el código salió que la premisa era falsa:
     (`ESP_CAM_SENSOR_IOC_SW_RESET`, registro 0x3103 bit 0) pero **nadie la llama**.
 - **Corrección (commit siguiente):** `app_camera` hace ese reset antes de cada foto y vuelve a escribir
   el formato (Kconfig `VOX_CAMERA_SENSOR_RESET`, activado). Sin tocar código de Espressif.
-- Prueba pendiente: instalar, foto, `iris restart`, foto (sin apagar).
+- **Resultado del reset por software (firmware `be522037…`):**
+  - Tras la instalación, 2 fotos correctas sin apagar.
+  - Tras `iris restart`, fallo (`DQBUF`), **también sin ninguna foto antes del reinicio** (captura en
+    directo: el reset se ejecuta y el formato se reescribe, pero no llegan fotogramas).
+  - Conclusión: el reset por SCCB no basta.
+- **Más hechos:**
+  - ESP-IDF, `esp_system/port/soc/esp32s31/system_internal.c`: el reinicio por software del S31 no para
+    ni resetea los DMA (`TODO: [ESP32S31] IDF-14841`); el del P4 sí. Cámara, pantalla y SPI comparten
+    el DMA AXI (3 canales).
+  - Esquemático oficial `SCH_ESP_Mosaico_SC101IOT_CameraBoard_V1_4A`:
+    - `CAM_RESET` = GPIO53 → pin 19 del sensor, pull-up de 10 kΩ, «0: Reset, 1: Normal»;
+    - `CAM_PWDN` = GPIO48 → solo el PWDN del sensor y el LED rojo (Q3); no corta la alimentación;
+    - el LDO de 2,8 V (CE a VIN) y el oscilador de 20 MHz están siempre encendidos con `VCC_3V3`.
+  - El driver del SC101IOT ignora el pin de reset (`reset_pin = -1`) y nadie lo mueve.
+- **Corrección (commit siguiente):** antes de cada foto, pulso de 10 ms a nivel bajo en `CAM_RESET`
+  (reset por hardware), espera de 20 ms, reset por SCCB y reescritura del formato.
+- Prueba pendiente: instalar, `iris restart`, foto (sin apagar).
 
 **Borrar todas (petición del propietario, commit siguiente):** mantener pulsada la X de la galería
 1,5 s. La sesión borra la partición entera (no solo las cabeceras), cierra la galería, oculta el contador

@@ -27,7 +27,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "driver/gpio.h"
+
 #define SENSOR_RESET_SETTLE_MS  20   /* driver waits 5 ms; esp32-camera waits 50 */
+#define SENSOR_RESET_LOW_MS     10
+#define CAMERA_RESET_GPIO       GPIO_NUM_53  /* CAM_RESET, left slot */
 #endif
 
 #if CONFIG_VOX_CAMERA
@@ -153,6 +157,31 @@ static esp_err_t convert_frame(const mosaico_camera_frame_t *frame)
 }
 
 #if CONFIG_VOX_CAMERA_SENSOR_RESET
+/* Hardware reset through CAM_RESET. Official SC101IOT CameraBoard V1.4
+ * schematic: GPIO53 -> CAM_RESET (sensor FPC pin 19), 10 kΩ pull-up to
+ * DOVDD_2V8, "0: Reset, 1: Normal". The SC101IOT driver ignores it
+ * (reset_pin = -1) and nothing else drives it. Called only while the module
+ * holds the left-slot claim (after mosaico_camera_new), where the slot GPIOs
+ * map 1:1. Afterwards the pin goes back to input; the pull-up keeps it high. */
+static esp_err_t pulse_reset_line(void)
+{
+    const gpio_config_t out = {
+        .pin_bit_mask = BIT64(CAMERA_RESET_GPIO),
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_RETURN_ON_ERROR(gpio_set_level(CAMERA_RESET_GPIO, 0), TAG, "CAM_RESET low");
+    ESP_RETURN_ON_ERROR(gpio_config(&out), TAG, "CAM_RESET output");
+    vTaskDelay(pdMS_TO_TICKS(SENSOR_RESET_LOW_MS));
+    ESP_RETURN_ON_ERROR(gpio_set_level(CAMERA_RESET_GPIO, 1), TAG, "CAM_RESET high");
+    const gpio_config_t in = {
+        .pin_bit_mask = BIT64(CAMERA_RESET_GPIO),
+        .mode = GPIO_MODE_INPUT,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&in), TAG, "CAM_RESET release");
+    vTaskDelay(pdMS_TO_TICKS(SENSOR_RESET_SETTLE_MS)); /* before any SCCB access */
+    return ESP_OK;
+}
+
 /* The camera board keeps its 3V3 rail and its own XCLK across esp_restart(), so
  * the sensor is never power-cycled by a software reset. The legacy esp32-camera
  * driver always soft-resets the sensor at probe ("Doing SW reset of sensor");
@@ -184,6 +213,8 @@ static esp_err_t reset_sensor(void)
     if (ioctl(fd, VIDIOC_G_SENSOR_FMT, &format) != 0) {
         ESP_LOGW(TAG, "sensor reset: get format failed (errno %d)", errno);
         err = ESP_FAIL;
+    } else if (pulse_reset_line() != ESP_OK) {
+        err = ESP_FAIL;
     } else if (ioctl(fd, VIDIOC_S_EXT_CTRLS, &controls) != 0) {
         ESP_LOGW(TAG, "sensor reset: SW reset failed (errno %d)", errno);
         err = ESP_FAIL;
@@ -193,7 +224,8 @@ static esp_err_t reset_sensor(void)
             ESP_LOGE(TAG, "sensor reset: format rewrite failed (errno %d)", errno);
             err = ESP_FAIL;
         } else {
-            ESP_LOGI(TAG, "sensor soft reset + format %s", format.name ? format.name : "?");
+            ESP_LOGI(TAG, "sensor hardware + soft reset, format %s",
+                     format.name ? format.name : "?");
         }
     }
     (void)close(fd);

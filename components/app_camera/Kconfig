@@ -53,13 +53,14 @@ menu "VOX M-01 camera (on-demand stills)"
         default 8
 
     config VOX_CAMERA_SENSOR_RESET
-        bool "Soft-reset the sensor before every still"
+        bool "Reset the sensor before every still"
         default y
         help
             The camera board is not power-cycled by a software restart, and
             esp_video never resets the sensor. Without this the SC101IOT gives
             no frames after `iris restart` until the board is switched off.
-            Sends ESP_CAM_SENSOR_IOC_SW_RESET and writes the format again.
+            Pulses CAM_RESET (GPIO53, active low), sends
+            ESP_CAM_SENSOR_IOC_SW_RESET and writes the format again.
 
     config VOX_CAMERA_BOOT_TEST
         bool "Diagnostic: take one test still 8 s after boot (not sent)"
