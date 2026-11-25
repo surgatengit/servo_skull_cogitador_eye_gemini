@@ -89,6 +89,9 @@ esp_gsp_err_t app_vox_eye_set_photo_count(app_vox_eye_handle_t handle, unsigned 
 esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t *jpeg, size_t size,
                                      unsigned position, unsigned count);
 
+/** Pause/resume the eye animation (no repaints, no panel DMA). Any task. */
+void app_vox_eye_set_paused(app_vox_eye_handle_t handle, bool paused);
+
 /** Hide the gallery and resume the eye. Any task. */
 esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle);
 

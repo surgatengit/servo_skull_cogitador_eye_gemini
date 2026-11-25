@@ -52,6 +52,19 @@ menu "VOX M-01 camera (on-demand stills)"
         range 0 30
         default 8
 
+    config VOX_CAMERA_STREAM_SETTLE_MS
+        int "Wait after starting the stream before the first frame read (ms)"
+        range 0 3000
+        default 700
+
+    config VOX_CAMERA_PAUSE_DISPLAY_RETRY
+        bool "Retry a timed-out still with the eye animation paused"
+        default y
+        help
+            Test 13 diagnostic: if the first attempt times out, pause the eye
+            (no panel DMA traffic) and try once more. The log says which
+            attempt succeeded.
+
     config VOX_CAMERA_BOOT_TEST
         bool "Diagnostic: take one test still 8 s after boot (not sent)"
         default n

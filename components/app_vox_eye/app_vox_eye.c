@@ -56,6 +56,7 @@ struct app_vox_eye {
     volatile int32_t requested_state;
     volatile int32_t blink_request; /* set by any task, consumed by the timer */
     volatile int32_t gallery_open;  /* set by any task: pause the eye under the gallery */
+    volatile int32_t paused;        /* set by any task: freeze the eye (camera capture) */
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -230,8 +231,8 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
-    if (eye->gallery_open) {
-        return; /* hidden under the gallery: no repaints, no DMA traffic */
+    if (eye->gallery_open || eye->paused) {
+        return; /* hidden or frozen: no repaints, no DMA traffic */
     }
     eye->stats.frames++;
 
@@ -468,6 +469,13 @@ esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t 
     handle->gallery_open = 1;
     const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, true);
     return err != ESP_GSP_OK ? err : (idx != ESP_GSP_OK ? idx : vis);
+}
+
+void app_vox_eye_set_paused(app_vox_eye_handle_t handle, bool paused)
+{
+    if (handle) {
+        handle->paused = paused ? 1 : 0;
+    }
 }
 
 esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle)

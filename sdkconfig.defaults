@@ -68,3 +68,6 @@ CONFIG_TINYUSB_CDC_COUNT=2
 # out. Build 25 fps as the default and leave 15 fps out so it cannot be chosen.
 CONFIG_CAMERA_SC101IOT_DVP_DEFAULT_FMT_YUV422_1280X720_25FPS=y
 # CONFIG_CAMERA_SC101IOT_DVP_YUV422_1280X720_15FPS is not set
+
+# Test 13 diagnostics (temporary): idle still 8 s after boot.
+CONFIG_VOX_CAMERA_BOOT_TEST=y

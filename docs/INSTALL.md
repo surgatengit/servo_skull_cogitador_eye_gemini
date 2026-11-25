@@ -473,6 +473,23 @@ escribe `iris system-update`, como en 1.1.0.
 **Corrección:** el 25 fps pasa a ser el formato por defecto y el de 15 fps deja de compilarse
 (`sdkconfig.defaults`), así el driver no puede elegirlo.
 
+**Segundo intento (firmware `dfcef2f499fc…`, con 25 fps):** sigue fallando (`VIDIOC_DQBUF`). Ni el
+formato de 25 fps ni el USB Serial/JTAG apagado bastan por sí solos.
+
+Lo único que tenía el diagnóstico 4 y ya no está:
+
+- la sonda, que mantenía ocupada la tarea de la sesión (núcleo 0, prioridad 8) durante unos 0,7 s
+  entre STREAMON y la primera lectura;
+- la foto de prueba del arranque.
+
+**Diagnóstico 5 (commit siguiente):** cada foto se intenta así.
+
+1. Esperar 700 ms tras STREAMON, sin ocupar la CPU.
+2. Si falla, repetir con la animación del ojo pausada, sin tráfico DMA de la pantalla.
+3. Si vuelve a fallar, repetir con espera activa de 700 ms, igual que hacía la sonda.
+
+Además, la foto de prueba del arranque vuelve a estar activada.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
