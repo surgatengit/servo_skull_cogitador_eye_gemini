@@ -532,9 +532,17 @@ Al leer el código salió que la premisa era falsa:
   - El reinicio por software no corta la alimentación del módulo, así que solo el arranque en frío lo
     limpió.
   - El README del componente avisa de que un reinicio por software puede dejar la cámara en mal estado.
-- Pendiente:
-  - un reinicio por software con esta versión (`iris restart`) seguido de una foto;
-  - comprobar la galería en el dispositivo.
+- **Galería:** el propietario confirma que funciona en el dispositivo (contador, fotos reales, ‹ › y X).
+- **Reinicio por software (`iris restart`, autorizado, `reset_reason=3`):**
+  - las 4 fotos se conservan (`4 stored still(s) of 10`);
+  - después, **4 fotos más correctas**, de unos 0,7 s cada una, guardadas en los huecos 4–7
+    (`8 stored`).
+  - Confirma que el fallo de justo tras instalar fue el estado que dejó el firmware anterior. Con
+    `b60f5d8` la cámara sobrevive a los reinicios por software.
+- **Nota para quien actualice desde una versión con la cámara antigua (1.4.0 o los diagnósticos):**
+  después de instalar, apagar y encender una vez.
+
+**Prueba 13 superada (2026-11-25).**
 
 ## 3. Volver al firmware actual (restauración)
 
