@@ -34,6 +34,7 @@ typedef enum {
     APP_VOX_GALLERY_PREV,       /**< "<" tapped (older photo) */
     APP_VOX_GALLERY_NEXT,       /**< ">" tapped (newer photo) */
     APP_VOX_GALLERY_TOUCH,      /**< any other touch while the gallery is shown */
+    APP_VOX_GALLERY_DELETE_ALL, /**< X held for 1.5 s: erase every stored photo */
 } app_vox_gallery_action_t;
 
 /** Gallery notification. Runs on the GSP framework task: return quickly, never block. */

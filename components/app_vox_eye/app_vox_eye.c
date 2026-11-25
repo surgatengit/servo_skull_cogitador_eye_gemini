@@ -22,6 +22,12 @@
 #define LID_TRAVEL             250
 #define GLOW_LEVELS            8.0f     /* quantized glow brightness steps */
 #define GLOW_MIN_TICKS         3        /* >= ~100 ms between glow repaints */
+/* Gallery X (gallery_close button hit area in ui/main.json; keep in sync). */
+#define CLOSE_X0               206
+#define CLOSE_X1               274
+#define CLOSE_Y0               0
+#define CLOSE_Y1               64
+#define DELETE_HOLD_TICKS      45       /* ~1.5 s holding the X deletes every photo */
 
 /* Blink phases in ticks (~66 ms close, ~33 ms hold, ~100 ms open). */
 #define BLINK_CLOSE_TICKS      2
@@ -56,6 +62,11 @@ struct app_vox_eye {
     volatile int32_t requested_state;
     volatile int32_t blink_request; /* set by any task, consumed by the timer */
     volatile int32_t gallery_open;  /* set by any task: pause the eye under the gallery */
+    /* Long press on the gallery X (render task only: interceptor + timer). */
+    uint32_t ticks;                 /* animation timer ticks, also while paused */
+    bool x_held;
+    bool x_fired;
+    uint32_t x_since;
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -230,6 +241,13 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
+    eye->ticks++;
+    if (eye->x_held && !eye->x_fired && eye->ticks - eye->x_since >= DELETE_HOLD_TICKS) {
+        eye->x_fired = true; /* fire while still held; the release is swallowed */
+        if (eye->config.on_gallery) {
+            eye->config.on_gallery(APP_VOX_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
+        }
+    }
     if (eye->gallery_open) {
         return; /* hidden under the gallery: no repaints, no DMA traffic */
     }
@@ -347,6 +365,32 @@ static bool gallery_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
     return true;
 }
 
+#if defined(ESP_PLATFORM) /* the PC sim_bridge has no input interceptor */
+/* Raw touch samples (render task): track a press that starts on the gallery X.
+ * GSP has no long-press event; a held X deletes all photos and its release
+ * must not also close the gallery as a normal tap. */
+static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, void *ctx)
+{
+    (void)ui;
+    struct app_vox_eye *eye = ctx;
+    const bool on_x = x >= CLOSE_X0 && x < CLOSE_X1 && y >= CLOSE_Y0 && y < CLOSE_Y1;
+    if (pressed) {
+        if (!eye->x_held && eye->gallery_open && on_x) {
+            eye->x_held = true;
+            eye->x_fired = false;
+            eye->x_since = eye->ticks;
+        } else if (eye->x_held && !on_x && !eye->x_fired) {
+            eye->x_held = false; /* slid off the X: neither delete nor block */
+        }
+        return eye->x_fired;
+    }
+    const bool swallow = eye->x_held && eye->x_fired;
+    eye->x_held = false;
+    eye->x_fired = false;
+    return swallow;
+}
+#endif
+
 static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ctx)
 {
     (void)ui;
@@ -407,6 +451,12 @@ esp_gsp_err_t app_vox_eye_create(esp_gsp_handle_t ui, const app_vox_eye_config_t
         if (err != ESP_GSP_OK) {
             (void)esp_gsp_timer_delete(ui, eye->timer);
         }
+    }
+    if (err == ESP_GSP_OK) {
+#if defined(ESP_PLATFORM)
+        /* Optional: without it the X only closes (no delete-all gesture). */
+        (void)esp_gsp_set_input_interceptor(ui, on_input, eye);
+#endif
     }
     if (err != ESP_GSP_OK) {
         free(eye);
@@ -498,6 +548,9 @@ esp_gsp_err_t app_vox_eye_destroy(app_vox_eye_handle_t *handle)
     if (!eye) {
         return ESP_GSP_OK;
     }
+#if defined(ESP_PLATFORM)
+    (void)esp_gsp_set_input_interceptor(eye->ui, NULL, NULL);
+#endif
     esp_gsp_err_t err = esp_gsp_on_event(eye->ui, NULL, NULL);
     if (err != ESP_GSP_OK) {
         return err;

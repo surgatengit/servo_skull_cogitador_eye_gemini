@@ -122,6 +122,22 @@ esp_err_t app_photos_save(const uint8_t *jpeg, size_t size)
     return ESP_OK;
 }
 
+esp_err_t app_photos_clear(void)
+{
+    if (!s.part) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    for (size_t i = 0; i < SLOT_COUNT; ++i) {
+        s.slots[i].valid = false;
+    }
+    photos_ring_build(s.slots, SLOT_COUNT, &s.ring);
+    /* One range: the flash driver uses large block erases where aligned. */
+    ESP_RETURN_ON_ERROR(esp_partition_erase_range(s.part, 0, (size_t)SLOT_COUNT * SLOT_SIZE), TAG,
+                        "erase photos");
+    ESP_LOGI(TAG, "all stills erased");
+    return ESP_OK;
+}
+
 esp_err_t app_photos_read(size_t position, uint8_t *buf, size_t cap, size_t *out_size)
 {
     if (!buf || !out_size) {

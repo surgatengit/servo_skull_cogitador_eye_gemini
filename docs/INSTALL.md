@@ -548,6 +548,10 @@ Al leer el código salió que la premisa era falsa:
   renderizado y espera a que terminen las transferencias de la pantalla antes del reinicio.
 - Prueba pendiente: instalar, apagar y encender una vez, y después `iris restart` seguido de una foto.
 
+**Borrar todas (petición del propietario, commit siguiente):** mantener pulsada la X de la galería
+1,5 s. La sesión borra la partición entera (no solo las cabeceras), cierra la galería, oculta el contador
+y muestra «BORRANDO...» y después «FOTOS BORRADAS» durante 3 s.
+
 **Galería y almacenamiento: superados.** Reinicio por software: pendiente de la corrección.
 
 ## 3. Volver al firmware actual (restauración)

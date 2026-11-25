@@ -61,6 +61,7 @@ static const char *TAG = "vox_session";
 #define TOOL_NAME_CAPACITY      32
 #define TOOL_CAPTURE            "capturar_imagen"
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
+#define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
 static const char PERSONA[] =
     "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
@@ -189,6 +190,7 @@ static struct {
     size_t gallery_pos;     /* 0 = oldest .. count-1 = newest */
     int64_t gallery_touch_us;
     uint8_t *photo_buf;     /* PSRAM, app_photos_max_size() */
+    int64_t notice_until_us; /* transient status text, 0 = none */
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -765,6 +767,10 @@ static void on_tick(void)
     if (s.gallery_open && now - s.gallery_touch_us > GALLERY_IDLE_US) {
         gallery_close();
     }
+    if (s.notice_until_us && now > s.notice_until_us) {
+        s.notice_until_us = 0;
+        refresh_status(); /* back to the error/sources line or hidden */
+    }
     if (s.reply_pending && now - s.model_progress_us > RESPONSE_TIMEOUT_US) {
         ESP_LOGW(TAG, "no model output for %d s; reply abandoned", CONFIG_VOX_RESPONSE_TIMEOUT_S);
         s.reply_pending = false;
@@ -955,6 +961,23 @@ static void on_gallery(app_vox_session_gallery_t action)
         break;
     case APP_VOX_SESSION_GALLERY_CLOSE:
         gallery_close();
+        break;
+    case APP_VOX_SESSION_GALLERY_DELETE_ALL:
+        if (!s.gallery_open) {
+            return;
+        }
+        gallery_close();
+        if (s.config.ui.set_status) {
+            s.config.ui.set_status(s.config.ui.ui, "BORRANDO...");
+        }
+        if (app_photos_clear() == ESP_OK) {
+            ESP_LOGI(TAG, "all photos deleted by the owner");
+        }
+        update_photo_count();
+        if (s.config.ui.set_status) {
+            s.config.ui.set_status(s.config.ui.ui, "FOTOS BORRADAS");
+        }
+        s.notice_until_us = esp_timer_get_time() + NOTICE_US;
         break;
     case APP_VOX_SESSION_GALLERY_TOUCH:
     default:

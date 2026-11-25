@@ -33,6 +33,10 @@ size_t app_photos_max_size(void);
 /** Store one JPEG (erases one slot; about 0.5 s). */
 esp_err_t app_photos_save(const uint8_t *jpeg, size_t size);
 
+/** Erase every slot completely (not only the headers): the stills are gone
+ * from flash. Takes a few seconds. */
+esp_err_t app_photos_clear(void);
+
 /** Copy photo `position` (0 = oldest .. count-1 = newest) into buf and check
  * its CRC. ESP_ERR_INVALID_CRC for a damaged slot. */
 esp_err_t app_photos_read(size_t position, uint8_t *buf, size_t cap, size_t *out_size);

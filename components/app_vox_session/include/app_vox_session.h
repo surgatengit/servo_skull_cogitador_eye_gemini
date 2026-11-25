@@ -39,6 +39,7 @@ typedef enum {
     APP_VOX_SESSION_GALLERY_PREV,
     APP_VOX_SESSION_GALLERY_NEXT,
     APP_VOX_SESSION_GALLERY_TOUCH,
+    APP_VOX_SESSION_GALLERY_DELETE_ALL,
 } app_vox_session_gallery_t;
 
 typedef struct {

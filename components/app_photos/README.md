@@ -30,5 +30,7 @@ Persistent ring of the latest camera stills for the eye's gallery (1.5.0). Kconf
 - `app_photos_save()` erases one 48 KiB slot (about 0.5 s). The session calls it after the still was
   sent to Gemini.
 - `app_photos_read(position, …)`: position 0 is the oldest and count-1 the newest.
+- `app_photos_clear()` erases the whole ring (every slot, not only the headers), so the stills are
+  really gone. It is triggered by holding the gallery X for 1.5 s.
 - Privacy: the stills stay on the device until they are overwritten. They are never sent anywhere
   else (Gemini gets the still once, when it asks for it).

@@ -62,6 +62,12 @@ a tap toggles idle/listening. Networking and audio are not simulated.
   - `app_vox_eye_show_photo()` copies the JPEG (GSP decodes it), sets the position and shows the
     gallery. `app_vox_eye_hide_gallery()` hides it.
   - The eye animation pauses while the gallery is shown: no repaints and no DMA traffic underneath.
+- **Delete all:** holding the X for 1.5 s raises `APP_VOX_GALLERY_DELETE_ALL`.
+  - It is detected through the GSP input interceptor (`esp_gsp_set_input_interceptor`): a press that
+    starts on the X is timed with the animation timer, which keeps ticking while the eye is paused.
+    The action fires while the X is still held, and the release is swallowed so it does not also
+    close the gallery as a normal tap.
+  - Device only (`ESP_PLATFORM`): the PC sim_bridge has no interceptor, so there the X only closes.
 - **PC preview:** `host/platform_pc.c` sets 3 demo photos and runs the gallery flow with the
   placeholder picture.
   - Scripted simulator runs (2026-11-25) checked: open (3/3), ‹ (2/3), › with wrap (1/3), X, and a
