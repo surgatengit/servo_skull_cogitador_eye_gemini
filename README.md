@@ -19,6 +19,7 @@ Investigación de proyectos de referencia y propuesta por fases: [docs/RESEARCH.
 | [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores de estado, toque); también corre en el simulador |
 | [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, reanudación, Google Search y grounding) |
+| [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda (1.4.0): cámara izquierda, PPA y JPEG por hardware, para «capturar_imagen» |
 | [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
 | [`app_wake`](components/app_wake/README.md) | «Hola ESP» local (ESP-SR WakeNet10 `wn10_es_holaesp`), solo en reposo |
 | [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |

@@ -3,9 +3,11 @@
 #include "app_vox_session.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "app_audio.h"
+#include "app_camera.h"
 #include "app_gemini_live.h"
 #include "app_secrets.h"
 #include "app_wake.h"
@@ -25,10 +27,17 @@
 #else
 #define VOX_GOOGLE_SEARCH 0
 #endif
+#if CONFIG_VOX_CAMERA
+#define VOX_CAMERA 1
+#define VOX_CAMERA_JPEG_MAX_BYTES ((size_t)CONFIG_VOX_CAMERA_JPEG_MAX_KB * 1024U)
+#else
+#define VOX_CAMERA 0
+#define VOX_CAMERA_JPEG_MAX_BYTES 0U
+#endif
 
 static const char *TAG = "vox_session";
 
-#define SESSION_TASK_STACK      6144
+#define SESSION_TASK_STACK      8192    /* camera/PPA/JPEG calls run on this task */
 #define SESSION_TASK_PRIO       8
 #define SESSION_TASK_CORE       0
 #define SESSION_QUEUE_LEN       24
@@ -46,6 +55,10 @@ static const char *TAG = "vox_session";
 #define GROUNDING_ROTATE_US     (3 * 1000 * 1000)
 #define STATUS_CAPACITY         48
 #define STATUS_MAX_CHARS        24      /* fits the round panel's bottom chord at 20 px bold */
+#define TOOL_SLOTS              2       /* pending function calls (WebSocket -> session) */
+#define TOOL_ID_CAPACITY        96
+#define TOOL_NAME_CAPACITY      32
+#define TOOL_CAPTURE            "capturar_imagen"
 
 static const char PERSONA[] =
     "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
@@ -88,7 +101,24 @@ typedef enum {
     EV_GL,
     EV_AUDIO_START,
     EV_WAKE,
+    EV_TOOL,        /* value = tool slot */
 } event_kind_t;
+
+/* Functions Gemini may call (Live setup functionDeclarations). */
+#if CONFIG_VOX_CAMERA
+static const char FUNCTION_DECLARATIONS[] =
+    "[{\"name\":\"" TOOL_CAPTURE "\","
+    "\"description\":\"Toma una fotografía con la cámara de VOX y la envía como imagen para "
+    "que puedas ver lo que hay delante. Úsala solo cuando el operador te pida que mires, que "
+    "describas lo que ves, que leas algo o que identifiques un objeto. Tras la respuesta, la "
+    "imagen es el último fotograma de vídeo que has recibido.\"}]";
+#endif
+
+typedef struct {
+    char id[TOOL_ID_CAPACITY];
+    char name[TOOL_NAME_CAPACITY];
+    uint32_t cancelled;     /* atomic: toolCallCancellation for this id */
+} tool_slot_t;
 
 typedef struct {
     event_kind_t kind;
@@ -145,6 +175,11 @@ static struct {
     size_t item_count;
     size_t item_index;      /* rotation position */
     int64_t item_shown_us;
+    /* Function calls: the WebSocket task fills a free slot and posts EV_TOOL;
+     * the session task runs it and frees the slot (busy flag, atomic). */
+    tool_slot_t tools[TOOL_SLOTS];
+    uint32_t tool_busy[TOOL_SLOTS];
+    uint32_t stills_sent;   /* diagnostics */
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -628,12 +663,14 @@ static void log_diagnostics(int64_t now)
     const float peak_dbfs = mic.peak ? 20.0f * log10f((float)mic.peak / 32768.0f) : -96.0f;
     ESP_LOGI(TAG, "diag st=%d mic{frames=%u peak=%.0f dBFS slot=%u on=%d} "
              "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u other=%u} "
-             "search{q=%u grounded=%u} pending=%d heap{int_dma_free=%u largest=%u}",
+             "search{q=%u grounded=%u} tools{calls=%u stills=%u} pending=%d "
+             "heap{int_dma_free=%u largest=%u}",
              (int)s.state, (unsigned)mic.frames, (double)peak_dbfs, (unsigned)mic.slot,
              (int)mic.enabled, (unsigned)gl.tx_messages, (unsigned)gl.tx_failures,
              (unsigned)gl.tx_not_ready, (unsigned)gl.rx_messages, (unsigned)gl.rx_audio_chunks,
              (unsigned)gl.rx_input_transcripts, (unsigned)gl.rx_other_parts,
-             (unsigned)gl.search_queries, (unsigned)gl.rx_grounding, (int)s.reply_pending,
+             (unsigned)gl.search_queries, (unsigned)gl.rx_grounding, (unsigned)gl.tool_calls,
+             (unsigned)s.stills_sent, (int)s.reply_pending,
              (unsigned)int_free, (unsigned)int_largest);
 }
 
@@ -732,6 +769,88 @@ static void on_tick(void)
     }
 }
 
+static void answer_tool(const tool_slot_t *slot, const char *response_json)
+{
+    if (__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE)) {
+        ESP_LOGI(TAG, "tool %s cancelled; no response", slot->name);
+        return;
+    }
+    (void)app_gemini_live_send_tool_response(s.gl, slot->id, slot->name, response_json);
+}
+
+/* capturar_imagen: one still, sent as realtimeInput video, then the response.
+ * Runs on the session task (about 1-2 s); the uplink pauses meanwhile so the
+ * large message does not compete with microphone frames for the socket. */
+static void run_capture(const tool_slot_t *slot)
+{
+    if (s.config.ui.acknowledge) {
+        s.config.ui.acknowledge(s.config.ui.ui);
+    }
+    if (s.config.ui.set_status) {
+        s.config.ui.set_status(s.config.ui.ui, "OBSERVANDO");
+    }
+    set_mic(false);
+    app_camera_still_t still;
+    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    if (err == ESP_OK && !__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE) &&
+            app_gemini_live_send_image(s.gl, still.data, still.size) == ESP_OK) {
+        s.stills_sent++;
+        answer_tool(slot, "{\"result\":\"Imagen enviada: es el último fotograma de vídeo "
+                    "recibido. Descríbela al operador.\"}");
+    } else if (err == ESP_ERR_NOT_FOUND) {
+        answer_tool(slot, "{\"error\":\"No hay ninguna cámara conectada en la ranura izquierda.\"}");
+    } else {
+        ESP_LOGW(TAG, "capture failed (%s)", esp_err_to_name(err));
+        answer_tool(slot, "{\"error\":\"La cámara no ha podido tomar la imagen.\"}");
+    }
+    const int64_t now = esp_timer_get_time();
+    s.last_activity_us = now;
+    s.model_progress_us = now;  /* the model now answers about the image */
+    set_mic(s.state == ST_LISTENING || s.state == ST_PROCESSING);
+    refresh_status();
+}
+
+static void run_tool(int index)
+{
+    if (index < 0 || index >= TOOL_SLOTS) {
+        return;
+    }
+    const tool_slot_t *slot = &s.tools[index];
+    const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
+    if (open && strcmp(slot->name, TOOL_CAPTURE) == 0 && VOX_CAMERA) {
+        run_capture(slot);
+    } else if (open) {
+        answer_tool(slot, "{\"error\":\"Función desconocida.\"}");
+    }
+    __atomic_store_n(&s.tool_busy[index], 0U, __ATOMIC_RELEASE);
+}
+
+/* WebSocket task: copy a function call into a free slot and hand it over. */
+static void queue_tool(const app_gemini_live_event_t *event)
+{
+    for (int i = 0; i < TOOL_SLOTS; ++i) {
+        if (__atomic_exchange_n(&s.tool_busy[i], 1U, __ATOMIC_ACQ_REL) == 0U) {
+            tool_slot_t *slot = &s.tools[i];
+            snprintf(slot->id, sizeof(slot->id), "%s", event->tool_id ? event->tool_id : "");
+            snprintf(slot->name, sizeof(slot->name), "%s", event->tool_name ? event->tool_name : "");
+            __atomic_store_n(&slot->cancelled, 0U, __ATOMIC_RELEASE);
+            post(EV_TOOL, i, 0);
+            return;
+        }
+    }
+    ESP_LOGW(TAG, "tool call %s dropped: %d calls already pending", event->tool_name, TOOL_SLOTS);
+}
+
+static void cancel_tool(const char *id)
+{
+    for (int i = 0; i < TOOL_SLOTS; ++i) {
+        if (__atomic_load_n(&s.tool_busy[i], __ATOMIC_ACQUIRE) && id &&
+                strcmp(s.tools[i].id, id) == 0) {
+            __atomic_store_n(&s.tools[i].cancelled, 1U, __ATOMIC_RELEASE);
+        }
+    }
+}
+
 static void session_task(void *arg)
 {
     (void)arg;
@@ -768,6 +887,9 @@ static void session_task(void *arg)
                     begin_reply();
                     enter(ST_SPEAKING);
                 }
+                break;
+            case EV_TOOL:
+                run_tool(ev.value);
                 break;
             case EV_WAKE:
                 if (s.state == ST_CLOSED) {
@@ -826,6 +948,13 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
     case APP_GL_EVT_GROUNDING:
         __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
         break;
+    case APP_GL_EVT_TOOL_CALL:
+        __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
+        queue_tool(event);
+        return;
+    case APP_GL_EVT_TOOL_CANCEL:
+        cancel_tool(event->tool_id);
+        return;
     default:
         break;
     }
@@ -926,6 +1055,9 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         .language = CONFIG_VOX_GEMINI_LANGUAGE,
         .system_instruction = PERSONA,
         .google_search = VOX_GOOGLE_SEARCH,
+#if CONFIG_VOX_CAMERA
+        .function_declarations = FUNCTION_DECLARATIONS,
+#endif
         .on_event = gl_event,
     };
     esp_err_t err = app_gemini_live_create(&gl_config, &s.gl);

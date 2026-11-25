@@ -88,6 +88,7 @@ python mosaico.py iris system-update --project projects/servocraneo_gemini_direc
 | `app_vox_eye` | Ojo GSP (escena `ui/main.json`), animación a 30 fps, toque | Brillo cuantizado (≤10 Hz) por la presión DMA de la pantalla |
 | `app_vox_session` | Máquina de estados, vigilantes, diagnóstico | Logs `diag st=…` cada 5 s en conversación y 10 s en reposo |
 | `app_gemini_live` | Cliente WSS + protocolo Live | TLS en PSRAM, búfer WS de 4 KB, 409 → sesión nueva |
+| `app_camera` | Foto bajo demanda (1.4.0): abre la cámara, captura un fotograma, PPA a 240×320 y JPEG por hardware ≤ 24 KB, y la cierra | La cámara parchea ESP-IDF (sección 5); componentes del BSP en `third_party/` |
 | `app_audio` | ES8311 a 48 kHz; 16 kHz de subida, 24 kHz de bajada | Ganancia 24 dB, volumen 70 |
 | `app_wake` | WakeNet10 `wn10_es_holaesp` (esp-sr 2.6.2) | Detector solo en reposo; se devuelve si el bloque DMA < 8 KB |
 | `app_wifi` | Estación con credenciales de Vibe Mode | `WIFI_STORAGE_RAM`, sin ahorro de energía |
@@ -122,6 +123,17 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   con `trans_queue_depth = 2` en la pantalla, el mismo arreglo que openai-live-esp32 (RESEARCH.md §2).
   Comprueba la copia con `python tools/check_bsp_fork.py` y rehazla si se actualiza el submódulo.
   El `diag` avisa además de cualquier reserva de memoria fallida (`allocation failures: …`).
+- **La cámara parchea ESP-IDF (decisión del propietario, 2026-11-25, fase 2).** Al configurar CMake,
+  `mosaico_module_camera` aplica `patches/esp-idf-dvp-frame-capture-stability.patch` (157 líneas del
+  driver DVP `esp_driver_cam`) **sobre `C:\esp\esp-idf-master`**. Además aplica un parche del sensor
+  SC101IOT en `managed_components`, dentro del proyecto.
+  - Se aceptó la opción 2 (dejar que parchee) porque en este PC solo se compila VOX.
+  - El commit de ESP-IDF sigue siendo `7b9cc1ac79f8`, pero su árbol queda modificado.
+  - Compruébalo con `git -C C:\esp\esp-idf-master status`. Para deshacerlo:
+    `git -C C:\esp\esp-idf-master checkout components/esp_driver_cam`.
+  - Otro PC necesita el mismo parche (lo aplica la propia compilación) para tener capturas estables.
+  - A 2026-11-25, ESP-IDF `master` aún no incluye el arreglo. Si se actualiza ESP-IDF y ya lo trae, el
+    componente lo detecta («already applied») o avisa sin romper la compilación.
 - **Cambiar valores por defecto de Kconfig o de `sdkconfig*.defaults` no afecta a un `build/sdkconfig`
   existente.** Borra `build/sdkconfig` (es generado) y recompila; compara después el diff de `CONFIG_`.
 - **Pilas de tareas en PSRAM: no.** La sesión lee la NVS; con la caché desactivada durante una

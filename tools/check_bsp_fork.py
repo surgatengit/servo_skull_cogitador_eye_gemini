@@ -22,6 +22,25 @@ def files(root: Path) -> set[str]:
     return {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
 
 
+# Unmodified copies that must resolve `../esp-mosaico-bsp` to the fork above.
+# Their unit-test folders are not copied.
+VERBATIM = ("mosaico_module_camera", "mosaico_module_mgr")
+SKIPPED_DIRS = ("test/",)
+
+
+def check_verbatim(name: str) -> list[str]:
+    fork, upstream = PROJECT / "third_party" / name, UPSTREAM.parent / name
+    if not fork.is_dir():
+        return []
+    up = {f for f in files(upstream) if not f.startswith(SKIPPED_DIRS)}
+    fk = files(fork)
+    errors = [f"{name}: only in fork: {f}" for f in sorted(fk - up)]
+    errors += [f"{name}: missing in fork: {f}" for f in sorted(up - fk)]
+    errors += [f"{name}: changed: {f}" for f in sorted(fk & up)
+               if (fork / f).read_bytes() != (upstream / f).read_bytes()]
+    return errors
+
+
 def main() -> int:
     if not UPSTREAM.is_dir():
         print(f"submodule BSP not found: {UPSTREAM}")
@@ -47,6 +66,8 @@ def main() -> int:
         code = [line for line in added if line and not line.startswith(("/*", "*", "//"))]
         if removed or code != [EXPECTED_LINE]:
             errors.append(f"{rel}: expected only the added line '{EXPECTED_LINE}' (plus comments)")
+    for name in VERBATIM:
+        errors += check_verbatim(name)
     for e in errors:
         print(e)
     print("BSP fork OK" if not errors else f"BSP fork check failed ({len(errors)})")

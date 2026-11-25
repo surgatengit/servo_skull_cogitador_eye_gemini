@@ -330,6 +330,28 @@ Sin `allocation failures`, sin errores de pantalla y `tx fail=0`. «Hola ESP», 
 reposo de 15 s funcionan igual. **El bloque DMA libre es 5 veces mayor y estable**: ya hay margen para
 la cámara, el AEC o «Hola ESP» durante la respuesta.
 
+### Prueba 12 (pendiente de autorización): 1.4.0, foto bajo demanda
+
+Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
+`python tools/test_live_setup.py` y comprobar que «functionDeclarations capturar_imagen» sale
+**ACEPTADO** con los dos modelos.
+
+1. Arranque: `app_version=1.4.0`, `crash_count=0` y `largest=` en reposo de unos 63 488 B.
+2. «Hola ESP» → `connected; setup sent` → `session ready`. El servidor acepta la declaración de la
+   función.
+3. «VOX, ¿qué ves?» o «Mira lo que tengo en la mano»:
+   - el ojo parpadea, muestra «OBSERVANDO» y se enciende el LED rojo de la cámara;
+   - VOX describe la escena.
+   - Logs: `toolCall capturar_imagen` → `app_camera: still 240x320 JPEG … B (q…) in … ms` →
+     `image … B … sent` → `toolResponse capturar_imagen sent`.
+4. **Orientación y color:** pregunta por un objeto de color conocido y si la imagen está derecha. Si sale
+   girada o en espejo, cambia `VOX_CAMERA_ROTATION` / `MIRROR_*`. Si los colores salen cambiados
+   (rojo↔azul), anotarlo.
+5. Memoria: `largest=` durante y después de la foto, y ningún `allocation failures`.
+6. Después de la foto, comprobar que `iris logs` y `iris device-status` siguen funcionando por USB.
+7. Repetir la foto 3 veces seguidas y comprobar que no hay fugas: `int_dma_free` debe volver al mismo
+   valor en reposo.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

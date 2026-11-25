@@ -30,6 +30,14 @@ always verified), `espressif/cjson` (PSRAM allocator) and Mbed TLS base64.
 - `turnComplete` with `interactionStatus: IN_PROGRESS` (spoken filler while the model keeps
   working) is reported with `event.in_progress = true`.
 - `usageMetadata`: one INFO line per finished turn (`turn usage: prompt response tool thoughts total`).
+- Functions (1.4.0): `config.function_declarations` (a JSON array) is declared as
+  `tools[].functionDeclarations`.
+  - Each `toolCall.functionCalls[]` raises `APP_GL_EVT_TOOL_CALL` (`tool_id`, `tool_name`, args JSON
+    in `text`).
+  - `toolCallCancellation.ids[]` raises `APP_GL_EVT_TOOL_CANCEL`.
+  - The owner answers with `app_gemini_live_send_tool_response()`.
+- `app_gemini_live_send_image()` sends a JPEG as `realtimeInput.video` (`image/jpeg`, base64). The
+  message is built in PSRAM and sent with a 3 s timeout.
 - Resilience: automatic reconnect (2 s) including after a clean server close;
   after 2 failed setups the fallback model is used; after 5 a `FAILED` event asks
   the owner to disconnect.

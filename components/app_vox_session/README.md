@@ -54,5 +54,14 @@ closes the conversation and re-arms local listening.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
 - Transcripts, search queries and source domains are logged only at DEBUG level.
+- Camera tool (Kconfig `VOX_CAMERA`, 1.4.0): the session declares `capturar_imagen` and handles
+  each call on its own task.
+  - The WebSocket task copies the call into one of 2 slots and posts `EV_TOOL`.
+  - During the call: blink, «OBSERVANDO» on the status line, uplink paused.
+  - It runs `app_camera_capture_jpeg()`, sends the still with `app_gemini_live_send_image()`, then
+    answers with `toolResponse`: a result, or an error such as «no camera» or «capture failed».
+  - A cancelled call gets no response.
+  - The `diag` line reports `tools{calls=… stills=…}`.
+  - The session task stack is 8 KiB.
 - Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only
   when asked or for recent facts it does not know, never mentioning sources or that it searched.

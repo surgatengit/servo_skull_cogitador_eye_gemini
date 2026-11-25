@@ -1,0 +1,65 @@
+menu "VOX M-01 camera (on-demand stills)"
+
+    config VOX_CAMERA
+        bool "Let Gemini take a picture on request (capturar_imagen)"
+        default y
+        help
+            Declare the capturar_imagen function in the Live setup. When Gemini
+            calls it, VOX opens the left-slot camera, takes one still, closes
+            the camera and sends the JPEG as realtimeInput video. No video
+            stream, nothing stored. Without a camera module the function
+            answers that the camera is unavailable.
+
+    if VOX_CAMERA
+
+    config VOX_CAMERA_WIDTH
+        int "Still width after rotation (pixels, multiple of 16)"
+        range 64 640
+        default 240
+
+    config VOX_CAMERA_HEIGHT
+        int "Still height after rotation (pixels, multiple of 16)"
+        range 64 640
+        default 320
+
+    choice VOX_CAMERA_ROTATION
+        prompt "Rotation applied by the PPA"
+        default VOX_CAMERA_ROTATE_270
+        help
+            The module sits rotated on the board; 270 degrees plus a vertical
+            mirror matches the BSP camera_photo_app preview. Adjust if Gemini
+            describes the scene upside down or sideways.
+        config VOX_CAMERA_ROTATE_0
+            bool "0"
+        config VOX_CAMERA_ROTATE_90
+            bool "90"
+        config VOX_CAMERA_ROTATE_180
+            bool "180"
+        config VOX_CAMERA_ROTATE_270
+            bool "270"
+    endchoice
+
+    config VOX_CAMERA_MIRROR_X
+        bool "Mirror horizontally"
+        default n
+
+    config VOX_CAMERA_MIRROR_Y
+        bool "Mirror vertically"
+        default y
+
+    config VOX_CAMERA_SETTLE_FRAMES
+        int "Frames discarded before the still (auto exposure)"
+        range 0 30
+        default 8
+
+    config VOX_CAMERA_JPEG_MAX_KB
+        int "Largest JPEG sent to Gemini (KiB)"
+        range 4 48
+        default 24
+        help
+            Quality steps down (80, 65, 50, 35, 20) until the still fits.
+            Base64 makes the WebSocket message about 4/3 of this size.
+
+    endif
+
+endmenu

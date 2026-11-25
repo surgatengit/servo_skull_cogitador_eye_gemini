@@ -46,8 +46,17 @@ def base_setup(model: str) -> dict:
     }
 
 
+CAPTURE_DECLARATION = {
+    "name": "capturar_imagen",
+    "description": "Toma una fotografía con la cámara de VOX y la envía como imagen.",
+}
+
+
 def variants(model: str):
     yield "sin herramientas (control, como 1.1.0)", base_setup(model)
+    s = base_setup(model)
+    s["tools"] = [{"functionDeclarations": [CAPTURE_DECLARATION]}]
+    yield "functionDeclarations capturar_imagen (1.4.0)", s
     s = base_setup(model)
     s["tools"] = [{"googleSearch": {}}]
     yield "tools googleSearch (como 1.2.0)", s
@@ -101,7 +110,7 @@ def main() -> int:
     for model in MODELS:
         print(f"== {model}")
         for name, setup in variants(model):
-            print(f"  {name:45s} -> {try_setup(key, setup)}")
+            print(f"  {name:47s} -> {try_setup(key, setup)}")
         print()
     return 0
 
