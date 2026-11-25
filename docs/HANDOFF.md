@@ -107,6 +107,10 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   `SPIRAM_MALLOC_RESERVE_INTERNAL=65536`, búferes propios en PSRAM, brillo cuantizado y la salvaguarda
   del detector. Mínimo observado: **8 192 B** (margen ajustado). Vigila `largest=` en los logs `diag`
   al añadir cualquier función. La solución de fondo sería que el BSP active `psram_dma_direct`.
+  **Desde 1.3.0 (rama `feat/display-dma`):** VOX usa una copia del BSP en `third_party/esp-mosaico-bsp`
+  con `trans_queue_depth = 2` en la pantalla, el mismo arreglo que openai-live-esp32 (RESEARCH.md §2).
+  Comprueba la copia con `python tools/check_bsp_fork.py` y rehazla si se actualiza el submódulo.
+  El `diag` avisa además de cualquier reserva de memoria fallida (`allocation failures: …`).
 - **Cambiar valores por defecto de Kconfig o de `sdkconfig*.defaults` no afecta a un `build/sdkconfig`
   existente.** Borra `build/sdkconfig` (es generado) y recompila; compara después el diff de `CONFIG_`.
 - **Pilas de tareas en PSRAM: no.** La sesión lee la NVS; con la caché desactivada durante una

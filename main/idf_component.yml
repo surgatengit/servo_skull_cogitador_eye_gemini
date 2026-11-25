@@ -2,7 +2,9 @@ dependencies:
   idf: ">=6.2"
   esp-mosaico-bsp:
     version: "*"
-    override_path: "../../../submodule/esp-mosaico-bsp/components/esp-mosaico-bsp"
+    # VOX fork of the BSP at submodule commit 5f88b91 with one change; see
+    # third_party/esp-mosaico-bsp/VOX_FORK.md and tools/check_bsp_fork.py.
+    override_path: "../third_party/esp-mosaico-bsp"
   esp_iris:
     version: "*"
     override_path: "../../../submodule/esp-mosaico-utils/ESP-Iris/components/esp_iris"

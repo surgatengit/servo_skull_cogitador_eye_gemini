@@ -296,6 +296,40 @@ Pendiente de la búsqueda discreta, si se activa con cuota disponible:
 7. Memoria: `largest=` ≥ 8192 durante las respuestas con búsqueda y ningún `Display render failed`.
 8. Modelo alternativo (opcional): repetir el punto 4 con `gemini-3.8-live`.
 
+### Prueba 11 (pendiente de autorización): 1.3.0, memoria DMA de la pantalla
+
+Rama `feat/display-dma` (RESEARCH.md, fase 1). Cambios:
+- copia del BSP con `trans_queue_depth = 2`;
+- aviso de reservas fallidas en el `diag`.
+
+Ni la funcionalidad ni las particiones cambian.
+
+1. Arranque: `app_version=1.3.0`, `crash_count=0`, ojo cian animado y sin `Display render failed`.
+2. `largest=` en reposo y tras dos o tres conversaciones (con «Hola ESP», interrupciones y cierre).
+   Comparar con 1.2.0: 12 288 B en reposo y 8 192 B tras conversar. **Se espera un valor mayor.**
+3. Animación del ojo fluida, sin tirones ni desgarros (antes con cola de 10 y ahora con 2).
+4. Ningún `allocation failures` en los logs.
+
+**Resultado (2026-11-25, instalación autorizada):**
+
+- `iris system-update` correcto en 44 s.
+- Estado: `app_version=1.3.0`, Boot ID `4574309094169058797`, firmware `0bd69a50b737…`,
+  `crash_count=0`.
+- Captura de logs en directo de dos conversaciones: «Hola ESP», preguntas, interrupción con un toque,
+  cierre con un toque y vuelta al reposo a los 15 s.
+
+| Medida | 1.2.0 | **1.3.0** |
+|---|---|---|
+| `largest=` en reposo | 12 288 B | **63 488 B** |
+| `largest=` durante y después de conversar | 8 192 B (mínimo) | **63 488 B (constante)** |
+| `int_dma_free` en reposo | 43 007 B | **108 867 B** |
+| `int_dma_free` mínimo hablando | — | **91 631 B** |
+| `free_internal` (device-status) | 74 975 B | **140 839 B** |
+
+Sin `allocation failures`, sin errores de pantalla y `tx fail=0`. «Hola ESP», toque, interrupción y
+reposo de 15 s funcionan igual. **El bloque DMA libre es 5 veces mayor y estable**: ya hay margen para
+la cámara, el AEC o «Hola ESP» durante la respuesta.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
