@@ -410,6 +410,27 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
   openai-live-esp32, porque GPIO33/34 son D2 y el flash de la cámara; VOX no usa el USJ.
 - Las medidas de la sonda se escriben después de cerrar la cámara, con pausas.
 
+**Diagnóstico 4 (firmware de `9263419`): RESUELTO.**
+
+- Con el **USB Serial/JTAG desactivado**, la foto del arranque sale bien: `still 240x320 JPEG 10107 B
+  (q80) in 1911 ms`.
+- La sonda mide unos 241 000 flancos en PCLK, unos 35 en VSYNC (≈ 25 fps) y actividad en DE y D0: el
+  sensor siempre transmitió.
+- **Causa:** el periférico USJ, activo aunque VOX no lo usaba, tiene los pads GPIO33/34, que son D2 y
+  el flash de la cámara. Con él activo ningún fotograma llegaba a completarse.
+
+**Prueba de voz (2026-11-25):** 3 fotos en una conversación.
+
+- Cada una: `toolCall capturar_imagen` → `still 240x320 JPEG 13–14 KB (q80) in ~1370 ms` →
+  `image … sent` → `toolResponse … sent`.
+- VOX describe la escena.
+- Según el propietario, **la orientación y los colores son correctos** (270° con espejo vertical,
+  RGB565).
+- `largest=` entre 47 104 y 63 488 B, sin `allocation failures` ni errores de pantalla.
+
+**Prueba 12 superada.** Se retira el código de diagnóstico; `VOX_CAMERA_BOOT_TEST` queda disponible pero
+apagado.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

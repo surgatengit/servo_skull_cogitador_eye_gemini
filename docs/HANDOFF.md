@@ -134,6 +134,10 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   - Otro PC necesita el mismo parche (lo aplica la propia compilación) para tener capturas estables.
   - A 2026-11-25, ESP-IDF `master` aún no incluye el arreglo. Si se actualiza ESP-IDF y ya lo trae, el
     componente lo detecta («already applied») o avisa sin romper la compilación.
+- **USB Serial/JTAG debe seguir desactivado (cámara, 1.4.0).** `# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`
+  en `sdkconfig.defaults`. GPIO33/34 son D2 y el flash de la cámara: con el USJ activo, el SC101IOT
+  transmite pero ningún fotograma se completa (`VIDIOC_DQBUF` agota el tiempo; prueba 12). VOX no usa el
+  USJ: la consola va por UART y ESP-Iris por el USB-OTG HS.
 - **Cambiar valores por defecto de Kconfig o de `sdkconfig*.defaults` no afecta a un `build/sdkconfig`
   existente.** Borra `build/sdkconfig` (es generado) y recompila; compara después el diff de `CONFIG_`.
 - **Pilas de tareas en PSRAM: no.** La sesión lee la NVS; con la caché desactivada durante una

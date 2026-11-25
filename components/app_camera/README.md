@@ -34,6 +34,14 @@ Kconfig: `VOX_CAMERA*`.
 - Nothing is stored and there is no video stream. The module's red LED lights while the camera is
   open.
 
+## Requirements (test 12)
+
+- **USB Serial/JTAG must be disabled** (`# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`). Its pads
+  are camera D2 and flash (GPIO33/34). With USJ enabled the sensor streams but no frame completes.
+- Validated with `esp_video` 2.5.0, the version pinned in `main/idf_component.yml`, on the V1.4 module
+  (SC101IOT): 13–14 KB JPEG at quality 80 in about 1.4 s. Orientation and colours were confirmed by the
+  owner.
+
 ## Build note
 
 At CMake configure time, `mosaico_module_camera` patches ESP-IDF's DVP driver (`esp_driver_cam`)

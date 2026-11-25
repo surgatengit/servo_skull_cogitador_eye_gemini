@@ -54,11 +54,11 @@ menu "VOX M-01 camera (on-demand stills)"
 
     config VOX_CAMERA_BOOT_TEST
         bool "Diagnostic: take one test still 8 s after boot (not sent)"
-        default y
+        default n
         help
-            Isolates camera problems from conversation load: the still is taken
-            while VOX is idle (no WebSocket, no audio uplink) and only logged.
-            Turn off once test 12 passes.
+            Checks the camera without a conversation: one still is taken while
+            VOX is idle and only logged (result and JPEG size). Used to find
+            the USB Serial/JTAG conflict in test 12; off in normal builds.
 
     config VOX_CAMERA_JPEG_MAX_KB
         int "Largest JPEG sent to Gemini (KiB)"

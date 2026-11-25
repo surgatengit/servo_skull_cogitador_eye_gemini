@@ -3,19 +3,14 @@
 #include "app_camera.h"
 #include "camera_geometry.h"
 
-#include <stdio.h>
 #include <string.h>
 
-#include "bsp/subboard.h"
-#include "driver/gpio.h"
 #include "driver/jpeg_encode.h"
 #include "driver/ppa.h"
 #include "esp_cache.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "linux/videodev2.h"
 #include "mosaico_module_camera.h"
 #include "sdkconfig.h"
@@ -69,69 +64,6 @@ static struct {
     uint8_t *jpeg;
     size_t jpeg_size;
 } s;
-
-static bool s_sensor_default_format;
-
-#if CONFIG_VOX_CAMERA_BOOT_TEST
-static char s_probe_text[256];
-
-/* Diagnostic (test 12): count level changes on the DVP control lines for a short
- * busy window after STREAMON. Toggling PCLK/VSYNC means the sensor streams and the
- * capture path drops the data; flat lines mean the sensor sends nothing. */
-static void probe_dvp_lines(void)
-{
-    static const struct {
-        const char *name;
-        gpio_num_t left_gpio;
-    } lines[] = {
-        { "PCLK", GPIO_NUM_17 }, { "VSYNC", GPIO_NUM_55 }, { "DE", GPIO_NUM_19 }, { "D0", GPIO_NUM_16 },
-    };
-    enum { LINE_COUNT = sizeof(lines) / sizeof(lines[0]), SAMPLES = 500000 };
-    gpio_num_t io[LINE_COUNT];
-    int last[LINE_COUNT];
-    uint32_t edges[LINE_COUNT] = { 0 };
-    uint32_t highs[LINE_COUNT] = { 0 };
-    for (int i = 0; i < LINE_COUNT; ++i) {
-        io[i] = bsp_subboard_map_gpio(BSP_SUBBOARD_SLOT_LEFT, lines[i].left_gpio);
-        last[i] = gpio_get_level(io[i]);
-    }
-    const int64_t start = esp_timer_get_time();
-    for (int n = 0; n < SAMPLES; ++n) {
-        for (int i = 0; i < LINE_COUNT; ++i) {
-            const int v = gpio_get_level(io[i]);
-            highs[i] += (uint32_t)v;
-            if (v != last[i]) {
-                edges[i]++;
-                last[i] = v;
-            }
-        }
-    }
-    const uint32_t us = (uint32_t)(esp_timer_get_time() - start);
-    /* Logged later (report_probe): lines printed during this busy loop were lost. */
-    size_t used = (size_t)snprintf(s_probe_text, sizeof(s_probe_text), "probe %lu us:",
-                                   (unsigned long)us);
-    for (int i = 0; i < LINE_COUNT && used < sizeof(s_probe_text); ++i) {
-        used += (size_t)snprintf(s_probe_text + used, sizeof(s_probe_text) - used,
-                                 " %s(GPIO%d) edges=%lu high=%lu/%d", lines[i].name, (int)io[i],
-                                 (unsigned long)edges[i], (unsigned long)highs[i], SAMPLES);
-    }
-}
-
-static void report_probe(void)
-{
-    if (s_probe_text[0]) {
-        vTaskDelay(pdMS_TO_TICKS(50));
-        ESP_LOGW(TAG, "%s", s_probe_text);
-        vTaskDelay(pdMS_TO_TICKS(50));
-        s_probe_text[0] = '\0';
-    }
-}
-#endif
-
-void app_camera_use_sensor_default_format(bool use_default)
-{
-    s_sensor_default_format = use_default;
-}
 
 static esp_err_t ensure_buffers(void)
 {
@@ -213,10 +145,8 @@ static esp_err_t grab_converted_frame(void)
     cfg.frame_timeout_ms = FRAME_TIMEOUT_MS;
     /* Both modules support 1280x720 UYVY (SC101IOT default; the OV3640 default
      * is RGB565 640x480, which the PPA path below does not take). */
-    if (!s_sensor_default_format) {
-        cfg.width = CAPTURE_W;
-        cfg.height = CAPTURE_H;
-    }
+    cfg.width = CAPTURE_W;
+    cfg.height = CAPTURE_H;
     cfg.pixel_format = V4L2_PIX_FMT_UYVY;
     mosaico_camera_handle_t camera = NULL;
     esp_err_t err = mosaico_camera_new(&cfg, &camera);
@@ -230,11 +160,6 @@ static esp_err_t grab_converted_frame(void)
     if (err == ESP_OK) {
         err = mosaico_camera_start_stream(camera);
     }
-#if CONFIG_VOX_CAMERA_BOOT_TEST
-    if (err == ESP_OK) {
-        probe_dvp_lines();
-    }
-#endif
     if (err == ESP_OK && SETTLE_FRAMES > 0) {
         err = mosaico_camera_discard_frames(camera, SETTLE_FRAMES); /* auto exposure */
     }
@@ -252,9 +177,6 @@ static esp_err_t grab_converted_frame(void)
     if (del_err != ESP_OK) {
         ESP_LOGE(TAG, "camera cleanup failed (%s)", esp_err_to_name(del_err));
     }
-#if CONFIG_VOX_CAMERA_BOOT_TEST
-    report_probe();
-#endif
     return err != ESP_OK ? err : del_err;
 }
 
@@ -315,11 +237,6 @@ esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)
 }
 
 #else /* !CONFIG_VOX_CAMERA */
-
-void app_camera_use_sensor_default_format(bool use_default)
-{
-    (void)use_default;
-}
 
 
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)

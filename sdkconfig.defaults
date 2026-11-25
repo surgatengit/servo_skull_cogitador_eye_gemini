@@ -56,9 +56,8 @@ CONFIG_APP_PROJECT_VER="1.4.0"
 
 CONFIG_TINYUSB_CDC_COUNT=2
 
-# Camera (1.4.0): the BSP camera component enables the SC101IOT 1280x720 25 fps
-# format; make it the sensor default (used when no size is requested).
-CONFIG_CAMERA_SC101IOT_DVP_DEFAULT_FMT_YUV422_1280X720_25FPS=y
-# GPIO33/34 are camera D2/flash and the USB Serial/JTAG pads. VOX never uses USJ
-# (console on UART, ESP-Iris on USB-OTG HS); disable it like the BSP camera examples.
+# REQUIRED for the camera (test 12): GPIO33/34 are camera D2/flash and the USB
+# Serial/JTAG pads. With USJ enabled the SC101IOT streams but no frame completes
+# (VIDIOC_DQBUF timeout). VOX never uses USJ (console on UART, ESP-Iris on
+# USB-OTG HS); the BSP camera examples disable it too.
 # CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set

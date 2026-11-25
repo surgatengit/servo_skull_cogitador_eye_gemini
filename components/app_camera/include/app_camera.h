@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -32,10 +31,6 @@ typedef struct {
  *         does not fit even at the lowest quality), or the driver error.
  */
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out);
-
-/** Diagnostic (test 12): request 1280x720 UYVY explicitly (false, default) or
- * use the sensor's Kconfig default format (true). Same task as the capture. */
-void app_camera_use_sensor_default_format(bool use_default);
 
 #ifdef __cplusplus
 }

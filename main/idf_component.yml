@@ -14,9 +14,9 @@ dependencies:
     version: "*"
     override_path: "../../../submodule/esp-mosaico-utils/ESP-Iris/components/esp_iris"
   espressif/esp-gsp: "==1.5.1"
-  # Camera: the BSP asks for esp_video ^2.4.1 and the resolver picked 2.6.0, which
-  # delivered no frames on the SC101IOT (test 12). openai-live-esp32 runs this
-  # BSP commit on ESP-Mosaico with 2.5.0.
+  # Camera: validated with esp_video 2.5.0 (the version openai-live-esp32 uses with
+  # this BSP commit). The test 12 failure was USB Serial/JTAG, not 2.6.0; moving
+  # to a newer esp_video needs a new photo test.
   espressif/esp_video: "==2.5.0"
   # The BSP display adapter uses headers deprecated by LVGL 9.6.
   lvgl/lvgl: "==9.5.0"
