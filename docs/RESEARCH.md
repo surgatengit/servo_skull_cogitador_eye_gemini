@@ -281,7 +281,7 @@ Cada fase va en su propia rama, con compilación, simulador si aplica, autorizac
 | Verificación | Resultado |
 |---|---|
 | USB de `iris` | **USB-OTG con TinyUSB**, no USB Serial/JTAG. Windows ve `VID_303A&PID_4002` compuesto (serie `1C2904D11390`) con COM7 (MI_00, control) y COM6 (MI_02, datos). `sdkconfig`: `ESP_IRIS_TRANSPORT_USB=y`, `TINYUSB_CDC_COUNT=2`, consola en UART0, sin consola secundaria en USB Serial/JTAG. **La cámara no corta la instalación ni los logs**: el riesgo principal de las fases 2 y 6 desaparece (salvo comprobarlo con la cámara activa) |
-| Versión del módulo de cámara | **Desconocida**: el módulo viene encapsulado y no se ve la serigrafía (V1.2 = OV3640; V1.4 = SC101IOT, con lente de enfoque manual). No bloquea nada, porque el driver del BSP admite los dos. La primera compilación de la fase 2 registrará el sensor detectado por SCCB |
+| Versión del módulo de cámara | **V1.4 = SC101IOT** (1 MP, 1280×720 UYVY por defecto, enfoque manual). El módulo viene encapsulado, pero indica «rotate clockwise to focus far», y solo el V1.4 tiene enfoque manual. La primera compilación de la fase 2 lo confirmará por SCCB |
 | Batería y alimentación (BQ27220) | **No se puede leer sin escribir en el dispositivo**: VOX no inicializa el indicador e `iris device-status` no informa de batería. Hace falta una compilación de diagnóstico que escriba `bsp_battery_read()` en la línea `diag`, con instalación autorizada. Se propone como primer paso de la fase 4 |
 
 ## 10. No verificado
