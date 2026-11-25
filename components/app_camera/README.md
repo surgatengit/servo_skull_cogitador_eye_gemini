@@ -9,6 +9,10 @@ Kconfig: `VOX_CAMERA*`.
 1. `mosaico_camera_new/open/start_stream`. This uses the BSP `mosaico_module_camera`, vendored
    verbatim in `third_party/`. The capture is requested as 1280×720 UYVY with 2 buffers, which both
    module versions support.
+   - Between `new` and `open`, with `VOX_CAMERA_SENSOR_RESET` (default y), the sensor gets a soft
+     reset (`ESP_CAM_SENSOR_IOC_SW_RESET`) and its format is written again. A software restart does
+     not power the camera board off and `esp_video` never resets the sensor (the legacy
+     `esp32-camera` driver always did); without it the SC101IOT gave no frames after `iris restart`.
 2. Discard `VOX_CAMERA_SETTLE_FRAMES` frames (8 by default) so auto exposure settles, then grab one
    frame.
 3. **PPA** (hardware) crop, scale and rotate: UYVY to RGB565 `VOX_CAMERA_WIDTH`×`HEIGHT` (240×320

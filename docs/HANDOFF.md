@@ -140,8 +140,12 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   - Tras `iris restart` o una instalación, la cámara no entrega fotogramas hasta apagar y encender.
   - El README oficial lo explica: hay que esperar a que terminen la LCD y la PPA antes de
     `esp_restart()`.
-  - VOX registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Validación
-    pendiente.
+  - VOX registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Probado: **no
+    basta**.
+  - Causa más probable: el sensor no se apaga en un reinicio por software (mismo `VCC_3V3` que la
+    pantalla, reloj propio, sin pin de reset) y `esp_video` nunca le manda un reset; `esp32-camera` sí
+    lo hace siempre. `app_camera` ahora envía `ESP_CAM_SENSOR_IOC_SW_RESET` y reescribe el formato
+    antes de cada foto (`VOX_CAMERA_SENSOR_RESET`). Validación pendiente.
 - **Componente de cámara con el arreglo oficial de PWDN `b60f5d8` (prueba 13).** Con el de nuestro
   BSP `5f88b91`, el driver genérico manejaba CAM_PWDN con una polaridad equivocada para el módulo, y
   el sensor respondía pero no entregaba fotogramas. Detalle en `third_party/esp-mosaico-bsp/VOX_FORK.md`.

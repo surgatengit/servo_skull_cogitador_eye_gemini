@@ -15,6 +15,21 @@
 #include "mosaico_module_camera.h"
 #include "sdkconfig.h"
 
+#if CONFIG_VOX_CAMERA_SENSOR_RESET
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
+#include "esp_cam_sensor_types.h"
+#include "esp_video_device.h"
+#include "esp_video_ioctl.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#define SENSOR_RESET_SETTLE_MS  20   /* driver waits 5 ms; esp32-camera waits 50 */
+#endif
+
 #if CONFIG_VOX_CAMERA
 
 static const char *TAG = "app_camera";
@@ -137,6 +152,55 @@ static esp_err_t convert_frame(const mosaico_camera_frame_t *frame)
     return esp_cache_msync(s.rgb, s.rgb_size, ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
 }
 
+#if CONFIG_VOX_CAMERA_SENSOR_RESET
+/* The camera board keeps its 3V3 rail and its own XCLK across esp_restart(), so
+ * the sensor is never power-cycled by a software reset. The legacy esp32-camera
+ * driver always soft-resets the sensor at probe ("Doing SW reset of sensor");
+ * esp_video/esp_cam_sensor never send ESP_CAM_SENSOR_IOC_SW_RESET. Without it the
+ * SC101IOT delivers no frames after `iris restart` until a power cycle (test 13).
+ * Called after mosaico_camera_new() (sensor detected, PWDN awake, default format
+ * written) and before mosaico_camera_open(): reset, then write the same format
+ * again, because the reset returns every register to its default. */
+static esp_err_t reset_sensor(void)
+{
+    const int fd = open(ESP_VIDEO_DVP_DEVICE_NAME, O_RDWR);
+    if (fd < 0) {
+        ESP_LOGW(TAG, "sensor reset: open failed (errno %d)", errno);
+        return ESP_FAIL;
+    }
+    esp_err_t err = ESP_OK;
+    esp_cam_sensor_format_t format = { 0 };
+    int unused = 1;
+    struct v4l2_ext_control control = {
+        .id = ESP_CAM_SENSOR_IOC_SW_RESET,
+        .size = sizeof(unused),
+        .p_u8 = (uint8_t *)&unused,
+    };
+    struct v4l2_ext_controls controls = {
+        .ctrl_class = V4L2_CTRL_CLASS_ESP_CAM_IOCTL,
+        .count = 1,
+        .controls = &control,
+    };
+    if (ioctl(fd, VIDIOC_G_SENSOR_FMT, &format) != 0) {
+        ESP_LOGW(TAG, "sensor reset: get format failed (errno %d)", errno);
+        err = ESP_FAIL;
+    } else if (ioctl(fd, VIDIOC_S_EXT_CTRLS, &controls) != 0) {
+        ESP_LOGW(TAG, "sensor reset: SW reset failed (errno %d)", errno);
+        err = ESP_FAIL;
+    } else {
+        vTaskDelay(pdMS_TO_TICKS(SENSOR_RESET_SETTLE_MS));
+        if (ioctl(fd, VIDIOC_S_SENSOR_FMT, &format) != 0) {
+            ESP_LOGE(TAG, "sensor reset: format rewrite failed (errno %d)", errno);
+            err = ESP_FAIL;
+        } else {
+            ESP_LOGI(TAG, "sensor soft reset + format %s", format.name ? format.name : "?");
+        }
+    }
+    (void)close(fd);
+    return err;
+}
+#endif
+
 /* Open, settle, grab one frame, convert it, and always release the camera. */
 static esp_err_t grab_converted_frame(void)
 {
@@ -156,6 +220,9 @@ static esp_err_t grab_converted_frame(void)
     }
     mosaico_camera_frame_t frame = { 0 };
     bool borrowed = false;
+#if CONFIG_VOX_CAMERA_SENSOR_RESET
+    reset_sensor(); /* best effort: logs and carries on */
+#endif
     err = mosaico_camera_open(camera);
     if (err == ESP_OK) {
         err = mosaico_camera_start_stream(camera);

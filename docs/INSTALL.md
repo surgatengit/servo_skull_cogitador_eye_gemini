@@ -546,7 +546,21 @@ Al leer el código salió que la premisa era falsa:
 - **Corrección (commit siguiente):** se registra un manejador de apagado
   (`esp_register_shutdown_handler`) que llama a `esp_gsp_esp_lcd_pause()`. Esa función detiene el
   renderizado y espera a que terminen las transferencias de la pantalla antes del reinicio.
-- Prueba pendiente: instalar, apagar y encender una vez, y después `iris restart` seguido de una foto.
+- **Resultado (firmware `f9b92c95…`):** tras arranque en frío y luego `iris restart`, la foto vuelve a
+  fallar (`DQBUF` timeout). **La pausa de la pantalla no lo arregla**; se mantiene porque es inocua y
+  la pide el README.
+- **Hechos comprobados después:**
+  - El driver de ESP-IDF resetea el controlador DVP al iniciarlo (`cam_ll_reset_register`), así que
+    el lado del SoC arranca limpio.
+  - La placa de cámara tiene su propio reloj (XCLK sin GPIO) y se alimenta de `VCC_3V3`, que también
+    alimenta la pantalla: un reinicio por software **no apaga el sensor**.
+  - El SC101IOT no tiene pin de reset (`reset_pin = -1` en el driver).
+  - El driver clásico `esp32-camera` hace **siempre** un reset por software del sensor al detectarlo
+    (`Doing SW reset of sensor` en `esp_camera.c`). `esp_video`/`esp_cam_sensor` tienen la orden
+    (`ESP_CAM_SENSOR_IOC_SW_RESET`, registro 0x3103 bit 0) pero **nadie la llama**.
+- **Corrección (commit siguiente):** `app_camera` hace ese reset antes de cada foto y vuelve a escribir
+  el formato (Kconfig `VOX_CAMERA_SENSOR_RESET`, activado). Sin tocar código de Espressif.
+- Prueba pendiente: instalar, foto, `iris restart`, foto (sin apagar).
 
 **Borrar todas (petición del propietario, commit siguiente):** mantener pulsada la X de la galería
 1,5 s. La sesión borra la partición entera (no solo las cabeceras), cierra la galería, oculta el contador
