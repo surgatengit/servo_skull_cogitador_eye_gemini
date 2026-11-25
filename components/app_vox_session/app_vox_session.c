@@ -147,6 +147,20 @@ static struct {
     int64_t item_shown_us;
 } s;
 
+/* Last failed heap allocation anywhere in the firmware (any task or ISR): only
+ * plain stores here; the diag line reports it. */
+static volatile uint32_t s_alloc_fail_count;
+static volatile uint32_t s_alloc_fail_size;
+static volatile uint32_t s_alloc_fail_caps;
+
+static void on_alloc_failed(size_t size, uint32_t caps, const char *function_name)
+{
+    (void)function_name;
+    s_alloc_fail_size = (uint32_t)size;
+    s_alloc_fail_caps = caps;
+    s_alloc_fail_count++;
+}
+
 static uint32_t now_ms(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000);
@@ -594,6 +608,13 @@ static void log_diagnostics(int64_t now)
     const uint32_t dma_caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA;
     const size_t int_free = heap_caps_get_free_size(dma_caps);
     const size_t int_largest = heap_caps_get_largest_free_block(dma_caps);
+    const uint32_t fails = s_alloc_fail_count;
+    static uint32_t fails_logged;
+    if (fails != fails_logged) {
+        fails_logged = fails;
+        ESP_LOGW(TAG, "allocation failures: %u (last %u B, caps 0x%x)", (unsigned)fails,
+                 (unsigned)s_alloc_fail_size, (unsigned)s_alloc_fail_caps);
+    }
     if (idle) {
         ESP_LOGI(TAG, "diag st=%d wake=%d heap{int_dma_free=%u largest=%u}", (int)s.state,
                  (int)__atomic_load_n(&s.wake_feed, __ATOMIC_ACQUIRE), (unsigned)int_free,
@@ -880,6 +901,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     }
     s.config = *config;
     s.state = ST_CLOSED;
+    (void)heap_caps_register_failed_alloc_callback(on_alloc_failed);
     s.queue = xQueueCreate(SESSION_QUEUE_LEN, sizeof(session_event_t));
     if (!s.queue) {
         return ESP_ERR_NO_MEM;
