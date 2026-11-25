@@ -396,6 +396,20 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
 - Tras STREAMON se cuentan los cambios de nivel en PCLK, VSYNC, DE y D0: ¿envía el sensor?
 - Prueba C: igual que A, pero con el micrófono y WakeNet parados.
 
+**Diagnóstico 3 (firmware de `29ba3ca`):**
+
+- La prueba C, con el audio parado, también falla.
+- La sonda se ejecutó, pero el canal de registros perdió sus líneas: aparecen líneas en blanco justo
+  tras «Camera stream started».
+- Comprobado: ESP-Iris usa el USB-OTG HS (`TINYUSB_PORT_HIGH_SPEED_0`), así que no comparte
+  GPIO33/34 con la cámara.
+
+**Diagnóstico 4 (commit siguiente):**
+
+- `CONFIG_USJ_ENABLE_USB_SERIAL_JTAG` desactivado. Lo hacen los ejemplos con cámara y Wi-Fi y
+  openai-live-esp32, porque GPIO33/34 son D2 y el flash de la cámara; VOX no usa el USJ.
+- Las medidas de la sonda se escriben después de cerrar la cámara, con pausas.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

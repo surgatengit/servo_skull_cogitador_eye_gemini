@@ -3,6 +3,7 @@
 #include "app_camera.h"
 #include "camera_geometry.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "bsp/subboard.h"
@@ -13,6 +14,8 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "linux/videodev2.h"
 #include "mosaico_module_camera.h"
 #include "sdkconfig.h"
@@ -70,6 +73,8 @@ static struct {
 static bool s_sensor_default_format;
 
 #if CONFIG_VOX_CAMERA_BOOT_TEST
+static char s_probe_text[256];
+
 /* Diagnostic (test 12): count level changes on the DVP control lines for a short
  * busy window after STREAMON. Toggling PCLK/VSYNC means the sensor streams and the
  * capture path drops the data; flat lines mean the sensor sends nothing. */
@@ -102,9 +107,23 @@ static void probe_dvp_lines(void)
         }
     }
     const uint32_t us = (uint32_t)(esp_timer_get_time() - start);
-    for (int i = 0; i < LINE_COUNT; ++i) {
-        ESP_LOGI(TAG, "probe %s (GPIO%d): %lu edges, high %lu/%d in %lu us", lines[i].name, (int)io[i],
-                 (unsigned long)edges[i], (unsigned long)highs[i], SAMPLES, (unsigned long)us);
+    /* Logged later (report_probe): lines printed during this busy loop were lost. */
+    size_t used = (size_t)snprintf(s_probe_text, sizeof(s_probe_text), "probe %lu us:",
+                                   (unsigned long)us);
+    for (int i = 0; i < LINE_COUNT && used < sizeof(s_probe_text); ++i) {
+        used += (size_t)snprintf(s_probe_text + used, sizeof(s_probe_text) - used,
+                                 " %s(GPIO%d) edges=%lu high=%lu/%d", lines[i].name, (int)io[i],
+                                 (unsigned long)edges[i], (unsigned long)highs[i], SAMPLES);
+    }
+}
+
+static void report_probe(void)
+{
+    if (s_probe_text[0]) {
+        vTaskDelay(pdMS_TO_TICKS(50));
+        ESP_LOGW(TAG, "%s", s_probe_text);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        s_probe_text[0] = '\0';
     }
 }
 #endif
@@ -233,6 +252,9 @@ static esp_err_t grab_converted_frame(void)
     if (del_err != ESP_OK) {
         ESP_LOGE(TAG, "camera cleanup failed (%s)", esp_err_to_name(del_err));
     }
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+    report_probe();
+#endif
     return err != ESP_OK ? err : del_err;
 }
 
