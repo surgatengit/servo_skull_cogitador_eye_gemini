@@ -89,6 +89,7 @@ python mosaico.py iris system-update --project projects/servocraneo_gemini_direc
 | `app_vox_session` | Máquina de estados, vigilantes, diagnóstico | Logs `diag st=…` cada 5 s en conversación y 10 s en reposo |
 | `app_gemini_live` | Cliente WSS + protocolo Live | TLS en PSRAM, búfer WS de 4 KB, 409 → sesión nueva |
 | `app_camera` | Foto bajo demanda (1.4.0): abre la cámara, captura un fotograma, PPA a 240×320 y JPEG por hardware ≤ 24 KB, y la cierra | La cámara parchea ESP-IDF (sección 5); componentes del BSP en `third_party/` |
+| `app_photos` | Anillo de las 10 últimas fotos en la partición `photos`, para la galería (1.5.0) | Solo desde la tarea de la sesión (pila interna); cabecera escrita al final y CRC |
 | `app_audio` | ES8311 a 48 kHz; 16 kHz de subida, 24 kHz de bajada | Ganancia 24 dB, volumen 70 |
 | `app_wake` | WakeNet10 `wn10_es_holaesp` (esp-sr 2.6.2) | Detector solo en reposo; se devuelve si el bloque DMA < 8 KB |
 | `app_wifi` | Estación con credenciales de Vibe Mode | `WIFI_STORAGE_RAM`, sin ahorro de energía |
@@ -106,7 +107,8 @@ mientras hay una respuesta pendiente; durante ese tiempo no corre el reposo).
 Pruebas en PC (MSVC) del análisis de `groundingMetadata` y del formato de la línea de estado:
 `powershell -File tools/host_tests/run.ps1`.
 
-Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 0x210000 (12 224 K),
+Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 0x210000 (11 712 K),
+`photos` 0xD80000 (512 K, fotos de la galería),
 `model` 0xE00000 (1 M, `srmodels.bin`), `ui_apps` 0xF00000 (1 M). El paquete de System Update tiene
 4 componentes: tabla, app, `ui_apps` y `model`.
 

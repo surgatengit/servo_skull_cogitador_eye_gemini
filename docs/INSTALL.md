@@ -431,6 +431,30 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
 **Prueba 12 superada.** Se retira el código de diagnóstico; `VOX_CAMERA_BOOT_TEST` queda disponible pero
 apagado.
 
+### Prueba 13 (pendiente de autorización): 1.5.0, galería de fotos
+
+Rama `feat/gallery`. Contiene la 1.4.0 (cámara) más:
+- la partición `photos` y el componente `app_photos`;
+- el contador de fotos en el bisel;
+- la galería.
+
+Diseño confirmado por el propietario el 2026-11-25 (maqueta en el simulador).
+
+**Cambia la tabla de particiones:** `main_app` pasa de 12 224 K a 11 712 K y aparece `photos`, de 512 K. La
+escribe `iris system-update`, como en 1.1.0.
+
+1. Arranque: `app_version=1.5.0`, `crash_count=0` y `app_photos: 0 stored still(s) of 10`. El contador
+   no se ve.
+2. «VOX, ¿qué ves?»: la foto llega a Gemini como en la 1.4.0. Después aparece
+   `app_photos: still saved in slot 0`, y en el bisel, arriba a la izquierda, el contador «1».
+3. Tocar el contador: galería con la foto real, «1 / 1», X, ‹ y ›.
+4. Hacer 2 o 3 fotos más: ‹ y › recorren todas y la posición cambia («2 / 3»…).
+5. X vuelve al ojo; a los 30 s sin tocar, la galería se cierra sola; «Hola ESP» la cierra y abre la
+   conversación.
+6. Mientras VOX habla, tocar el contador no abre la galería.
+7. Reiniciar el dispositivo: el contador mantiene el número de fotos.
+8. Memoria: `largest=` con la galería abierta y ningún `allocation failures`.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

@@ -2,6 +2,7 @@
 /* Host preview adapter: runs the real eye controller with a scripted demo of
  * the session states. No networking or audio exists on the PC backend. */
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include "app_vox_eye.h"
 #include "gsp_sim_bridge.h"
@@ -15,7 +16,12 @@ static struct {
     app_vox_eye_state_t state;
     unsigned level_tick;
     unsigned transitions;
+    unsigned photo;          /* gallery demo position, 1..DEMO_PHOTOS */
+    bool gallery;
+    unsigned gallery_events;
 } backend;
+
+#define DEMO_PHOTOS 3        /* the PC has no photo store: placeholder picture */
 
 static const char *const STATUS[APP_VOX_EYE_STATE_COUNT] = {
     [APP_VOX_EYE_IDLE] = "",
@@ -43,7 +49,38 @@ static void demo_tick(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
     (void)ctx;
-    advance();
+    if (!backend.gallery) {
+        advance();
+    }
+}
+
+/* Gallery flow with the scene's placeholder picture (no JPEG on the PC). */
+static void on_gallery(app_vox_gallery_action_t action, void *ctx)
+{
+    (void)ctx;
+    backend.gallery_events++;
+    switch (action) {
+    case APP_VOX_GALLERY_OPEN:
+        backend.photo = DEMO_PHOTOS;
+        backend.gallery = true;
+        break;
+    case APP_VOX_GALLERY_PREV:
+        backend.photo = backend.photo <= 1 ? DEMO_PHOTOS : backend.photo - 1;
+        break;
+    case APP_VOX_GALLERY_NEXT:
+        backend.photo = backend.photo >= DEMO_PHOTOS ? 1 : backend.photo + 1;
+        break;
+    case APP_VOX_GALLERY_CLOSE:
+        backend.gallery = false;
+        (void)app_vox_eye_hide_gallery(backend.eye);
+        fprintf(stderr, "vox_eye_backend: gallery closed (events=%u)\n", backend.gallery_events);
+        return;
+    case APP_VOX_GALLERY_TOUCH:
+    default:
+        return;
+    }
+    (void)app_vox_eye_show_photo(backend.eye, NULL, 0, backend.photo, DEMO_PHOTOS);
+    fprintf(stderr, "vox_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
 }
 
 /* Tap opens/closes the demo conversation like the device session does. */
@@ -67,6 +104,7 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
 {
     const app_vox_eye_config_t config = {
         .on_tap = on_tap,
+        .on_gallery = on_gallery,
         .level = level,
         .seed = 0xC0617A70u,
     };
@@ -74,6 +112,7 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
     if (err != ESP_GSP_OK) {
         return err;
     }
+    (void)app_vox_eye_set_photo_count(backend.eye, DEMO_PHOTOS);
     backend.state = APP_VOX_EYE_IDLE;
     backend.demo_timer = esp_gsp_timer_create(ui, DEMO_STEP_MS, demo_tick, NULL);
     return backend.demo_timer ? ESP_GSP_OK : ESP_GSP_ERR_NO_MEM;

@@ -3,6 +3,7 @@
 #include "app_vox_eye.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -54,6 +55,7 @@ struct app_vox_eye {
     void *timer;
     volatile int32_t requested_state;
     volatile int32_t blink_request; /* set by any task, consumed by the timer */
+    volatile int32_t gallery_open;  /* set by any task: pause the eye under the gallery */
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -228,6 +230,9 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
+    if (eye->gallery_open) {
+        return; /* hidden under the gallery: no repaints, no DMA traffic */
+    }
     eye->stats.frames++;
 
     int32_t requested = eye->requested_state;
@@ -320,11 +325,36 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     }
 }
 
+static bool gallery_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
+{
+    app_vox_gallery_action_t action;
+    if (gsp_vox_event_is_photos_open(event)) {
+        action = APP_VOX_GALLERY_OPEN;
+    } else if (gsp_vox_event_is_gallery_close(event)) {
+        action = APP_VOX_GALLERY_CLOSE;
+    } else if (gsp_vox_event_is_gallery_prev(event)) {
+        action = APP_VOX_GALLERY_PREV;
+    } else if (gsp_vox_event_is_gallery_next(event)) {
+        action = APP_VOX_GALLERY_NEXT;
+    } else if (gsp_vox_event_is_gallery_touch(event)) {
+        action = APP_VOX_GALLERY_TOUCH;
+    } else {
+        return false;
+    }
+    if (eye->config.on_gallery) {
+        eye->config.on_gallery(action, eye->config.gallery_ctx);
+    }
+    return true;
+}
+
 static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
-    if (!gsp_vox_event_is_eye_tap(event)) {
+    if (gallery_event(eye, event)) {
+        return;
+    }
+    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open) {
         return;
     }
     eye->stats.taps++;
@@ -407,6 +437,47 @@ esp_gsp_err_t app_vox_eye_set_status(app_vox_eye_handle_t handle, const char *ut
     }
     return (esp_gsp_err_t)gsp_vox_status_set_text(handle->ui,
                                                   (utf8 && utf8[0]) ? utf8 : " ");
+}
+
+esp_gsp_err_t app_vox_eye_set_photo_count(app_vox_eye_handle_t handle, unsigned count)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    char text[8];
+    snprintf(text, sizeof(text), "%u", count > 99U ? 99U : count);
+    esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_photo_count_set_text(handle->ui, text);
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_photo_badge_set_visible(handle->ui, count > 0U);
+    return err != ESP_GSP_OK ? err : vis;
+}
+
+esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t *jpeg, size_t size,
+                                     unsigned position, unsigned count)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    esp_gsp_err_t err = ESP_GSP_OK;
+    if (jpeg && size > 0) {
+        /* The previous picture stays visible while this one decodes. */
+        err = (esp_gsp_err_t)gsp_vox_gallery_photo_set_image(handle->ui, jpeg, size);
+    }
+    char text[16];
+    snprintf(text, sizeof(text), "%u / %u", position, count);
+    const esp_gsp_err_t idx = (esp_gsp_err_t)gsp_vox_gallery_index_set_text(handle->ui, text);
+    handle->gallery_open = 1;
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, true);
+    return err != ESP_GSP_OK ? err : (idx != ESP_GSP_OK ? idx : vis);
+}
+
+esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    const esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, false);
+    handle->gallery_open = 0;
+    return err;
 }
 
 esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot_t *out_snapshot)

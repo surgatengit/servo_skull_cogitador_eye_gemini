@@ -53,6 +53,14 @@ closes the conversation and re-arms local listening.
   fallback `gemini-3.8-live`.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
+- Gallery (1.5.0):
+  - Stills are saved with `app_photos` after each `capturar_imagen`, and the photo count is pushed to
+    the UI sink (`set_photo_count`).
+  - `app_vox_session_gallery(action)` (GSP task) only enqueues. The session reads the JPEG from flash
+    on its own task and calls `show_photo` (GSP copies it) or `hide_gallery`.
+  - Opening is refused while CONNECTING, PROCESSING or SPEAKING.
+  - The gallery opens on the newest photo; ‹ and › wrap around.
+  - It closes after 30 s without touches, or when «Hola ESP» is heard.
 - Transcripts, search queries and source domains are logged only at DEBUG level.
 - Camera tool (Kconfig `VOX_CAMERA`, 1.4.0): the session declares `capturar_imagen` and handles
   each call on its own task.

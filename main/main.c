@@ -45,6 +45,29 @@ static void ui_acknowledge(void *ui)
     app_vox_eye_blink((app_vox_eye_handle_t)ui);
 }
 
+static void ui_set_photo_count(void *ui, unsigned count)
+{
+    (void)app_vox_eye_set_photo_count((app_vox_eye_handle_t)ui, count);
+}
+
+static void ui_show_photo(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
+                          unsigned count)
+{
+    (void)app_vox_eye_show_photo((app_vox_eye_handle_t)ui, jpeg, size, position, count);
+}
+
+static void ui_hide_gallery(void *ui)
+{
+    (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
+}
+
+/* GSP framework task: only enqueue. The enums share their values. */
+static void eye_gallery(app_vox_gallery_action_t action, void *ctx)
+{
+    (void)ctx;
+    app_vox_session_gallery((app_vox_session_gallery_t)action);
+}
+
 static void eye_tapped(void *ctx)
 {
     (void)ctx;
@@ -88,6 +111,7 @@ static esp_err_t start_eye(void)
     ESP_ERROR_CHECK(iris_screen_mirror_attach(application.ui));
     const app_vox_eye_config_t eye = {
         .on_tap = eye_tapped,
+        .on_gallery = eye_gallery,
         .level = eye_level,
         .seed = esp_random() | 1U,
     };
@@ -122,6 +146,9 @@ void app_main(void)
             .set_view = eye_ready ? ui_set_view : NULL,
             .set_status = eye_ready ? ui_set_status : NULL,
             .acknowledge = eye_ready ? ui_acknowledge : NULL,
+            .set_photo_count = eye_ready ? ui_set_photo_count : NULL,
+            .show_photo = eye_ready ? ui_show_photo : NULL,
+            .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
             .ui = application.eye,
         },
     };

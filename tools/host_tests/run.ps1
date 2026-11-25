@@ -35,4 +35,11 @@ $geo = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /I`"$root\components\app_c
 cmd /c $geo
 if ($LASTEXITCODE -ne 0) { throw "geometry build failed" }
 & "$out\test_camera_geometry.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$ring = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /I`"$root\components\app_photos`" " +
+        "`"$here\test_photos_ring.c`" `"$root\components\app_photos\photos_ring.c`" " +
+        "/Fo`"$out\\`" /Fe`"$out\test_photos_ring.exe`""
+cmd /c $ring
+if ($LASTEXITCODE -ne 0) { throw "photo ring build failed" }
+& "$out\test_photos_ring.exe"
 exit $LASTEXITCODE

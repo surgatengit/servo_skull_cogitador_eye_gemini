@@ -269,7 +269,9 @@ Cada fase va en su propia rama, con compilación, simulador si aplica, autorizac
 |---|---|---|---|
 | ~~**0. Verificaciones de solo lectura**~~ **Hecha (§9.1)** | Qué USB usa `iris` (Type-C con USB-OTG o USB Serial/JTAG). Versión del módulo de cámara por la serigrafía. Lectura del BQ27220 con y sin USB (por un log temporal) | Nada | Nulo |
 | ~~**1. Memoria DMA**~~ **Hecha: 1.3.0, prueba 11** | `trans_queue_depth = 2` sustituyendo el componente del BSP en el proyecto (opción 2 de la sección 2), callback de reserva fallida y, quizá, `RESERVE_INTERNAL=98304` | Decisión del propietario sobre el BSP | Bajo si se mide; mantenimiento de la copia del BSP |
-| ~~**2. Cámara bajo demanda**~~ **Hecha: 1.4.0, prueba 12** (la causa del fallo inicial fue el USB Serial/JTAG) | Función `capturar_imagen`, captura única con apertura y cierre, JPEG por hardware ≤ 16 KB, `realtimeInput.video`, destello en el ojo | Fase 1; resolver el USB (fase 0) | Medio (USB, DMA) |
+| ~~**2. Cámara bajo demanda**~~ **Hecha: 1.4.0, prueba 12** (la causa del fallo inicial fue el USB Serial/JTAG) |
+
+Añadido a petición del propietario (1.5.0, `feat/gallery`): almacenamiento de las 10 últimas fotos en la partición `photos`, contador en el bisel y galería con X para volver al ojo. Diseño confirmado con una maqueta en el simulador. Función `capturar_imagen`, captura única con apertura y cierre, JPEG por hardware ≤ 16 KB, `realtimeInput.video`, destello en el ojo | Fase 1; resolver el USB (fase 0) | Medio (USB, DMA) |
 | **3. Funciones propias** | `cambiar_emocion`, `leer_sensores`, «CUOTA AGOTADA» sin reintentos; Google Search se reactiva si hay cuota | — (independiente; puede ir antes que la 2) | Bajo |
 | **4. Alimentación** | Detección por BQ27220, indicación en reposo y aviso de batería baja. Después, la base magnética (hardware) | Fase 0 | Bajo (software); medio (hardware) |
 | **5. Interrupción por voz** | Primero «Hola ESP» durante la respuesta. Después, AEC con referencia por software en esp-sr AFE | Fase 1 | Alto (CPU, RAM interna, alineación) |

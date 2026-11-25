@@ -46,3 +46,23 @@ app_vox_eye_set_status(eye, "SIN WI-FI");            /* any task; "" hides */
 `python mosaico.py project sim --project projects/servocraneo_gemini_direct --interactive`
 runs the same controller; the Host adapter cycles the five states every 3 s and
 a tap toggles idle/listening. Networking and audio are not simulated.
+
+## Photo counter and gallery (1.5.0)
+
+- **Counter:** `photo_badge` / `photo_count` on the bezel at about 10:30 (60,60 56×56), above the
+  full-screen `tap` button. It is hidden while the count is 0.
+  - `app_vox_eye_set_photo_count()` updates it.
+  - A tap on it raises `APP_VOX_GALLERY_OPEN` through `config.on_gallery`.
+- **Gallery:** the `gallery` container covers the screen and starts hidden.
+  - Contents: the `gallery_photo` image (264×352, bound resource with a 240×320 placeholder that fixes
+    the pixel format), the X (`gallery_close`), the arrows (`gallery_prev` / `gallery_next`) and the
+    position (`gallery_index`, "n / m").
+  - A full-screen `gallery_bg` button swallows other touches (`APP_VOX_GALLERY_TOUCH`), so no tap
+    reaches the eye's `tap` while the gallery is shown.
+  - `app_vox_eye_show_photo()` copies the JPEG (GSP decodes it), sets the position and shows the
+    gallery. `app_vox_eye_hide_gallery()` hides it.
+  - The eye animation pauses while the gallery is shown: no repaints and no DMA traffic underneath.
+- **PC preview:** `host/platform_pc.c` sets 3 demo photos and runs the gallery flow with the
+  placeholder picture.
+  - Scripted simulator runs (2026-11-25) checked: open (3/3), ‹ (2/3), › with wrap (1/3), X, and a
+    tap on the photo that does not start a conversation.
