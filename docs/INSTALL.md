@@ -490,6 +490,35 @@ Lo único que tenía el diagnóstico 4 y ya no está:
 
 Además, la foto de prueba del arranque vuelve a estar activada.
 
+**Diagnóstico 5 (firmware de `4a1b2f4`): fallan la foto del arranque y los tres intentos.**
+
+Al leer el código salió que la premisa era falsa:
+
+- `mosaico_camera_start_stream()` ya lee fotogramas por sí misma: justo después de STREAMON llama
+  a `discard_stream_frames(buffer_count)`.
+- El tiempo agotado se produce **dentro** de esa función. Por eso el error aparece siempre 2000 ms
+  después de «Camera stream started».
+- Ni la espera, ni la pausa del ojo, ni la sonda del diagnóstico 4 llegaban a actuar antes de la
+  primera lectura.
+- La configuración completa de `sdkconfig` del diagnóstico 4 y la actual son iguales, salvo el
+  formato de 15 fps.
+
+**Causa documentada en el repositorio oficial del BSP:**
+
+- El commit **`b60f5d8`** de esp-mosaico/esp-mosaico-bsp (2026-10-19, «fix: update camera app»),
+  posterior a nuestro `5f88b91`, hace que el módulo controle él mismo CAM_PWDN (GPIO48), con 0 normal
+  y 1 dormido, «including SC101IOT».
+- Hasta entonces se pasaba ese pin al driver genérico del sensor, que usa su propia polaridad.
+- Encaja con lo observado: el LED rojo siguiendo el nivel equivocado, y un sensor que responde por
+  SCCB pero no completa fotogramas.
+
+**Corrección (commit siguiente):**
+
+- `third_party/mosaico_module_camera/mosaico_camera.c` y su README pasan a la versión oficial
+  `b60f5d8`, sin modificar.
+- Se retira el diagnóstico 5.
+- Se mantienen los 25 fps y el USB Serial/JTAG desactivado, igual que los ejemplos oficiales.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

@@ -11,8 +11,6 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "linux/videodev2.h"
 #include "mosaico_module_camera.h"
 #include "sdkconfig.h"
@@ -66,13 +64,6 @@ static struct {
     uint8_t *jpeg;
     size_t jpeg_size;
 } s;
-
-static bool s_busy_settle; /* test 13 attempt 3: busy-wait instead of sleeping */
-
-void app_camera_set_busy_settle(bool busy)
-{
-    s_busy_settle = busy;
-}
 
 static esp_err_t ensure_buffers(void)
 {
@@ -169,19 +160,6 @@ static esp_err_t grab_converted_frame(void)
     if (err == ESP_OK) {
         err = mosaico_camera_start_stream(camera);
     }
-    if (err == ESP_OK && CONFIG_VOX_CAMERA_STREAM_SETTLE_MS > 0) {
-        /* Test 13: the stills that worked (diagnostics 4) read the first frame
-         * about 0.7 s after STREAMON; reading at once timed out. */
-        if (s_busy_settle) {
-            /* Same as the diagnostics-4 probe: keep this core busy, starving
-             * lower-priority tasks on it, instead of sleeping. */
-            const int64_t until = esp_timer_get_time() + CONFIG_VOX_CAMERA_STREAM_SETTLE_MS * 1000LL;
-            while (esp_timer_get_time() < until) {
-            }
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(CONFIG_VOX_CAMERA_STREAM_SETTLE_MS));
-        }
-    }
     if (err == ESP_OK && SETTLE_FRAMES > 0) {
         err = mosaico_camera_discard_frames(camera, SETTLE_FRAMES); /* auto exposure */
     }
@@ -259,11 +237,6 @@ esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)
 }
 
 #else /* !CONFIG_VOX_CAMERA */
-
-void app_camera_set_busy_settle(bool busy)
-{
-    (void)busy;
-}
 
 
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)

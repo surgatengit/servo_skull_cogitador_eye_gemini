@@ -7,6 +7,7 @@ Usage (from the project root): python tools/check_bsp_fork.py
 """
 
 import difflib
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,9 +24,26 @@ def files(root: Path) -> set[str]:
 
 
 # Unmodified copies that must resolve `../esp-mosaico-bsp` to the fork above.
-# Their unit-test folders are not copied.
+# Their unit-test folders are not copied. Files listed in UPSTREAM_FIXES are taken
+# verbatim from a later official esp-mosaico-bsp commit instead of the submodule
+# checkout (see third_party/esp-mosaico-bsp/VOX_FORK.md).
 VERBATIM = ("mosaico_module_camera", "mosaico_module_mgr")
 SKIPPED_DIRS = ("test/",)
+UPSTREAM_FIXES = {
+    # b60f5d8 (2026-10-19) "fix: update camera app": the module drives CAM_PWDN with
+    # board polarity (0 normal, 1 sleep, including SC101IOT); test 13.
+    "mosaico_module_camera/mosaico_camera.c": "b60f5d8",
+    "mosaico_module_camera/README.md": "b60f5d8",
+}
+BSP_REPO = UPSTREAM.parents[1]
+
+
+def reference_bytes(name: str, rel: str) -> bytes:
+    commit = UPSTREAM_FIXES.get(f"{name}/{rel}")
+    if commit is None:
+        return (UPSTREAM.parent / name / rel).read_bytes()
+    return subprocess.run(["git", "-C", str(BSP_REPO), "show", f"{commit}:components/{name}/{rel}"],
+                          check=True, capture_output=True).stdout
 
 
 def check_verbatim(name: str) -> list[str]:
@@ -36,8 +54,12 @@ def check_verbatim(name: str) -> list[str]:
     fk = files(fork)
     errors = [f"{name}: only in fork: {f}" for f in sorted(fk - up)]
     errors += [f"{name}: missing in fork: {f}" for f in sorted(up - fk)]
-    errors += [f"{name}: changed: {f}" for f in sorted(fk & up)
-               if (fork / f).read_bytes() != (upstream / f).read_bytes()]
+    for f in sorted(fk & up):
+        try:
+            if (fork / f).read_bytes() != reference_bytes(name, f):
+                errors.append(f"{name}: changed: {f}")
+        except subprocess.CalledProcessError:
+            errors.append(f"{name}: upstream commit for {f} not available (git fetch in the BSP)")
     return errors
 
 

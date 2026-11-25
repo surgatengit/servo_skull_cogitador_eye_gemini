@@ -136,6 +136,9 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   - Otro PC necesita el mismo parche (lo aplica la propia compilación) para tener capturas estables.
   - A 2026-11-25, ESP-IDF `master` aún no incluye el arreglo. Si se actualiza ESP-IDF y ya lo trae, el
     componente lo detecta («already applied») o avisa sin romper la compilación.
+- **Componente de cámara con el arreglo oficial de PWDN `b60f5d8` (prueba 13).** Con el de nuestro
+  BSP `5f88b91`, el driver genérico manejaba CAM_PWDN con una polaridad equivocada para el módulo, y
+  el sensor respondía pero no entregaba fotogramas. Detalle en `third_party/esp-mosaico-bsp/VOX_FORK.md`.
 - **Formato del SC101IOT: solo 1280×720 a 25 fps (cámara, 1.5.0).** Con el de 15 fps la cámara
   tampoco entrega fotogramas. `sdkconfig.defaults` lo fija como formato por defecto y no compila el de
   15 fps (prueba 13).

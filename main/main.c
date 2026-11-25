@@ -56,11 +56,6 @@ static void ui_show_photo(void *ui, const uint8_t *jpeg, size_t size, unsigned p
     (void)app_vox_eye_show_photo((app_vox_eye_handle_t)ui, jpeg, size, position, count);
 }
 
-static void ui_pause_display(void *ui, bool paused)
-{
-    app_vox_eye_set_paused((app_vox_eye_handle_t)ui, paused);
-}
-
 static void ui_hide_gallery(void *ui)
 {
     (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
@@ -154,7 +149,6 @@ void app_main(void)
             .set_photo_count = eye_ready ? ui_set_photo_count : NULL,
             .show_photo = eye_ready ? ui_show_photo : NULL,
             .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
-            .pause_display = eye_ready ? ui_pause_display : NULL,
             .ui = application.eye,
         },
     };

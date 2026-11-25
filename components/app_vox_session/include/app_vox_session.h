@@ -29,7 +29,6 @@ typedef struct {
     void (*show_photo)(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
                        unsigned count);
     void (*hide_gallery)(void *ui);
-    void (*pause_display)(void *ui, bool paused);     /**< optional: freeze the eye */
     void *ui;
 } app_vox_session_ui_t;
 

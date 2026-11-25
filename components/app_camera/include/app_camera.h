@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -32,10 +31,6 @@ typedef struct {
  *         does not fit even at the lowest quality), or the driver error.
  */
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out);
-
-/** Test 13 diagnostic: busy-wait (true) instead of sleeping (false, default)
- * during VOX_CAMERA_STREAM_SETTLE_MS after STREAMON. Same task as the capture. */
-void app_camera_set_busy_settle(bool busy);
 
 #ifdef __cplusplus
 }

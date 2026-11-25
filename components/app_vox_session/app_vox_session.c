@@ -827,27 +827,7 @@ static void run_capture(const tool_slot_t *slot)
     }
     set_mic(false);
     app_camera_still_t still;
-    esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
-#if CONFIG_VOX_CAMERA_PAUSE_DISPLAY_RETRY
-    if (err == ESP_ERR_TIMEOUT && s.config.ui.pause_display) {
-        /* Test 13: second hypothesis, panel DMA traffic during the first frames. */
-        ESP_LOGW(TAG, "still attempt 1 timed out; retrying with the eye paused");
-        s.config.ui.pause_display(s.config.ui.ui, true);
-        vTaskDelay(pdMS_TO_TICKS(100)); /* let the last frame finish */
-        err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
-        s.config.ui.pause_display(s.config.ui.ui, false);
-        ESP_LOGW(TAG, "still attempt 2 (eye paused): %s", esp_err_to_name(err));
-        if (err == ESP_ERR_TIMEOUT) {
-            /* Third hypothesis: the diagnostics-4 probe busy-waited on this core. */
-            app_camera_set_busy_settle(true);
-            err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
-            app_camera_set_busy_settle(false);
-            ESP_LOGW(TAG, "still attempt 3 (busy settle): %s", esp_err_to_name(err));
-        }
-    } else {
-        ESP_LOGI(TAG, "still attempt 1: %s", esp_err_to_name(err));
-    }
-#endif
+    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
     if (err == ESP_OK && !__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE) &&
             app_gemini_live_send_image(s.gl, still.data, still.size) == ESP_OK) {
         s.stills_sent++;

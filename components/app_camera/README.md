@@ -38,6 +38,8 @@ Kconfig: `VOX_CAMERA*`.
 
 - **USB Serial/JTAG must be disabled** (`# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`). Its pads
   are camera D2 and flash (GPIO33/34). With USJ enabled the sensor streams but no frame completes.
+- **`mosaico_module_camera` must include the official CAM_PWDN fix `b60f5d8`** (test 13).
+  Without it, the sensor answers over SCCB but no frame completes.
 - **SC101IOT format: 1280×720 at 25 fps only** (test 13). With the 15 fps format (the sensor
   driver's Kconfig default) no frame completes either. `sdkconfig.defaults` makes 25 fps the default
   and leaves 15 fps out of the build.
