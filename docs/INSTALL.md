@@ -535,14 +535,20 @@ Al leer el código salió que la premisa era falsa:
 - **Galería:** el propietario confirma que funciona en el dispositivo (contador, fotos reales, ‹ › y X).
 - **Reinicio por software (`iris restart`, autorizado, `reset_reason=3`):**
   - las 4 fotos se conservan (`4 stored still(s) of 10`);
-  - después, **4 fotos más correctas**, de unos 0,7 s cada una, guardadas en los huecos 4–7
-    (`8 stored`).
-  - Confirma que el fallo de justo tras instalar fue el estado que dejó el firmware anterior. Con
-    `b60f5d8` la cámara sobrevive a los reinicios por software.
-- **Nota para quien actualice desde una versión con la cámara antigua (1.4.0 o los diagnósticos):**
-  después de instalar, apagar y encender una vez.
+  - **pero la cámara vuelve a fallar** (`DQBUF` timeout).
+  - Tras apagar y encender, 4 fotos más correctas, guardadas en los huecos 4–7 (`8 stored`).
+  - **Corrección de una conclusión anterior:** se leyó por error el arranque en frío posterior. En
+    realidad, **cualquier reinicio por software deja la cámara sin fotogramas hasta apagar y encender**.
+- **Causa según el README oficial del componente:** el reinicio por software puede dejar activo el DMA
+  de la cámara **o de la pantalla**. Antes de `esp_restart()`, la aplicación debe esperar a que
+  terminen la PPA y la LCD. VOX no paraba la pantalla, y los reinicios los lanza ESP-Iris
+  (`iris restart` y System Update).
+- **Corrección (commit siguiente):** se registra un manejador de apagado
+  (`esp_register_shutdown_handler`) que llama a `esp_gsp_esp_lcd_pause()`. Esa función detiene el
+  renderizado y espera a que terminen las transferencias de la pantalla antes del reinicio.
+- Prueba pendiente: instalar, apagar y encender una vez, y después `iris restart` seguido de una foto.
 
-**Prueba 13 superada (2026-11-25).**
+**Galería y almacenamiento: superados.** Reinicio por software: pendiente de la corrección.
 
 ## 3. Volver al firmware actual (restauración)
 

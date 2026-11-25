@@ -8,7 +8,10 @@
 #include "app_wifi.h"
 #include "esp_iris.h"
 #include "esp_log.h"
+#include "esp_gsp_esp_lcd.h"
 #include "esp_random.h"
+#include "esp_rom_sys.h"
+#include "esp_system.h"
 #include "iris_ota_support.h"
 #include "iris_screen_mirror.h"
 #include "nvs_flash.h"
@@ -92,6 +95,21 @@ static void secrets_changed(void *ctx)
     app_vox_session_secrets_changed();
 }
 
+/* esp_restart() runs this before the reset (ESP-Iris triggers restarts for
+ * `iris restart` and System Update). The camera component's README requires
+ * waiting for LCD/PPA completion before a software reset: a panel transfer cut
+ * in flight leaves the DVP camera unable to deliver frames until a power cycle
+ * (test 13). Pause the GSP render task and retire the presenter fences. */
+static void quiesce_display_on_restart(void)
+{
+    if (!application.ui) {
+        return;
+    }
+    esp_gsp_esp_lcd_pause_t *pause = NULL;
+    const esp_err_t err = esp_gsp_esp_lcd_pause(application.ui, 300, &pause);
+    esp_rom_printf("vox_m01: display quiesced before restart (%s)\n", esp_err_to_name(err));
+}
+
 static esp_err_t start_eye(void)
 {
     esp_gsp_config_t config;
@@ -109,6 +127,7 @@ static esp_err_t start_eye(void)
     ESP_ERROR_CHECK(iris_screen_mirror_init());
     ESP_ERROR_CHECK(esp_gsp_esp_lcd_start(&config, &display, &application.ui));
     ESP_ERROR_CHECK(iris_screen_mirror_attach(application.ui));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_register_shutdown_handler(quiesce_display_on_restart));
     const app_vox_eye_config_t eye = {
         .on_tap = eye_tapped,
         .on_gallery = eye_gallery,

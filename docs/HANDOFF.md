@@ -136,9 +136,12 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   - Otro PC necesita el mismo parche (lo aplica la propia compilación) para tener capturas estables.
   - A 2026-11-25, ESP-IDF `master` aún no incluye el arreglo. Si se actualiza ESP-IDF y ya lo trae, el
     componente lo detecta («already applied») o avisa sin romper la compilación.
-- **Tras actualizar desde un firmware con la cámara antigua, apagar y encender una vez.** El reinicio
-  por software no corta la alimentación del módulo y el sensor arrastra el estado anterior. Con
-  `b60f5d8` los reinicios por software posteriores ya funcionan (prueba 13).
+- **Reinicio por software y cámara (prueba 13).**
+  - Tras `iris restart` o una instalación, la cámara no entrega fotogramas hasta apagar y encender.
+  - El README oficial lo explica: hay que esperar a que terminen la LCD y la PPA antes de
+    `esp_restart()`.
+  - VOX registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Validación
+    pendiente.
 - **Componente de cámara con el arreglo oficial de PWDN `b60f5d8` (prueba 13).** Con el de nuestro
   BSP `5f88b91`, el driver genérico manejaba CAM_PWDN con una polaridad equivocada para el módulo, y
   el sensor respondía pero no entregaba fotogramas. Detalle en `third_party/esp-mosaico-bsp/VOX_FORK.md`.
