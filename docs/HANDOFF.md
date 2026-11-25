@@ -1,18 +1,28 @@
 # VOX M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
 
-Última actualización: **2026-11-25**: rama `feat/google-search` (1.2.0) compilada, probada en PC
-y en GitHub, **pendiente de instalar** (prueba 10 de INSTALL.md). Google Search nativo:
-[GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Ampliaciones futuras: [ROADMAP.md](ROADMAP.md).
+Última actualización: **2026-11-25**, al cierre de la sesión de 1.2.0 y 1.3.0. `main` = **1.3.0**
+instalada y validada.
+
+Otros documentos:
+- Google Search (opcional y apagado): [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md);
+- plan de evolución por fases: [RESEARCH.md](RESEARCH.md);
+- ideas futuras: [ROADMAP.md](ROADMAP.md).
 Empieza por aquí en cualquier sesión nueva. El detalle está en [DESIGN.md](DESIGN.md)
 (requisitos y arquitectura) y en [INSTALL.md](INSTALL.md) (instalación, restauración, seguridad y
 el historial completo de las pruebas físicas).
 
 ## 1. Estado en una frase
 
-VOX M-01 **1.1.0** funciona en el ESP-Mosaico: un ojo mecánico GSP que conversa con **Gemini Live
-directamente por Wi-Fi y WebSocket seguro** (sin Windows ni servicios intermedios), se despierta con
-**«Hola ESP»** en local, se interrumpe con un toque, se cierra con otro y vuelve al reposo a los 15 s.
-Todo validado en el hardware (pruebas 1–9 de INSTALL.md).
+VOX M-01 **1.3.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
+- conversa con **Gemini Live directamente por Wi-Fi y WebSocket seguro**, sin Windows ni servicios
+  intermedios;
+- se despierta con **«Hola ESP»** en local;
+- se interrumpe con un toque y se cierra con otro;
+- no vuelve al reposo mientras Gemini prepara la respuesta y vuelve a los 15 s de inactividad;
+- desde 1.3.0 tiene margen de sobra en la memoria DMA de la pantalla.
+
+Todo está validado en el hardware (pruebas 1–11 de INSTALL.md). Google Search está implementado pero
+**apagado** por la cuota del plan gratuito.
 
 | Elemento | Valor |
 |---|---|
@@ -127,37 +137,46 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
 
 ## 6. Pendiente y siguientes pasos
 
-Plan de evolución por fases (cámara, seguimiento, AEC, herramientas, memoria, alimentación) a partir
-de cuatro proyectos de referencia: [RESEARCH.md](RESEARCH.md). Lo más urgente es su sección 2:
-`trans_queue_depth = 2` en la pantalla, el arreglo de openai-live-esp32 para la DMA en este mismo
-hardware.
+El plan principal está en [RESEARCH.md](RESEARCH.md) §9. Estado:
+- **Fase 0 (verificaciones) hecha:** `iris` usa el USB-OTG con TinyUSB, no el USB Serial/JTAG que
+  comparte pines con la cámara, y la cámara es el módulo V1.4 (SC101IOT, enfoque manual).
+- **Fase 1 (memoria DMA) hecha:** 1.3.0.
 
-0. **Estado 2026-11-25:** 1.2.0 con búsqueda desactivada (`VOX_GOOGLE_SEARCH=n`) instalada y
-   validada por voz (INSTALL.md, prueba 10). Falta fusionar en `main` y etiquetar `v1.2.0` cuando
-   lo pida el propietario. Lo que sigue en este punto 0 es el plan original para la búsqueda, que
-   solo aplica si se reactiva con cuota disponible.
-   **1.2.0 / Google Search:** con autorización, instalar la rama `feat/google-search` y hacer la
-   prueba 10 (confirmar que el servidor acepta `tools:[{"googleSearch":{}}]`, las fuentes en pantalla
-   y `largest=` ≥ 8192). Si sale bien, fusionar en `main` (solo cuando lo pida el propietario) y
-   etiquetar `v1.2.0`. Cumplimiento de la presentación de fuentes en un dispositivo de voz: riesgo
-   abierto (GOOGLE_SEARCH.md §4).
+Siguientes, en el orden recomendado:
 
-1. **Proponer al BSP** (`esp-mosaico-bsp`, fuera de este repo) evaluar `psram_dma_direct = true` para el
-   CO5300: eliminaría la presión DMA de raíz.
-2. **AEC por software / full-duplex** (esp-sr AFE, formato «MR» con referencia de reproducción) para
-   poder interrumpir hablando en lugar de con un toque. Ojo con la RAM interna (sección 5).
-3. Ajuste fino: latencia, umbral de voz, volumen, prompt de la personalidad.
-4. Pruebas de larga duración (sesiones >15 min con compresión y reanudación, `goAway`).
-5. Seguridad opcional (irreversible, **requiere autorización expresa**): cifrado NVS con HMAC en eFuse.
-6. Opcional: borrar las ramas ya fusionadas si reaparecen; empaquetar como Idea (`mosaico.py project package`).
-7. Si `GEMINI_API_KEY` sigue como variable de entorno persistente en Windows, el propietario puede
-   eliminarla: `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", $null, "User")`.
+1. **Fase 2, cámara bajo demanda** («VOX, ¿qué ves?»): captura única, JPEG por hardware y
+   `realtimeInput.video`.
+2. **Fase 3, funciones propias:** emoción del ojo, sensores y mensaje «CUOTA AGOTADA» sin reintentos.
+   Es independiente de la fase 2.
+3. **Fase 5, interrupción por voz:** primero «Hola ESP» durante la respuesta, que ahora es viable con
+   el margen de DMA; después, AEC con referencia por software.
+4. **Fase 4, alimentación:** compilación de diagnóstico del BQ27220 y después la base magnética
+   (ROADMAP.md §3).
+5. **Fase 6, seguimiento de movimiento** para orientar el iris (rejilla 32×24, idea de jamiryo, MIT).
+
+Otros pendientes:
+
+- **Google Search:** reactivar solo con cuota. Comprobarlo antes con `tools/test_live_setup.py`
+  (GOOGLE_SEARCH.md).
+- **BSP:** proponer aguas arriba (`esp-mosaico-bsp`) que se pueda configurar `trans_queue_depth`, para
+  poder retirar la copia `third_party/esp-mosaico-bsp`. Si se actualiza el submódulo, rehacer la copia
+  y pasar `tools/check_bsp_fork.py`.
+- Ajuste fino: latencia, umbral de voz, volumen y personalidad.
+- Pruebas de larga duración: sesiones de más de 15 min con compresión, reanudación y `goAway`.
+- Seguridad opcional (irreversible, **requiere autorización expresa**): cifrado NVS con HMAC en eFuse.
+- Opcional: empaquetar como Idea (`mosaico.py project package`).
+- Si `GEMINI_API_KEY` sigue como variable de entorno persistente en Windows, el propietario puede
+  eliminarla: `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", $null, "User")`.
+- Los registros del dispositivo solo conservan unos 20 s tras el arranque. Para las pruebas de voz, abre
+  una captura en directo: `python mosaico.py iris logs --project projects/servocraneo_gemini_direct
+  --timeout 240`.
 
 ## 7. Cómo verificar rápidamente que todo sigue bien
 
 1. `iris device-status --json` → `firmware_mode=normal`, `project_name=servocraneo_gemini_direct`,
-   `app_version=1.1.0`, `crash_count=0`.
-2. `iris logs --snapshot` → `app_wake: listening for "Hola ESP"`, `diag st=0 … largest=` ≥ 8192,
-   ningún `Display render failed`.
+   `app_version=1.3.0`, `crash_count=0`.
+2. `iris logs --snapshot` → `app_wake: listening for "Hola ESP"`, `search off`,
+   `diag st=0 … largest=` de unos 63 488 (con 1.2.0 era 8 192–12 288; si baja de 8 192 el ojo puede
+   congelarse) y ningún `Display render failed` ni `allocation failures`.
 3. Prueba de voz: «Hola ESP» → ámbar → rojo; pregunta → verde con voz; un toque interrumpe; otro cierra.
-4. (1.2.0) Pregunta de actualidad → ámbar mientras busca → verde con «GOOGLE: …» / «FUENTE …» abajo.
+4. Para pruebas de voz con medidas, usa una captura en directo (sección 6).

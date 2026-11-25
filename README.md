@@ -31,6 +31,10 @@ Este repositorio debe estar en `esp-mosaico-vibe/projects/servocraneo_gemini_dir
 (usa `../../submodule/esp-mosaico-utils` y `../../submodule/esp-mosaico-bsp`), con
 ESP-IDF en el commit `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe` para `esp32s31`.
 
+Desde 1.3.0, el componente `esp-mosaico-bsp` sale de una copia en `third_party/esp-mosaico-bsp`
+(Apache-2.0) con un único cambio para la memoria DMA de la pantalla. Detalles en su `VOX_FORK.md`;
+comprobación con `python tools/check_bsp_fork.py`. El submódulo no se modifica.
+
 ## Compilar y simular (desde la raíz del espacio de trabajo)
 
 ```powershell

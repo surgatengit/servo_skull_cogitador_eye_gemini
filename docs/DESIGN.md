@@ -217,6 +217,9 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
    [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Pendiente de validar en el dispositivo.
 8. Ampliaciones futuras sin implementar (cámara bajo demanda, Gemini 3.8 Extended Thinking, base
    magnética de 5 V): [ROADMAP.md](ROADMAP.md).
+   Plan por fases basado en proyectos de referencia: [RESEARCH.md](RESEARCH.md).
+9. ✅ **Memoria DMA de la pantalla** (1.3.0): copia del BSP con `trans_queue_depth = 2`.
+   El bloque libre más grande pasó de 8 192 B a 63 488 B estables (INSTALL.md, prueba 11).
 
 ## 7. Activación por voz «Hola ESP» (implementada y validada en 1.1.0)
 

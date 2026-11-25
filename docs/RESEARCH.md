@@ -28,6 +28,11 @@ la habitual.
 
 ## 2. Hallazgo principal: la DMA de la pantalla (afecta a todo lo demás)
 
+> **Hecho en 1.3.0 (2026-11-25, prueba 11):**
+> - Opción 2: copia del BSP en `third_party/esp-mosaico-bsp`, con `tools/check_bsp_fork.py`.
+> - El bloque DMA libre más grande pasó de 8 192 B a **63 488 B estables** durante las conversaciones.
+> - El ojo sigue fluido.
+
 Nuestro punto débil conocido es este: el ojo se congela si el bloque interno DMA más grande baja de
 unos 7,7 KB (HANDOFF §5). El mínimo medido es 8 192 B, tanto con 1.1.0 como con 1.2.0 tras una
 conversación.
@@ -262,8 +267,8 @@ Cada fase va en su propia rama, con compilación, simulador si aplica, autorizac
 
 | Fase | Contenido | Requisitos | Riesgo |
 |---|---|---|---|
-| **0. Verificaciones de solo lectura** | Qué USB usa `iris` (Type-C con USB-OTG o USB Serial/JTAG). Versión del módulo de cámara por la serigrafía. Lectura del BQ27220 con y sin USB (por un log temporal) | Nada | Nulo |
-| **1. Memoria DMA** | `trans_queue_depth = 2` sustituyendo el componente del BSP en el proyecto (opción 2 de la sección 2), callback de reserva fallida y, quizá, `RESERVE_INTERNAL=98304` | Decisión del propietario sobre el BSP | Bajo si se mide; mantenimiento de la copia del BSP |
+| ~~**0. Verificaciones de solo lectura**~~ **Hecha (§9.1)** | Qué USB usa `iris` (Type-C con USB-OTG o USB Serial/JTAG). Versión del módulo de cámara por la serigrafía. Lectura del BQ27220 con y sin USB (por un log temporal) | Nada | Nulo |
+| ~~**1. Memoria DMA**~~ **Hecha: 1.3.0, prueba 11** | `trans_queue_depth = 2` sustituyendo el componente del BSP en el proyecto (opción 2 de la sección 2), callback de reserva fallida y, quizá, `RESERVE_INTERNAL=98304` | Decisión del propietario sobre el BSP | Bajo si se mide; mantenimiento de la copia del BSP |
 | **2. Cámara bajo demanda** | Función `capturar_imagen`, captura única con apertura y cierre, JPEG por hardware ≤ 16 KB, `realtimeInput.video`, destello en el ojo | Fase 1; resolver el USB (fase 0) | Medio (USB, DMA) |
 | **3. Funciones propias** | `cambiar_emocion`, `leer_sensores`, «CUOTA AGOTADA» sin reintentos; Google Search se reactiva si hay cuota | — (independiente; puede ir antes que la 2) | Bajo |
 | **4. Alimentación** | Detección por BQ27220, indicación en reposo y aviso de batería baja. Después, la base magnética (hardware) | Fase 0 | Bajo (software); medio (hardware) |
@@ -286,7 +291,8 @@ Cada fase va en su propia rama, con compilación, simulador si aplica, autorizac
 
 ## 10. No verificado
 
-- Que `trans_queue_depth = 2` baste con nuestras reservas propias (WakeNet, TLS). openai solo lo midió
+- ~~Que `trans_queue_depth = 2` baste con nuestras reservas propias~~: verificado en la prueba 11
+  (63 488 B estables con WakeNet, TLS y audio). Lo que sigue es la nota original: openai solo lo midió
   en sesiones cortas. Medir en el dispositivo.
 - ~~Qué puerto USB usa `iris`~~: verificado en la fase 0 (USB-OTG con TinyUSB; la cámara no lo afecta).
 - Detalles internos sin comprobar:
