@@ -455,6 +455,24 @@ escribe `iris system-update`, como en 1.1.0.
 7. Reiniciar el dispositivo: el contador mantiene el número de fotos.
 8. Memoria: `largest=` con la galería abierta y ningún `allocation failures`.
 
+**Primer intento (2026-11-25, instalación autorizada, firmware `fb446eb87dbc…`):**
+
+- La instalación, la tabla de particiones nueva (`app_photos: 0 stored still(s) of 10`) y la memoria
+  están bien.
+- **Las fotos vuelven a fallar** (`VIDIOC_DQBUF` timeout) y Gemini dice que «sus sistemas de visión
+  fallan».
+
+**Causa:** al retirar el diagnóstico (`a4f71d9`), el formato por defecto del SC101IOT volvió a 15 fps.
+
+- Al pedir 1280×720, el driver toma el formato por defecto si coincide.
+- En el diagnóstico 4 era el de 25 fps: la sonda contó unos 35 flancos de VSYNC en 0,7 s, es decir,
+  unos 25 fps.
+- **Hacen falta las dos cosas:** USB Serial/JTAG desactivado **y** el formato de 25 fps, que es el
+  que activa `mosaico_module_camera`.
+
+**Corrección:** el 25 fps pasa a ser el formato por defecto y el de 15 fps deja de compilarse
+(`sdkconfig.defaults`), así el driver no puede elegirlo.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

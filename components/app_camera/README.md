@@ -38,6 +38,9 @@ Kconfig: `VOX_CAMERA*`.
 
 - **USB Serial/JTAG must be disabled** (`# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`). Its pads
   are camera D2 and flash (GPIO33/34). With USJ enabled the sensor streams but no frame completes.
+- **SC101IOT format: 1280×720 at 25 fps only** (test 13). With the 15 fps format (the sensor
+  driver's Kconfig default) no frame completes either. `sdkconfig.defaults` makes 25 fps the default
+  and leaves 15 fps out of the build.
 - Validated with `esp_video` 2.5.0, the version pinned in `main/idf_component.yml`, on the V1.4 module
   (SC101IOT): 13–14 KB JPEG at quality 80 in about 1.4 s. Orientation and colours were confirmed by the
   owner.

@@ -61,3 +61,10 @@ CONFIG_TINYUSB_CDC_COUNT=2
 # (VIDIOC_DQBUF timeout). VOX never uses USJ (console on UART, ESP-Iris on
 # USB-OTG HS); the BSP camera examples disable it too.
 # CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set
+
+# REQUIRED for the camera (test 13): the SC101IOT only delivers frames in its
+# 1280x720 25 fps format (the one mosaico_module_camera selects). With 15 fps as
+# the default, the explicit 1280x720 request picks 15 fps and VIDIOC_DQBUF times
+# out. Build 25 fps as the default and leave 15 fps out so it cannot be chosen.
+CONFIG_CAMERA_SC101IOT_DVP_DEFAULT_FMT_YUV422_1280X720_25FPS=y
+# CONFIG_CAMERA_SC101IOT_DVP_YUV422_1280X720_15FPS is not set
