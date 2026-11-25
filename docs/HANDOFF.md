@@ -1,7 +1,7 @@
 # VOX M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
 
-Última actualización: **2026-11-25**, al cierre de la sesión de 1.2.0 y 1.3.0. `main` = **1.3.0**
-instalada y validada.
+Última actualización: **2026-11-25**, al cierre de la sesión de 1.4.0 (cámara) y 1.5.0 (galería).
+`main` = **1.5.0** (etiqueta `v1.5.0`, publicada como *Release* con el `.irisfw` compilado).
 
 Otros documentos:
 - Google Search (opcional y apagado): [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md);
@@ -13,25 +13,33 @@ el historial completo de las pruebas físicas).
 
 ## 1. Estado en una frase
 
-VOX M-01 **1.3.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
+VOX M-01 **1.5.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
 - conversa con **Gemini Live directamente por Wi-Fi y WebSocket seguro**, sin Windows ni servicios
   intermedios;
 - se despierta con **«Hola ESP»** en local;
 - se interrumpe con un toque y se cierra con otro;
 - no vuelve al reposo mientras Gemini prepara la respuesta y vuelve a los 15 s de inactividad;
-- desde 1.3.0 tiene margen de sobra en la memoria DMA de la pantalla.
+- desde 1.3.0 tiene margen de sobra en la memoria DMA de la pantalla;
+- desde 1.4.0 hace fotos bajo demanda («¿qué ves?», herramienta `capturar_imagen`) con la cámara
+  izquierda SC101IOT;
+- desde 1.5.0 guarda las 10 últimas fotos en flash y las muestra en una galería (contador arriba a la
+  izquierda, ‹ ›, X para volver, X mantenida 1,5 s para borrarlas todas).
 
-Todo está validado en el hardware (pruebas 1–11 de INSTALL.md). Google Search está implementado pero
+Todo está validado en el hardware (pruebas 1–13 de INSTALL.md).
+**Limitación conocida:** tras instalar un firmware o un reinicio por software, la cámara no da
+fotogramas hasta apagar y encender con el botón (ver §5 y prueba 13). El propietario lo acepta por
+ahora; queda para revisar. Google Search está implementado pero
 **apagado** por la cuota del plan gratuito.
 
 | Elemento | Valor |
 |---|---|
-| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada (**1.3.0**, etiqueta `v1.3.0`); `v1.2.0` y `v1.1.0` = estables anteriores |
+| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = **1.5.0** (etiqueta `v1.5.0`); `v1.4.0` (cámara), `v1.3.0`, `v1.2.0` y `v1.1.0` = anteriores |
+| 1.5.0 | Galería de las 10 últimas fotos (partición `photos`), borrado total con la X mantenida, reset del sensor antes de cada foto (SCCB + `CAM_RESET` GPIO53) |
+| 1.4.0 | Foto bajo demanda: SC101IOT, PPA + JPEG por hardware, USB Serial/JTAG desactivado, 25 fps, arreglo oficial de PWDN `b60f5d8` |
 | 1.3.0 | Memoria DMA de la pantalla: copia del BSP con `trans_queue_depth = 2` (`third_party/`), bloque DMA libre de 63 488 B estable (antes 8 192 B), aviso de reservas fallidas |
 | 1.2.0 | Google Search opcional y **desactivado** (`VOX_GOOGLE_SEARCH=n`, cuota del plan gratuito), espera mientras el modelo piensa, motivo de cierre en los logs |
 | Ruta local | `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (repo Git propio, dentro del espacio de trabajo) |
-| Último commit validado | `35159d8` (main) |
-| Firmware en el dispositivo | 1.3.0, SHA `0bd69a50b737…`, instalado con `iris system-update` (2026-11-25), prueba 11 superada |
+| Firmware en el dispositivo | 1.5.0 con reset por SCCB (`be522037…`, commit `75beb52`). El pulso de `CAM_RESET` (`2b8676e`, incluido en `main`) está compilado pero **sin probar** en el dispositivo |
 | Dispositivo | ESP-Mosaico, Device ID `4553502d4952495301001c2904d11390`, USB (COM7 control / COM6 datos) |
 | Modelo Gemini | `gemini-3.1-flash-live-preview` (principal) / `gemini-3.8-live` (alternativo) |
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
