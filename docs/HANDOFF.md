@@ -39,7 +39,7 @@ ahora; queda para revisar. Google Search está implementado pero
 | 1.3.0 | Memoria DMA de la pantalla: copia del BSP con `trans_queue_depth = 2` (`third_party/`), bloque DMA libre de 63 488 B estable (antes 8 192 B), aviso de reservas fallidas |
 | 1.2.0 | Google Search opcional y **desactivado** (`VOX_GOOGLE_SEARCH=n`, cuota del plan gratuito), espera mientras el modelo piensa, motivo de cierre en los logs |
 | Ruta local | `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (repo Git propio, dentro del espacio de trabajo) |
-| Firmware en el dispositivo | 1.5.0 con reset por SCCB (`be522037…`, commit `75beb52`). El pulso de `CAM_RESET` (`2b8676e`, incluido en `main`) está compilado pero **sin probar** en el dispositivo |
+| Firmware en el dispositivo | **v1.5.0 final** (`main`, pulso de `CAM_RESET` + reset por SCCB), instalada desde la Release con `iris system-update --bundle` (2026-11-25). Fotos correctas tras la instalación sin apagar; `iris restart` + foto aún sin probar con esta versión |
 | Dispositivo | ESP-Mosaico, Device ID `4553502d4952495301001c2904d11390`, USB (COM7 control / COM6 datos) |
 | Modelo Gemini | `gemini-3.1-flash-live-preview` (principal) / `gemini-3.8-live` (alternativo) |
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |

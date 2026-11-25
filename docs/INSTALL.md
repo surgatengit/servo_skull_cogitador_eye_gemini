@@ -576,7 +576,14 @@ Al leer el código salió que la premisa era falsa:
   - El driver del SC101IOT ignora el pin de reset (`reset_pin = -1`) y nadie lo mueve.
 - **Corrección (commit siguiente):** antes de cada foto, pulso de 10 ms a nivel bajo en `CAM_RESET`
   (reset por hardware), espera de 20 ms, reset por SCCB y reescritura del formato.
-- Prueba pendiente: instalar, `iris restart`, foto (sin apagar).
+- **Resultado (v1.5.0 final, instalada desde la Release con `iris system-update --bundle`):**
+  - la orden de la Guía A del README funciona;
+  - tras la instalación, sin apagar, 2 fotos correctas (`sensor hardware + soft reset`, JPEG de
+    20,9 y 21,3 KB, 0,8–1,3 s, `2 stored`); el propietario lo confirma en el dispositivo.
+  - Ojo: con el reset solo por SCCB, tras la instalación también funcionó; el caso que fallaba era
+    `iris restart`. **Sin probar todavía:** `iris restart` y foto con el pulso de `CAM_RESET`.
+- Mientras tanto, la regla práctica aceptada por el propietario: tras cargar un firmware, si la foto
+  falla, apagar y encender con el botón.
 
 **Borrar todas (petición del propietario, commit siguiente):** mantener pulsada la X de la galería
 1,5 s. La sesión borra la partición entera (no solo las cabeceras), cierra la galería, oculta el contador
