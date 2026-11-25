@@ -53,6 +53,23 @@ closes the conversation and re-arms local listening.
   fallback `gemini-3.8-live`.
 - Persona, voice (`Charon`), language (`es-ES`) and models come from this
   component (Kconfig `VOX_*`); a provisioned model override takes precedence.
+- Gallery (1.5.0):
+  - Stills are saved with `app_photos` after each `capturar_imagen`, and the photo count is pushed to
+    the UI sink (`set_photo_count`).
+  - `app_vox_session_gallery(action)` (GSP task) only enqueues. The session reads the JPEG from flash
+    on its own task and calls `show_photo` (GSP copies it) or `hide_gallery`.
+  - Opening is refused while CONNECTING, PROCESSING or SPEAKING.
+  - The gallery opens on the newest photo; ‹ and › wrap around.
+  - It closes after 30 s without touches, or when «Hola ESP» is heard.
 - Transcripts, search queries and source domains are logged only at DEBUG level.
+- Camera tool (Kconfig `VOX_CAMERA`, 1.4.0): the session declares `capturar_imagen` and handles
+  each call on its own task.
+  - The WebSocket task copies the call into one of 2 slots and posts `EV_TOOL`.
+  - During the call: blink, «OBSERVANDO» on the status line, uplink paused.
+  - It runs `app_camera_capture_jpeg()`, sends the still with `app_gemini_live_send_image()`, then
+    answers with `toolResponse`: a result, or an error such as «no camera» or «capture failed».
+  - A cancelled call gets no response.
+  - The `diag` line reports `tools{calls=… stills=…}`.
+  - The session task stack is 8 KiB.
 - Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only
   when asked or for recent facts it does not know, never mentioning sources or that it searched.

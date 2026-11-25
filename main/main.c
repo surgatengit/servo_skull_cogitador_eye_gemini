@@ -8,7 +8,10 @@
 #include "app_wifi.h"
 #include "esp_iris.h"
 #include "esp_log.h"
+#include "esp_gsp_esp_lcd.h"
 #include "esp_random.h"
+#include "esp_rom_sys.h"
+#include "esp_system.h"
 #include "iris_ota_support.h"
 #include "iris_screen_mirror.h"
 #include "nvs_flash.h"
@@ -45,6 +48,29 @@ static void ui_acknowledge(void *ui)
     app_vox_eye_blink((app_vox_eye_handle_t)ui);
 }
 
+static void ui_set_photo_count(void *ui, unsigned count)
+{
+    (void)app_vox_eye_set_photo_count((app_vox_eye_handle_t)ui, count);
+}
+
+static void ui_show_photo(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
+                          unsigned count)
+{
+    (void)app_vox_eye_show_photo((app_vox_eye_handle_t)ui, jpeg, size, position, count);
+}
+
+static void ui_hide_gallery(void *ui)
+{
+    (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
+}
+
+/* GSP framework task: only enqueue. The enums share their values. */
+static void eye_gallery(app_vox_gallery_action_t action, void *ctx)
+{
+    (void)ctx;
+    app_vox_session_gallery((app_vox_session_gallery_t)action);
+}
+
 static void eye_tapped(void *ctx)
 {
     (void)ctx;
@@ -69,6 +95,21 @@ static void secrets_changed(void *ctx)
     app_vox_session_secrets_changed();
 }
 
+/* esp_restart() runs this before the reset (ESP-Iris triggers restarts for
+ * `iris restart` and System Update). The camera component's README requires
+ * waiting for LCD/PPA completion before a software reset: a panel transfer cut
+ * in flight leaves the DVP camera unable to deliver frames until a power cycle
+ * (test 13). Pause the GSP render task and retire the presenter fences. */
+static void quiesce_display_on_restart(void)
+{
+    if (!application.ui) {
+        return;
+    }
+    esp_gsp_esp_lcd_pause_t *pause = NULL;
+    const esp_err_t err = esp_gsp_esp_lcd_pause(application.ui, 300, &pause);
+    esp_rom_printf("vox_m01: display quiesced before restart (%s)\n", esp_err_to_name(err));
+}
+
 static esp_err_t start_eye(void)
 {
     esp_gsp_config_t config;
@@ -86,8 +127,10 @@ static esp_err_t start_eye(void)
     ESP_ERROR_CHECK(iris_screen_mirror_init());
     ESP_ERROR_CHECK(esp_gsp_esp_lcd_start(&config, &display, &application.ui));
     ESP_ERROR_CHECK(iris_screen_mirror_attach(application.ui));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_register_shutdown_handler(quiesce_display_on_restart));
     const app_vox_eye_config_t eye = {
         .on_tap = eye_tapped,
+        .on_gallery = eye_gallery,
         .level = eye_level,
         .seed = esp_random() | 1U,
     };
@@ -122,6 +165,9 @@ void app_main(void)
             .set_view = eye_ready ? ui_set_view : NULL,
             .set_status = eye_ready ? ui_set_status : NULL,
             .acknowledge = eye_ready ? ui_acknowledge : NULL,
+            .set_photo_count = eye_ready ? ui_set_photo_count : NULL,
+            .show_photo = eye_ready ? ui_show_photo : NULL,
+            .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
             .ui = application.eye,
         },
     };

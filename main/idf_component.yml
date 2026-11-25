@@ -5,9 +5,18 @@ dependencies:
     # VOX fork of the BSP at submodule commit 5f88b91 with one change; see
     # third_party/esp-mosaico-bsp/VOX_FORK.md and tools/check_bsp_fork.py.
     override_path: "../third_party/esp-mosaico-bsp"
+  # Verbatim BSP camera component (fase 2), resolving esp-mosaico-bsp to the fork.
+  # It patches ESP-IDF's DVP driver at configure time (owner's decision, HANDOFF §5).
+  mosaico_module_camera:
+    version: "*"
+    override_path: "../third_party/mosaico_module_camera"
   esp_iris:
     version: "*"
     override_path: "../../../submodule/esp-mosaico-utils/ESP-Iris/components/esp_iris"
   espressif/esp-gsp: "==1.5.1"
+  # Camera: validated with esp_video 2.5.0 (the version openai-live-esp32 uses with
+  # this BSP commit). The test 12 failure was USB Serial/JTAG, not 2.6.0; moving
+  # to a newer esp_video needs a new photo test.
+  espressif/esp_video: "==2.5.0"
   # The BSP display adapter uses headers deprecated by LVGL 9.6.
   lvgl/lvgl: "==9.5.0"

@@ -28,6 +28,9 @@ typedef enum {
                                         call, generationComplete): the turn is in progress. */
     APP_GL_EVT_GROUNDING,          /**< groundingMetadata received; sources updated
                                         (see app_gemini_live_get_sources()). */
+    APP_GL_EVT_TOOL_CALL,          /**< tool_id/tool_name/text(args JSON): a declared function
+                                        to run; answer with app_gemini_live_send_tool_response(). */
+    APP_GL_EVT_TOOL_CANCEL,        /**< tool_id: the server cancelled that pending call. */
 } app_gemini_live_event_type_t;
 
 typedef struct {
@@ -38,6 +41,8 @@ typedef struct {
     int close_code;                /**< RFC 6455 close code or HTTP handshake status. */
     bool in_progress;              /**< TURN_COMPLETE only: interactionStatus IN_PROGRESS,
                                         more output follows (fillers while searching). */
+    const char *tool_id;           /**< TOOL_CALL / TOOL_CANCEL; valid during the callback. */
+    const char *tool_name;         /**< TOOL_CALL; valid during the callback. */
 } app_gemini_live_event_t;
 
 /** Runs on the WebSocket task. May block briefly (playback backpressure);
@@ -51,6 +56,8 @@ typedef struct {
     const char *language;           /**< BCP-47, e.g. "es-ES" (copied). */
     const char *system_instruction; /**< Persona (copied). */
     bool google_search;             /**< Declare the native googleSearch tool in setup. */
+    const char *function_declarations; /**< JSON array of functionDeclarations (copied,
+                                            optional); calls arrive as APP_GL_EVT_TOOL_CALL. */
     app_gemini_live_cb_t on_event;  /**< Required. */
     void *ctx;
 } app_gemini_live_config_t;
@@ -69,6 +76,17 @@ esp_err_t app_gemini_live_disconnect(app_gemini_live_handle_t handle);
 /** Send one mono 16 kHz PCM frame (<= 1600 samples). Drops when not ready. Any task. */
 esp_err_t app_gemini_live_send_audio(app_gemini_live_handle_t handle, const int16_t *pcm,
                                      size_t samples);
+
+/** Send one JPEG still as realtimeInput video (base64; message built in PSRAM).
+ * Blocks up to ~3 s while it is written; the caller should pause its own audio
+ * uplink meanwhile. Any task except the event callback. */
+esp_err_t app_gemini_live_send_image(app_gemini_live_handle_t handle, const uint8_t *jpeg,
+                                     size_t size);
+
+/** Answer a TOOL_CALL: response_json is the JSON object for functionResponses[].response
+ * (for example {"result":"ok"}). Any task except the event callback. */
+esp_err_t app_gemini_live_send_tool_response(app_gemini_live_handle_t handle, const char *tool_id,
+                                             const char *tool_name, const char *response_json);
 
 /** Signal a paused microphone (automatic VAD). Any task. */
 esp_err_t app_gemini_live_send_audio_stream_end(app_gemini_live_handle_t handle);

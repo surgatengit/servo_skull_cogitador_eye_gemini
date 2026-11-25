@@ -1,0 +1,11 @@
+menu "VOX M-01 photo store"
+
+    config VOX_PHOTOS_SLOTS
+        int "Stills kept in the photos partition (oldest replaced)"
+        range 1 10
+        default 10
+        help
+            Each slot is 48 KiB in the 512 KiB "photos" partition, so at most 10.
+            The gallery on the eye screen shows them, newest first.
+
+endmenu

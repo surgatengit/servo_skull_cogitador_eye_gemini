@@ -33,6 +33,8 @@ static const char *TAG = "gemini_live";
 #define GL_WS_TASK_PRIO        10
 #define GL_WS_TASK_CORE        0
 #define GL_SEND_TIMEOUT_MS     200
+#define GL_IMAGE_TIMEOUT_MS    3000           /* one ~32 KB realtimeInput.video message */
+#define GL_TOOL_TIMEOUT_MS     1000
 #define GL_RECONNECT_MS        2000
 #define GL_FAILURES_TO_FALLBACK 2
 #define GL_FAILURES_TO_GIVE_UP  5
@@ -40,6 +42,8 @@ static const char *TAG = "gemini_live";
 static const char AUDIO_PREFIX[] = "{\"realtimeInput\":{\"audio\":{\"mimeType\":\"audio/pcm;rate=16000\",\"data\":\"";
 static const char AUDIO_SUFFIX[] = "\"}}}";
 static const char STREAM_END[] = "{\"realtimeInput\":{\"audioStreamEnd\":true}}";
+static const char IMAGE_PREFIX[] = "{\"realtimeInput\":{\"video\":{\"mimeType\":\"image/jpeg\",\"data\":\"";
+static const char IMAGE_SUFFIX[] = "\"}}}";
 
 /* Ownership: config strings, buffers and the client belong to the instance.
  * `lock` serializes senders against disconnect; the WebSocket task never takes
@@ -52,6 +56,7 @@ struct app_gemini_live {
     char *language;
     char *system_instruction;
     bool google_search;
+    char *function_declarations;  /* JSON array, or NULL */
     app_gemini_live_cb_t on_event;
     void *ctx;
 
@@ -142,14 +147,30 @@ static char *build_setup(struct app_gemini_live *gl)
         cJSON_AddStringToObject(part, "text", gl->system_instruction);
         cJSON_AddItemToArray(parts, part);
     }
-    if (gl->google_search) {
-        /* Native Grounding with Google Search: runs on Google's side, so it needs
-         * no toolResponse from the device. No thinkingConfig is sent: 3.1 Flash
-         * Live keeps its default level and 3.8 Live rejects the field. */
+    /* No thinkingConfig is sent: 3.1 Flash Live keeps its default level and 3.8
+     * Live rejects the field. */
+    cJSON *decls = gl->function_declarations ? cJSON_Parse(gl->function_declarations) : NULL;
+    if (gl->function_declarations && !cJSON_IsArray(decls)) {
+        ESP_LOGE(TAG, "function declarations are not a JSON array; not declared");
+        cJSON_Delete(decls);
+        decls = NULL;
+    }
+    if (gl->google_search || decls) {
         cJSON *tools = cJSON_AddArrayToObject(setup, "tools");
-        cJSON *tool = cJSON_CreateObject();
-        cJSON_AddObjectToObject(tool, "googleSearch");
-        cJSON_AddItemToArray(tools, tool);
+        if (gl->google_search) {
+            /* Native Grounding with Google Search: runs on Google's side, so it
+             * needs no toolResponse from the device. */
+            cJSON *tool = cJSON_CreateObject();
+            cJSON_AddObjectToObject(tool, "googleSearch");
+            cJSON_AddItemToArray(tools, tool);
+        }
+        if (decls) {
+            /* Device functions: calls arrive as toolCall and are answered with
+             * toolResponse (app_gemini_live_send_tool_response). */
+            cJSON *tool = cJSON_CreateObject();
+            cJSON_AddItemToObject(tool, "functionDeclarations", decls);
+            cJSON_AddItemToArray(tools, tool);
+        }
     }
     cJSON_AddObjectToObject(setup, "inputAudioTranscription");
     cJSON_AddObjectToObject(setup, "outputAudioTranscription");
@@ -268,18 +289,43 @@ static void handle_usage(struct app_gemini_live *gl, const cJSON *usage)
     gl->usage.total = usage_field(usage, "totalTokenCount");
 }
 
-/* VOX declares no functions: Google Search runs on the server and needs no
- * reply. A toolCall here would be unexpected; log it and let the turn continue. */
+/* Each functionCall goes to the owner as APP_GL_EVT_TOOL_CALL (id, name, args
+ * JSON). Google Search runs on the server and never appears here. */
 static void handle_tool_call(struct app_gemini_live *gl, const cJSON *call)
 {
     __atomic_add_fetch(&gl->stats.tool_calls, 1U, __ATOMIC_RELAXED);
     const cJSON *fc;
     cJSON_ArrayForEach(fc, cJSON_GetObjectItemCaseSensitive(call, "functionCalls")) {
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(fc, "id");
         const cJSON *name = cJSON_GetObjectItemCaseSensitive(fc, "name");
-        ESP_LOGW(TAG, "unexpected toolCall %s; not answered",
-                 cJSON_IsString(name) ? name->valuestring : "?");
+        if (!cJSON_IsString(name)) {
+            continue;
+        }
+        char *args = cJSON_PrintUnformatted(cJSON_GetObjectItemCaseSensitive(fc, "args"));
+        ESP_LOGI(TAG, "toolCall %s", name->valuestring);
+        const app_gemini_live_event_t ev = {
+            .type = APP_GL_EVT_TOOL_CALL,
+            .tool_id = cJSON_IsString(id) ? id->valuestring : "",
+            .tool_name = name->valuestring,
+            .text = args ? args : "{}",
+        };
+        gl->on_event(&ev, gl->ctx);
+        cJSON_free(args);
     }
     emit(gl, APP_GL_EVT_MODEL_ACTIVITY, 0);
+}
+
+static void handle_tool_cancel(struct app_gemini_live *gl, const cJSON *cancel)
+{
+    const cJSON *id;
+    cJSON_ArrayForEach(id, cJSON_GetObjectItemCaseSensitive(cancel, "ids")) {
+        if (cJSON_IsString(id)) {
+            ESP_LOGI(TAG, "toolCallCancellation");
+            const app_gemini_live_event_t ev = { .type = APP_GL_EVT_TOOL_CANCEL,
+                                                 .tool_id = id->valuestring };
+            gl->on_event(&ev, gl->ctx);
+        }
+    }
 }
 
 static void handle_message(struct app_gemini_live *gl, esp_websocket_client_handle_t client)
@@ -309,8 +355,9 @@ static void handle_message(struct app_gemini_live *gl, esp_websocket_client_hand
     if (tool_call) {
         handle_tool_call(gl, tool_call);
     }
-    if (cJSON_GetObjectItemCaseSensitive(root, "toolCallCancellation")) {
-        ESP_LOGI(TAG, "toolCallCancellation (nothing pending on the device)");
+    const cJSON *tool_cancel = cJSON_GetObjectItemCaseSensitive(root, "toolCallCancellation");
+    if (tool_cancel) {
+        handle_tool_cancel(gl, tool_cancel);
     }
     const cJSON *update = cJSON_GetObjectItemCaseSensitive(root, "sessionResumptionUpdate");
     if (update) {
@@ -495,6 +542,7 @@ esp_err_t app_gemini_live_create(const app_gemini_live_config_t *config,
     gl->language = dup_or_null(config->language);
     gl->system_instruction = dup_or_null(config->system_instruction);
     gl->google_search = config->google_search;
+    gl->function_declarations = dup_or_null(config->function_declarations);
     gl->lock = xSemaphoreCreateMutex();
     const esp_err_t grounding_err = gl_grounding_init(&gl->grounding);
     gl->rx = heap_caps_malloc(GL_RX_CAPACITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -504,7 +552,8 @@ esp_err_t app_gemini_live_create(const app_gemini_live_config_t *config,
     if (!gl->model || !gl->lock || !gl->rx || !gl->pcm || !gl->tx || grounding_err != ESP_OK ||
             (config->fallback_model && !gl->fallback_model) ||
             (config->voice && !gl->voice) || (config->language && !gl->language) ||
-            (config->system_instruction && !gl->system_instruction)) {
+            (config->system_instruction && !gl->system_instruction) ||
+            (config->function_declarations && !gl->function_declarations)) {
         app_gemini_live_handle_t tmp = gl;
         (void)app_gemini_live_destroy(&tmp);
         return ESP_ERR_NO_MEM;
@@ -601,13 +650,14 @@ esp_err_t app_gemini_live_disconnect(app_gemini_live_handle_t gl)
     return err;
 }
 
-static esp_err_t send_locked(struct app_gemini_live *gl, const char *text, size_t len)
+static esp_err_t send_locked_timeout(struct app_gemini_live *gl, const char *text, size_t len,
+                                     uint32_t timeout_ms)
 {
     if (!gl->client || !gl->ready) {
         return ESP_ERR_INVALID_STATE;
     }
     const int sent = esp_websocket_client_send_text(gl->client, text, (int)len,
-                                                    pdMS_TO_TICKS(GL_SEND_TIMEOUT_MS));
+                                                    pdMS_TO_TICKS(timeout_ms));
     if (sent < 0) {
         if (__atomic_add_fetch(&gl->stats.tx_failures, 1U, __ATOMIC_RELAXED) == 1U) {
             ESP_LOGW(TAG, "first send failure (%u bytes)", (unsigned)len);
@@ -616,6 +666,70 @@ static esp_err_t send_locked(struct app_gemini_live *gl, const char *text, size_
     }
     __atomic_add_fetch(&gl->stats.tx_messages, 1U, __ATOMIC_RELAXED);
     return ESP_OK;
+}
+
+static esp_err_t send_locked(struct app_gemini_live *gl, const char *text, size_t len)
+{
+    return send_locked_timeout(gl, text, len, GL_SEND_TIMEOUT_MS);
+}
+
+esp_err_t app_gemini_live_send_image(app_gemini_live_handle_t gl, const uint8_t *jpeg, size_t size)
+{
+    if (!gl || !jpeg || size == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const size_t prefix = sizeof(IMAGE_PREFIX) - 1;
+    const size_t suffix = sizeof(IMAGE_SUFFIX) - 1;
+    const size_t b64_cap = 4 * ((size + 2) / 3) + 1;
+    char *msg = psram_malloc(prefix + b64_cap + suffix + 1);
+    if (!msg) {
+        return ESP_ERR_NO_MEM;
+    }
+    memcpy(msg, IMAGE_PREFIX, prefix);
+    size_t b64 = 0;
+    esp_err_t err = ESP_ERR_INVALID_SIZE;
+    if (mbedtls_base64_encode((unsigned char *)msg + prefix, b64_cap, &b64, jpeg, size) == 0) {
+        memcpy(msg + prefix + b64, IMAGE_SUFFIX, suffix);
+        xSemaphoreTake(gl->lock, portMAX_DELAY);
+        err = send_locked_timeout(gl, msg, prefix + b64 + suffix, GL_IMAGE_TIMEOUT_MS);
+        xSemaphoreGive(gl->lock);
+    }
+    psram_free(msg);
+    ESP_LOGI(TAG, "image %u B (%u B message) %s", (unsigned)size, (unsigned)(prefix + b64 + suffix),
+             err == ESP_OK ? "sent" : esp_err_to_name(err));
+    return err;
+}
+
+esp_err_t app_gemini_live_send_tool_response(app_gemini_live_handle_t gl, const char *tool_id,
+                                             const char *tool_name, const char *response_json)
+{
+    if (!gl || !tool_id || !tool_name || !response_json) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    cJSON *response = cJSON_Parse(response_json);
+    if (!cJSON_IsObject(response)) {
+        cJSON_Delete(response);
+        return ESP_ERR_INVALID_ARG;
+    }
+    cJSON *root = cJSON_CreateObject();
+    cJSON *tr = cJSON_AddObjectToObject(root, "toolResponse");
+    cJSON *list = cJSON_AddArrayToObject(tr, "functionResponses");
+    cJSON *fr = cJSON_CreateObject();
+    cJSON_AddStringToObject(fr, "id", tool_id);
+    cJSON_AddStringToObject(fr, "name", tool_name);
+    cJSON_AddItemToObject(fr, "response", response);
+    cJSON_AddItemToArray(list, fr);
+    char *text = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!text) {
+        return ESP_ERR_NO_MEM;
+    }
+    xSemaphoreTake(gl->lock, portMAX_DELAY);
+    const esp_err_t err = send_locked_timeout(gl, text, strlen(text), GL_TOOL_TIMEOUT_MS);
+    xSemaphoreGive(gl->lock);
+    cJSON_free(text);
+    ESP_LOGI(TAG, "toolResponse %s %s", tool_name, err == ESP_OK ? "sent" : esp_err_to_name(err));
+    return err;
 }
 
 void app_gemini_live_get_stats(app_gemini_live_handle_t gl, app_gemini_live_stats_t *out)
@@ -725,6 +839,7 @@ esp_err_t app_gemini_live_destroy(app_gemini_live_handle_t *handle)
     psram_free(gl->voice);
     psram_free(gl->language);
     psram_free(gl->system_instruction);
+    psram_free(gl->function_declarations);
     if (gl->grounding.lock) {
         gl_grounding_deinit(&gl->grounding);
     }

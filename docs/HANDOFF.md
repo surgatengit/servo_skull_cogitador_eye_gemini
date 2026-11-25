@@ -1,7 +1,7 @@
 # VOX M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
 
-Última actualización: **2026-11-25**, al cierre de la sesión de 1.2.0 y 1.3.0. `main` = **1.3.0**
-instalada y validada.
+Última actualización: **2026-11-25**, al cierre de la sesión de 1.4.0 (cámara) y 1.5.0 (galería).
+`main` = **1.5.0** (etiqueta `v1.5.0`, publicada como *Release* con el `.irisfw` compilado).
 
 Otros documentos:
 - Google Search (opcional y apagado): [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md);
@@ -13,25 +13,33 @@ el historial completo de las pruebas físicas).
 
 ## 1. Estado en una frase
 
-VOX M-01 **1.3.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
+VOX M-01 **1.5.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
 - conversa con **Gemini Live directamente por Wi-Fi y WebSocket seguro**, sin Windows ni servicios
   intermedios;
 - se despierta con **«Hola ESP»** en local;
 - se interrumpe con un toque y se cierra con otro;
 - no vuelve al reposo mientras Gemini prepara la respuesta y vuelve a los 15 s de inactividad;
-- desde 1.3.0 tiene margen de sobra en la memoria DMA de la pantalla.
+- desde 1.3.0 tiene margen de sobra en la memoria DMA de la pantalla;
+- desde 1.4.0 hace fotos bajo demanda («¿qué ves?», herramienta `capturar_imagen`) con la cámara
+  izquierda SC101IOT;
+- desde 1.5.0 guarda las 10 últimas fotos en flash y las muestra en una galería (contador arriba a la
+  izquierda, ‹ ›, X para volver, X mantenida 1,5 s para borrarlas todas).
 
-Todo está validado en el hardware (pruebas 1–11 de INSTALL.md). Google Search está implementado pero
+Todo está validado en el hardware (pruebas 1–13 de INSTALL.md).
+**Limitación conocida:** tras instalar un firmware o un reinicio por software, la cámara no da
+fotogramas hasta apagar y encender con el botón (ver §5 y prueba 13). El propietario lo acepta por
+ahora; queda para revisar. Google Search está implementado pero
 **apagado** por la cuota del plan gratuito.
 
 | Elemento | Valor |
 |---|---|
-| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = versión instalada (**1.3.0**, etiqueta `v1.3.0`); `v1.2.0` y `v1.1.0` = estables anteriores |
+| Repositorio | `github.com/surgatengit/cogitador_gemini` (**privado**), rama `main` = **1.5.0** (etiqueta `v1.5.0`); `v1.4.0` (cámara), `v1.3.0`, `v1.2.0` y `v1.1.0` = anteriores |
+| 1.5.0 | Galería de las 10 últimas fotos (partición `photos`), borrado total con la X mantenida, reset del sensor antes de cada foto (SCCB + `CAM_RESET` GPIO53) |
+| 1.4.0 | Foto bajo demanda: SC101IOT, PPA + JPEG por hardware, USB Serial/JTAG desactivado, 25 fps, arreglo oficial de PWDN `b60f5d8` |
 | 1.3.0 | Memoria DMA de la pantalla: copia del BSP con `trans_queue_depth = 2` (`third_party/`), bloque DMA libre de 63 488 B estable (antes 8 192 B), aviso de reservas fallidas |
 | 1.2.0 | Google Search opcional y **desactivado** (`VOX_GOOGLE_SEARCH=n`, cuota del plan gratuito), espera mientras el modelo piensa, motivo de cierre en los logs |
 | Ruta local | `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (repo Git propio, dentro del espacio de trabajo) |
-| Último commit validado | `35159d8` (main) |
-| Firmware en el dispositivo | 1.3.0, SHA `0bd69a50b737…`, instalado con `iris system-update` (2026-11-25), prueba 11 superada |
+| Firmware en el dispositivo | 1.5.0 con reset por SCCB (`be522037…`, commit `75beb52`). El pulso de `CAM_RESET` (`2b8676e`, incluido en `main`) está compilado pero **sin probar** en el dispositivo |
 | Dispositivo | ESP-Mosaico, Device ID `4553502d4952495301001c2904d11390`, USB (COM7 control / COM6 datos) |
 | Modelo Gemini | `gemini-3.1-flash-live-preview` (principal) / `gemini-3.8-live` (alternativo) |
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
@@ -88,6 +96,8 @@ python mosaico.py iris system-update --project projects/servocraneo_gemini_direc
 | `app_vox_eye` | Ojo GSP (escena `ui/main.json`), animación a 30 fps, toque | Brillo cuantizado (≤10 Hz) por la presión DMA de la pantalla |
 | `app_vox_session` | Máquina de estados, vigilantes, diagnóstico | Logs `diag st=…` cada 5 s en conversación y 10 s en reposo |
 | `app_gemini_live` | Cliente WSS + protocolo Live | TLS en PSRAM, búfer WS de 4 KB, 409 → sesión nueva |
+| `app_camera` | Foto bajo demanda (1.4.0): abre la cámara, captura un fotograma, PPA a 240×320 y JPEG por hardware ≤ 24 KB, y la cierra | La cámara parchea ESP-IDF (sección 5); componentes del BSP en `third_party/` |
+| `app_photos` | Anillo de las 10 últimas fotos en la partición `photos`, para la galería (1.5.0) | Solo desde la tarea de la sesión (pila interna); cabecera escrita al final y CRC |
 | `app_audio` | ES8311 a 48 kHz; 16 kHz de subida, 24 kHz de bajada | Ganancia 24 dB, volumen 70 |
 | `app_wake` | WakeNet10 `wn10_es_holaesp` (esp-sr 2.6.2) | Detector solo en reposo; se devuelve si el bloque DMA < 8 KB |
 | `app_wifi` | Estación con credenciales de Vibe Mode | `WIFI_STORAGE_RAM`, sin ahorro de energía |
@@ -105,7 +115,8 @@ mientras hay una respuesta pendiente; durante ese tiempo no corre el reposo).
 Pruebas en PC (MSVC) del análisis de `groundingMetadata` y del formato de la línea de estado:
 `powershell -File tools/host_tests/run.ps1`.
 
-Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 0x210000 (12 224 K),
+Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 0x210000 (11 712 K),
+`photos` 0xD80000 (512 K, fotos de la galería),
 `model` 0xE00000 (1 M, `srmodels.bin`), `ui_apps` 0xF00000 (1 M). El paquete de System Update tiene
 4 componentes: tabla, app, `ui_apps` y `model`.
 
@@ -122,6 +133,41 @@ Particiones (1.1.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   con `trans_queue_depth = 2` en la pantalla, el mismo arreglo que openai-live-esp32 (RESEARCH.md §2).
   Comprueba la copia con `python tools/check_bsp_fork.py` y rehazla si se actualiza el submódulo.
   El `diag` avisa además de cualquier reserva de memoria fallida (`allocation failures: …`).
+- **La cámara parchea ESP-IDF (decisión del propietario, 2026-11-25, fase 2).** Al configurar CMake,
+  `mosaico_module_camera` aplica `patches/esp-idf-dvp-frame-capture-stability.patch` (157 líneas del
+  driver DVP `esp_driver_cam`) **sobre `C:\esp\esp-idf-master`**. Además aplica un parche del sensor
+  SC101IOT en `managed_components`, dentro del proyecto.
+  - Se aceptó la opción 2 (dejar que parchee) porque en este PC solo se compila VOX.
+  - El commit de ESP-IDF sigue siendo `7b9cc1ac79f8`, pero su árbol queda modificado.
+  - Compruébalo con `git -C C:\esp\esp-idf-master status`. Para deshacerlo:
+    `git -C C:\esp\esp-idf-master checkout components/esp_driver_cam`.
+  - Otro PC necesita el mismo parche (lo aplica la propia compilación) para tener capturas estables.
+  - A 2026-11-25, ESP-IDF `master` aún no incluye el arreglo. Si se actualiza ESP-IDF y ya lo trae, el
+    componente lo detecta («already applied») o avisa sin romper la compilación.
+- **Reinicio por software y cámara (prueba 13).**
+  - Tras `iris restart` o una instalación, la cámara no entrega fotogramas hasta apagar y encender.
+  - El README oficial lo explica: hay que esperar a que terminen la LCD y la PPA antes de
+    `esp_restart()`.
+  - VOX registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Probado: **no
+    basta**.
+  - Causa más probable: el sensor no se apaga en un reinicio por software (mismo `VCC_3V3` que la
+    pantalla, reloj propio, sin pin de reset) y `esp_video` nunca le manda un reset; `esp32-camera` sí
+    lo hace siempre. El reset por SCCB solo no bastó tras `iris restart`.
+  - El esquemático oficial V1.4 tiene `CAM_RESET` en GPIO53 (activo a nivel bajo) y el driver lo
+    ignora. `app_camera` ahora da un pulso en `CAM_RESET`, después el reset por SCCB y reescribe el
+    formato antes de cada foto (`VOX_CAMERA_SENSOR_RESET`). Validación pendiente.
+  - Si no basta: el reinicio del S31 no resetea los DMA (`IDF-14841`); siguiente paso, parar los
+    canales AXI-DMA en el manejador de apagado, como hace el P4.
+- **Componente de cámara con el arreglo oficial de PWDN `b60f5d8` (prueba 13).** Con el de nuestro
+  BSP `5f88b91`, el driver genérico manejaba CAM_PWDN con una polaridad equivocada para el módulo, y
+  el sensor respondía pero no entregaba fotogramas. Detalle en `third_party/esp-mosaico-bsp/VOX_FORK.md`.
+- **Formato del SC101IOT: solo 1280×720 a 25 fps (cámara, 1.5.0).** Con el de 15 fps la cámara
+  tampoco entrega fotogramas. `sdkconfig.defaults` lo fija como formato por defecto y no compila el de
+  15 fps (prueba 13).
+- **USB Serial/JTAG debe seguir desactivado (cámara, 1.4.0).** `# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`
+  en `sdkconfig.defaults`. GPIO33/34 son D2 y el flash de la cámara: con el USJ activo, el SC101IOT
+  transmite pero ningún fotograma se completa (`VIDIOC_DQBUF` agota el tiempo; prueba 12). VOX no usa el
+  USJ: la consola va por UART y ESP-Iris por el USB-OTG HS.
 - **Cambiar valores por defecto de Kconfig o de `sdkconfig*.defaults` no afecta a un `build/sdkconfig`
   existente.** Borra `build/sdkconfig` (es generado) y recompila; compara después el diff de `CONFIG_`.
 - **Pilas de tareas en PSRAM: no.** La sesión lee la NVS; con la caché desactivada durante una

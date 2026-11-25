@@ -28,4 +28,18 @@ $cmd = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /wd4100 /wd4996 /D_CRT_SEC
 cmd /c $cmd
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 & "$out\test_grounding.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$geo = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /I`"$root\components\app_camera`" " +
+       "`"$here\test_camera_geometry.c`" `"$root\components\app_camera\camera_geometry.c`" " +
+       "/Fo`"$out\\`" /Fe`"$out\test_camera_geometry.exe`""
+cmd /c $geo
+if ($LASTEXITCODE -ne 0) { throw "geometry build failed" }
+& "$out\test_camera_geometry.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$ring = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /I`"$root\components\app_photos`" " +
+        "`"$here\test_photos_ring.c`" `"$root\components\app_photos\photos_ring.c`" " +
+        "/Fo`"$out\\`" /Fe`"$out\test_photos_ring.exe`""
+cmd /c $ring
+if ($LASTEXITCODE -ne 0) { throw "photo ring build failed" }
+& "$out\test_photos_ring.exe"
 exit $LASTEXITCODE

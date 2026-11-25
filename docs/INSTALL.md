@@ -330,6 +330,260 @@ Sin `allocation failures`, sin errores de pantalla y `tx fail=0`. «Hola ESP», 
 reposo de 15 s funcionan igual. **El bloque DMA libre es 5 veces mayor y estable**: ya hay margen para
 la cámara, el AEC o «Hola ESP» durante la respuesta.
 
+### Prueba 12 (pendiente de autorización): 1.4.0, foto bajo demanda
+
+Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
+`python tools/test_live_setup.py` y comprobar que «functionDeclarations capturar_imagen» sale
+**ACEPTADO** con los dos modelos.
+
+1. Arranque: `app_version=1.4.0`, `crash_count=0` y `largest=` en reposo de unos 63 488 B.
+2. «Hola ESP» → `connected; setup sent` → `session ready`. El servidor acepta la declaración de la
+   función.
+3. «VOX, ¿qué ves?» o «Mira lo que tengo en la mano»:
+   - el ojo parpadea, muestra «OBSERVANDO» y se enciende el LED rojo de la cámara;
+   - VOX describe la escena.
+   - Logs: `toolCall capturar_imagen` → `app_camera: still 240x320 JPEG … B (q…) in … ms` →
+     `image … B … sent` → `toolResponse capturar_imagen sent`.
+4. **Orientación y color:** pregunta por un objeto de color conocido y si la imagen está derecha. Si sale
+   girada o en espejo, cambia `VOX_CAMERA_ROTATION` / `MIRROR_*`. Si los colores salen cambiados
+   (rojo↔azul), anotarlo.
+5. Memoria: `largest=` durante y después de la foto, y ningún `allocation failures`.
+6. Después de la foto, comprobar que `iris logs` y `iris device-status` siguen funcionando por USB.
+7. Repetir la foto 3 veces seguidas y comprobar que no hay fugas: `int_dma_free` debe volver al mismo
+   valor en reposo.
+
+**Primer intento (2026-11-25, instalación autorizada, firmware `30b15ccc1351…`):**
+
+- Funciona:
+  - Google acepta la función: `toolCall capturar_imagen`, 3 veces.
+  - El módulo se identifica como **SC101IOT** (`PID=0xda4a`, leído del propio sensor por SCCB).
+  - La cámara se abre a 1280×720, se libera bien y Gemini recibe el error.
+  - Sin fugas (`int_dma_free` 83 379 estable) y `largest=` de 63 488 mientras habla.
+- **Falla:** `VIDIOC_DQBUF … timed out`, ningún fotograma en 1 s.
+- El propietario confirma que la cámara funciona perfectamente en Vibe Mode, así que el hardware está
+  bien.
+- El LED rojo está encendido en reposo y se apaga al liberar la cámara, que queda en power-down.
+
+**Hipótesis:** contención del ancho de banda de la PSRAM. VOX ejecutaba el código desde PSRAM
+(`SPIRAM_XIP_FROM_PSRAM=y`), mientras que los ejemplos del BSP con cámara y Wi-Fi (`wifi_http_cam`,
+`camera_lcd_preview`) lo desactivan.
+
+**Compilación de diagnóstico (commit siguiente):**
+
+- Código desde flash.
+- Tiempo de espera del fotograma de 2 s.
+- Una foto de prueba 8 s después del arranque, sin conversación (`VOX_CAMERA_BOOT_TEST`): solo se
+  registra y no se envía.
+- Coste: unos 19 KB más de RAM interna, porque los búferes de ESP-Iris dejan la PSRAM.
+
+**Diagnóstico 1 (firmware `bc4aab0b28d9…`):** con el código desde flash, la foto de prueba del
+arranque, sin conversación, **también falla** (`VIDIOC_DQBUF` tras 2 s). No es contención de PSRAM, así
+que se revierte. Tampoco hay conflicto de pines con el BSP ni con VOX.
+
+**Diagnóstico 2 (commit siguiente):** el resolvedor eligió `esp_video` 2.6.0 / `esp_cam_sensor` 2.7.0,
+mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
+
+- Se fija `esp_video==2.5.0` (trae `esp_cam_sensor` 2.6.0).
+- El formato por defecto del SC101IOT pasa a 1280×720 a 25 fps, el que activa el BSP.
+- La prueba del arranque intenta A (1280×720 explícito, que resulta en 15 fps) y, si falla, B (formato
+  por defecto, 25 fps).
+
+**Diagnóstico 2 (firmware `7e7d15594342…`):** con `esp_video` 2.5.0 fallan **los dos formatos**
+(A, 15 fps, y B, 25 fps), también en reposo. No es la versión ni el formato.
+
+**Diagnóstico 3 (commit siguiente):**
+
+- Tras STREAMON se cuentan los cambios de nivel en PCLK, VSYNC, DE y D0: ¿envía el sensor?
+- Prueba C: igual que A, pero con el micrófono y WakeNet parados.
+
+**Diagnóstico 3 (firmware de `29ba3ca`):**
+
+- La prueba C, con el audio parado, también falla.
+- La sonda se ejecutó, pero el canal de registros perdió sus líneas: aparecen líneas en blanco justo
+  tras «Camera stream started».
+- Comprobado: ESP-Iris usa el USB-OTG HS (`TINYUSB_PORT_HIGH_SPEED_0`), así que no comparte
+  GPIO33/34 con la cámara.
+
+**Diagnóstico 4 (commit siguiente):**
+
+- `CONFIG_USJ_ENABLE_USB_SERIAL_JTAG` desactivado. Lo hacen los ejemplos con cámara y Wi-Fi y
+  openai-live-esp32, porque GPIO33/34 son D2 y el flash de la cámara; VOX no usa el USJ.
+- Las medidas de la sonda se escriben después de cerrar la cámara, con pausas.
+
+**Diagnóstico 4 (firmware de `9263419`): RESUELTO.**
+
+- Con el **USB Serial/JTAG desactivado**, la foto del arranque sale bien: `still 240x320 JPEG 10107 B
+  (q80) in 1911 ms`.
+- La sonda mide unos 241 000 flancos en PCLK, unos 35 en VSYNC (≈ 25 fps) y actividad en DE y D0: el
+  sensor siempre transmitió.
+- **Causa:** el periférico USJ, activo aunque VOX no lo usaba, tiene los pads GPIO33/34, que son D2 y
+  el flash de la cámara. Con él activo ningún fotograma llegaba a completarse.
+
+**Prueba de voz (2026-11-25):** 3 fotos en una conversación.
+
+- Cada una: `toolCall capturar_imagen` → `still 240x320 JPEG 13–14 KB (q80) in ~1370 ms` →
+  `image … sent` → `toolResponse … sent`.
+- VOX describe la escena.
+- Según el propietario, **la orientación y los colores son correctos** (270° con espejo vertical,
+  RGB565).
+- `largest=` entre 47 104 y 63 488 B, sin `allocation failures` ni errores de pantalla.
+
+**Prueba 12 superada.** Se retira el código de diagnóstico; `VOX_CAMERA_BOOT_TEST` queda disponible pero
+apagado.
+
+### Prueba 13 (pendiente de autorización): 1.5.0, galería de fotos
+
+Rama `feat/gallery`. Contiene la 1.4.0 (cámara) más:
+- la partición `photos` y el componente `app_photos`;
+- el contador de fotos en el bisel;
+- la galería.
+
+Diseño confirmado por el propietario el 2026-11-25 (maqueta en el simulador).
+
+**Cambia la tabla de particiones:** `main_app` pasa de 12 224 K a 11 712 K y aparece `photos`, de 512 K. La
+escribe `iris system-update`, como en 1.1.0.
+
+1. Arranque: `app_version=1.5.0`, `crash_count=0` y `app_photos: 0 stored still(s) of 10`. El contador
+   no se ve.
+2. «VOX, ¿qué ves?»: la foto llega a Gemini como en la 1.4.0. Después aparece
+   `app_photos: still saved in slot 0`, y en el bisel, arriba a la izquierda, el contador «1».
+3. Tocar el contador: galería con la foto real, «1 / 1», X, ‹ y ›.
+4. Hacer 2 o 3 fotos más: ‹ y › recorren todas y la posición cambia («2 / 3»…).
+5. X vuelve al ojo; a los 30 s sin tocar, la galería se cierra sola; «Hola ESP» la cierra y abre la
+   conversación.
+6. Mientras VOX habla, tocar el contador no abre la galería.
+7. Reiniciar el dispositivo: el contador mantiene el número de fotos.
+8. Memoria: `largest=` con la galería abierta y ningún `allocation failures`.
+
+**Primer intento (2026-11-25, instalación autorizada, firmware `fb446eb87dbc…`):**
+
+- La instalación, la tabla de particiones nueva (`app_photos: 0 stored still(s) of 10`) y la memoria
+  están bien.
+- **Las fotos vuelven a fallar** (`VIDIOC_DQBUF` timeout) y Gemini dice que «sus sistemas de visión
+  fallan».
+
+**Causa:** al retirar el diagnóstico (`a4f71d9`), el formato por defecto del SC101IOT volvió a 15 fps.
+
+- Al pedir 1280×720, el driver toma el formato por defecto si coincide.
+- En el diagnóstico 4 era el de 25 fps: la sonda contó unos 35 flancos de VSYNC en 0,7 s, es decir,
+  unos 25 fps.
+- **Hacen falta las dos cosas:** USB Serial/JTAG desactivado **y** el formato de 25 fps, que es el
+  que activa `mosaico_module_camera`.
+
+**Corrección:** el 25 fps pasa a ser el formato por defecto y el de 15 fps deja de compilarse
+(`sdkconfig.defaults`), así el driver no puede elegirlo.
+
+**Segundo intento (firmware `dfcef2f499fc…`, con 25 fps):** sigue fallando (`VIDIOC_DQBUF`). Ni el
+formato de 25 fps ni el USB Serial/JTAG apagado bastan por sí solos.
+
+Lo único que tenía el diagnóstico 4 y ya no está:
+
+- la sonda, que mantenía ocupada la tarea de la sesión (núcleo 0, prioridad 8) durante unos 0,7 s
+  entre STREAMON y la primera lectura;
+- la foto de prueba del arranque.
+
+**Diagnóstico 5 (commit siguiente):** cada foto se intenta así.
+
+1. Esperar 700 ms tras STREAMON, sin ocupar la CPU.
+2. Si falla, repetir con la animación del ojo pausada, sin tráfico DMA de la pantalla.
+3. Si vuelve a fallar, repetir con espera activa de 700 ms, igual que hacía la sonda.
+
+Además, la foto de prueba del arranque vuelve a estar activada.
+
+**Diagnóstico 5 (firmware de `4a1b2f4`): fallan la foto del arranque y los tres intentos.**
+
+Al leer el código salió que la premisa era falsa:
+
+- `mosaico_camera_start_stream()` ya lee fotogramas por sí misma: justo después de STREAMON llama
+  a `discard_stream_frames(buffer_count)`.
+- El tiempo agotado se produce **dentro** de esa función. Por eso el error aparece siempre 2000 ms
+  después de «Camera stream started».
+- Ni la espera, ni la pausa del ojo, ni la sonda del diagnóstico 4 llegaban a actuar antes de la
+  primera lectura.
+- La configuración completa de `sdkconfig` del diagnóstico 4 y la actual son iguales, salvo el
+  formato de 15 fps.
+
+**Causa documentada en el repositorio oficial del BSP:**
+
+- El commit **`b60f5d8`** de esp-mosaico/esp-mosaico-bsp (2026-10-19, «fix: update camera app»),
+  posterior a nuestro `5f88b91`, hace que el módulo controle él mismo CAM_PWDN (GPIO48), con 0 normal
+  y 1 dormido, «including SC101IOT».
+- Hasta entonces se pasaba ese pin al driver genérico del sensor, que usa su propia polaridad.
+- Encaja con lo observado: el LED rojo siguiendo el nivel equivocado, y un sensor que responde por
+  SCCB pero no completa fotogramas.
+
+**Corrección (commit siguiente):**
+
+- `third_party/mosaico_module_camera/mosaico_camera.c` y su README pasan a la versión oficial
+  `b60f5d8`, sin modificar.
+- Se retira el diagnóstico 5.
+- Se mantienen los 25 fps y el USB Serial/JTAG desactivado, igual que los ejemplos oficiales.
+
+**Con el arreglo oficial `b60f5d8` (2026-11-25, firmware `e99925eb830e…`):**
+
+- **Justo tras la instalación** (reinicio por software hecho por Vibe Mode): las fotos siguen fallando
+  (`VIDIOC_DQBUF`).
+- **Tras apagar y encender** (arranque en frío): **4 fotos seguidas correctas**.
+  - Cada una: `still 240x320 JPEG 12–16 KB (q80)` en unos 0,7 s, enviada a Gemini y guardada
+    (`still saved in slot 0…3; 4 stored`).
+  - Sin errores; `largest=` entre 55 296 y 63 488 B.
+- Interpretación (por confirmar):
+  - El firmware anterior, con la polaridad de PWDN equivocada, dejó el sensor en mal estado.
+  - El reinicio por software no corta la alimentación del módulo, así que solo el arranque en frío lo
+    limpió.
+  - El README del componente avisa de que un reinicio por software puede dejar la cámara en mal estado.
+- **Galería:** el propietario confirma que funciona en el dispositivo (contador, fotos reales, ‹ › y X).
+- **Reinicio por software (`iris restart`, autorizado, `reset_reason=3`):**
+  - las 4 fotos se conservan (`4 stored still(s) of 10`);
+  - **pero la cámara vuelve a fallar** (`DQBUF` timeout).
+  - Tras apagar y encender, 4 fotos más correctas, guardadas en los huecos 4–7 (`8 stored`).
+  - **Corrección de una conclusión anterior:** se leyó por error el arranque en frío posterior. En
+    realidad, **cualquier reinicio por software deja la cámara sin fotogramas hasta apagar y encender**.
+- **Causa según el README oficial del componente:** el reinicio por software puede dejar activo el DMA
+  de la cámara **o de la pantalla**. Antes de `esp_restart()`, la aplicación debe esperar a que
+  terminen la PPA y la LCD. VOX no paraba la pantalla, y los reinicios los lanza ESP-Iris
+  (`iris restart` y System Update).
+- **Corrección (commit siguiente):** se registra un manejador de apagado
+  (`esp_register_shutdown_handler`) que llama a `esp_gsp_esp_lcd_pause()`. Esa función detiene el
+  renderizado y espera a que terminen las transferencias de la pantalla antes del reinicio.
+- **Resultado (firmware `f9b92c95…`):** tras arranque en frío y luego `iris restart`, la foto vuelve a
+  fallar (`DQBUF` timeout). **La pausa de la pantalla no lo arregla**; se mantiene porque es inocua y
+  la pide el README.
+- **Hechos comprobados después:**
+  - El driver de ESP-IDF resetea el controlador DVP al iniciarlo (`cam_ll_reset_register`), así que
+    el lado del SoC arranca limpio.
+  - La placa de cámara tiene su propio reloj (XCLK sin GPIO) y se alimenta de `VCC_3V3`, que también
+    alimenta la pantalla: un reinicio por software **no apaga el sensor**.
+  - El SC101IOT no tiene pin de reset (`reset_pin = -1` en el driver).
+  - El driver clásico `esp32-camera` hace **siempre** un reset por software del sensor al detectarlo
+    (`Doing SW reset of sensor` en `esp_camera.c`). `esp_video`/`esp_cam_sensor` tienen la orden
+    (`ESP_CAM_SENSOR_IOC_SW_RESET`, registro 0x3103 bit 0) pero **nadie la llama**.
+- **Corrección (commit siguiente):** `app_camera` hace ese reset antes de cada foto y vuelve a escribir
+  el formato (Kconfig `VOX_CAMERA_SENSOR_RESET`, activado). Sin tocar código de Espressif.
+- **Resultado del reset por software (firmware `be522037…`):**
+  - Tras la instalación, 2 fotos correctas sin apagar.
+  - Tras `iris restart`, fallo (`DQBUF`), **también sin ninguna foto antes del reinicio** (captura en
+    directo: el reset se ejecuta y el formato se reescribe, pero no llegan fotogramas).
+  - Conclusión: el reset por SCCB no basta.
+- **Más hechos:**
+  - ESP-IDF, `esp_system/port/soc/esp32s31/system_internal.c`: el reinicio por software del S31 no para
+    ni resetea los DMA (`TODO: [ESP32S31] IDF-14841`); el del P4 sí. Cámara, pantalla y SPI comparten
+    el DMA AXI (3 canales).
+  - Esquemático oficial `SCH_ESP_Mosaico_SC101IOT_CameraBoard_V1_4A`:
+    - `CAM_RESET` = GPIO53 → pin 19 del sensor, pull-up de 10 kΩ, «0: Reset, 1: Normal»;
+    - `CAM_PWDN` = GPIO48 → solo el PWDN del sensor y el LED rojo (Q3); no corta la alimentación;
+    - el LDO de 2,8 V (CE a VIN) y el oscilador de 20 MHz están siempre encendidos con `VCC_3V3`.
+  - El driver del SC101IOT ignora el pin de reset (`reset_pin = -1`) y nadie lo mueve.
+- **Corrección (commit siguiente):** antes de cada foto, pulso de 10 ms a nivel bajo en `CAM_RESET`
+  (reset por hardware), espera de 20 ms, reset por SCCB y reescritura del formato.
+- Prueba pendiente: instalar, `iris restart`, foto (sin apagar).
+
+**Borrar todas (petición del propietario, commit siguiente):** mantener pulsada la X de la galería
+1,5 s. La sesión borra la partición entera (no solo las cabeceras), cierra la galería, oculta el contador
+y muestra «BORRANDO...» y después «FOTOS BORRADAS» durante 3 s.
+
+**Galería y almacenamiento: superados.** Reinicio por software: pendiente de la corrección.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

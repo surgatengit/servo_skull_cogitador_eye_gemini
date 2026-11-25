@@ -31,3 +31,22 @@ io_config.trans_queue_depth = 2;
   3. update the commit above;
   4. run the check.
 - Drop the fork once the BSP exposes the queue depth (proposal to upstream pending).
+
+## Camera components (1.4.0+)
+
+- `third_party/mosaico_module_camera` and `third_party/mosaico_module_mgr` are verbatim copies, so
+  that their `../esp-mosaico-bsp` dependency resolves to this fork. Unit-test folders are not
+  copied.
+- **Official fix taken from upstream (test 13):** `mosaico_module_camera/mosaico_camera.c` and its
+  `README.md` come from esp-mosaico-bsp **`b60f5d8`** (2026-10-19, "fix: update camera app"),
+  instead of the submodule commit `5f88b91`.
+  - With that fix the module drives CAM_PWDN (GPIO48) itself, with board polarity: 0 normal,
+    1 sleep, SC101IOT included.
+  - Before it, the generic sensor driver drove that pin with its own polarity.
+  - With `5f88b91`, VOX's SC101IOT answered over SCCB but never delivered a frame
+    (`VIDIOC_DQBUF` timeout), and its red LED followed the wrong PWDN level.
+  - The only other change in `5f88b91..b60f5d8` is a display drive-strength default in the BSP
+    Kconfig. It is unrelated and deliberately not taken.
+- `tools/check_bsp_fork.py` compares those two files with `git show b60f5d8:…` in the submodule
+  repository, and the rest with the submodule checkout.
+

@@ -3,10 +3,13 @@
 #include "app_vox_session.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "app_audio.h"
+#include "app_camera.h"
 #include "app_gemini_live.h"
+#include "app_photos.h"
 #include "app_secrets.h"
 #include "app_wake.h"
 #include "app_wifi.h"
@@ -25,10 +28,17 @@
 #else
 #define VOX_GOOGLE_SEARCH 0
 #endif
+#if CONFIG_VOX_CAMERA
+#define VOX_CAMERA 1
+#define VOX_CAMERA_JPEG_MAX_BYTES ((size_t)CONFIG_VOX_CAMERA_JPEG_MAX_KB * 1024U)
+#else
+#define VOX_CAMERA 0
+#define VOX_CAMERA_JPEG_MAX_BYTES 0U
+#endif
 
 static const char *TAG = "vox_session";
 
-#define SESSION_TASK_STACK      6144
+#define SESSION_TASK_STACK      8192    /* camera/PPA/JPEG calls run on this task */
 #define SESSION_TASK_PRIO       8
 #define SESSION_TASK_CORE       0
 #define SESSION_QUEUE_LEN       24
@@ -46,6 +56,12 @@ static const char *TAG = "vox_session";
 #define GROUNDING_ROTATE_US     (3 * 1000 * 1000)
 #define STATUS_CAPACITY         48
 #define STATUS_MAX_CHARS        24      /* fits the round panel's bottom chord at 20 px bold */
+#define TOOL_SLOTS              2       /* pending function calls (WebSocket -> session) */
+#define TOOL_ID_CAPACITY        96
+#define TOOL_NAME_CAPACITY      32
+#define TOOL_CAPTURE            "capturar_imagen"
+#define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
+#define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
 static const char PERSONA[] =
     "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
@@ -88,7 +104,25 @@ typedef enum {
     EV_GL,
     EV_AUDIO_START,
     EV_WAKE,
+    EV_TOOL,        /* value = tool slot */
+    EV_GALLERY,     /* value = app_vox_session_gallery_t */
 } event_kind_t;
+
+/* Functions Gemini may call (Live setup functionDeclarations). */
+#if CONFIG_VOX_CAMERA
+static const char FUNCTION_DECLARATIONS[] =
+    "[{\"name\":\"" TOOL_CAPTURE "\","
+    "\"description\":\"Toma una fotografía con la cámara de VOX y la envía como imagen para "
+    "que puedas ver lo que hay delante. Úsala solo cuando el operador te pida que mires, que "
+    "describas lo que ves, que leas algo o que identifiques un objeto. Tras la respuesta, la "
+    "imagen es el último fotograma de vídeo que has recibido.\"}]";
+#endif
+
+typedef struct {
+    char id[TOOL_ID_CAPACITY];
+    char name[TOOL_NAME_CAPACITY];
+    uint32_t cancelled;     /* atomic: toolCallCancellation for this id */
+} tool_slot_t;
 
 typedef struct {
     event_kind_t kind;
@@ -145,6 +179,18 @@ static struct {
     size_t item_count;
     size_t item_index;      /* rotation position */
     int64_t item_shown_us;
+    /* Function calls: the WebSocket task fills a free slot and posts EV_TOOL;
+     * the session task runs it and frees the slot (busy flag, atomic). */
+    tool_slot_t tools[TOOL_SLOTS];
+    uint32_t tool_busy[TOOL_SLOTS];
+    uint32_t stills_sent;   /* diagnostics */
+    /* Gallery (session task only): photos are read from flash here, never on
+     * the GSP task (its stack may be in PSRAM). */
+    bool gallery_open;
+    size_t gallery_pos;     /* 0 = oldest .. count-1 = newest */
+    int64_t gallery_touch_us;
+    uint8_t *photo_buf;     /* PSRAM, app_photos_max_size() */
+    int64_t notice_until_us; /* transient status text, 0 = none */
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -160,6 +206,10 @@ static void on_alloc_failed(size_t size, uint32_t caps, const char *function_nam
     s_alloc_fail_caps = caps;
     s_alloc_fail_count++;
 }
+
+/* Gallery helpers (defined with the gallery logic below). */
+static void update_photo_count(void);
+static void gallery_close(void);
 
 static uint32_t now_ms(void)
 {
@@ -628,12 +678,14 @@ static void log_diagnostics(int64_t now)
     const float peak_dbfs = mic.peak ? 20.0f * log10f((float)mic.peak / 32768.0f) : -96.0f;
     ESP_LOGI(TAG, "diag st=%d mic{frames=%u peak=%.0f dBFS slot=%u on=%d} "
              "tx{ok=%u fail=%u notready=%u} rx{msgs=%u audio=%u transcripts=%u other=%u} "
-             "search{q=%u grounded=%u} pending=%d heap{int_dma_free=%u largest=%u}",
+             "search{q=%u grounded=%u} tools{calls=%u stills=%u} pending=%d "
+             "heap{int_dma_free=%u largest=%u}",
              (int)s.state, (unsigned)mic.frames, (double)peak_dbfs, (unsigned)mic.slot,
              (int)mic.enabled, (unsigned)gl.tx_messages, (unsigned)gl.tx_failures,
              (unsigned)gl.tx_not_ready, (unsigned)gl.rx_messages, (unsigned)gl.rx_audio_chunks,
              (unsigned)gl.rx_input_transcripts, (unsigned)gl.rx_other_parts,
-             (unsigned)gl.search_queries, (unsigned)gl.rx_grounding, (int)s.reply_pending,
+             (unsigned)gl.search_queries, (unsigned)gl.rx_grounding, (unsigned)gl.tool_calls,
+             (unsigned)s.stills_sent, (int)s.reply_pending,
              (unsigned)int_free, (unsigned)int_largest);
 }
 
@@ -670,9 +722,29 @@ static bool check_silent_model(void)
     return true;
 }
 
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+/* Diagnostic still while idle, once per boot: tells conversation load apart
+ * from a camera/driver problem. Logged only, never sent. */
+static void camera_boot_test(int64_t now)
+{
+    static bool done;
+    if (done || now < 8LL * 1000 * 1000 || s.state != ST_CLOSED) {
+        return;
+    }
+    done = true;
+    app_camera_still_t still;
+    ESP_LOGI(TAG, "camera boot test: taking one still while idle");
+    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    ESP_LOGI(TAG, "camera boot test: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+}
+#endif
+
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+    camera_boot_test(now);
+#endif
     log_diagnostics(now);
     if (check_silent_model()) {
         return;
@@ -692,6 +764,13 @@ static void on_tick(void)
         s.model_progress_us = now;
     }
     rotate_grounding(now);
+    if (s.gallery_open && now - s.gallery_touch_us > GALLERY_IDLE_US) {
+        gallery_close();
+    }
+    if (s.notice_until_us && now > s.notice_until_us) {
+        s.notice_until_us = 0;
+        refresh_status(); /* back to the error/sources line or hidden */
+    }
     if (s.reply_pending && now - s.model_progress_us > RESPONSE_TIMEOUT_US) {
         ESP_LOGW(TAG, "no model output for %d s; reply abandoned", CONFIG_VOX_RESPONSE_TIMEOUT_S);
         s.reply_pending = false;
@@ -732,6 +811,181 @@ static void on_tick(void)
     }
 }
 
+static void answer_tool(const tool_slot_t *slot, const char *response_json)
+{
+    if (__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE)) {
+        ESP_LOGI(TAG, "tool %s cancelled; no response", slot->name);
+        return;
+    }
+    (void)app_gemini_live_send_tool_response(s.gl, slot->id, slot->name, response_json);
+}
+
+/* capturar_imagen: one still, sent as realtimeInput video, then the response.
+ * Runs on the session task (about 1-2 s); the uplink pauses meanwhile so the
+ * large message does not compete with microphone frames for the socket. */
+static void run_capture(const tool_slot_t *slot)
+{
+    if (s.config.ui.acknowledge) {
+        s.config.ui.acknowledge(s.config.ui.ui);
+    }
+    if (s.config.ui.set_status) {
+        s.config.ui.set_status(s.config.ui.ui, "OBSERVANDO");
+    }
+    set_mic(false);
+    app_camera_still_t still;
+    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    if (err == ESP_OK && !__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE) &&
+            app_gemini_live_send_image(s.gl, still.data, still.size) == ESP_OK) {
+        s.stills_sent++;
+        answer_tool(slot, "{\"result\":\"Imagen enviada: es el último fotograma de vídeo "
+                    "recibido. Descríbela al operador.\"}");
+        /* Keep it for the gallery after Gemini has it (the erase takes ~0.5 s). */
+        if (app_photos_save(still.data, still.size) == ESP_OK) {
+            update_photo_count();
+        }
+    } else if (err == ESP_ERR_NOT_FOUND) {
+        answer_tool(slot, "{\"error\":\"No hay ninguna cámara conectada en la ranura izquierda.\"}");
+    } else {
+        ESP_LOGW(TAG, "capture failed (%s)", esp_err_to_name(err));
+        answer_tool(slot, "{\"error\":\"La cámara no ha podido tomar la imagen.\"}");
+    }
+    const int64_t now = esp_timer_get_time();
+    s.last_activity_us = now;
+    s.model_progress_us = now;  /* the model now answers about the image */
+    set_mic(s.state == ST_LISTENING || s.state == ST_PROCESSING);
+    refresh_status();
+}
+
+static void run_tool(int index)
+{
+    if (index < 0 || index >= TOOL_SLOTS) {
+        return;
+    }
+    const tool_slot_t *slot = &s.tools[index];
+    const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
+    if (open && strcmp(slot->name, TOOL_CAPTURE) == 0 && VOX_CAMERA) {
+        run_capture(slot);
+    } else if (open) {
+        answer_tool(slot, "{\"error\":\"Función desconocida.\"}");
+    }
+    __atomic_store_n(&s.tool_busy[index], 0U, __ATOMIC_RELEASE);
+}
+
+/* WebSocket task: copy a function call into a free slot and hand it over. */
+static void queue_tool(const app_gemini_live_event_t *event)
+{
+    for (int i = 0; i < TOOL_SLOTS; ++i) {
+        if (__atomic_exchange_n(&s.tool_busy[i], 1U, __ATOMIC_ACQ_REL) == 0U) {
+            tool_slot_t *slot = &s.tools[i];
+            snprintf(slot->id, sizeof(slot->id), "%s", event->tool_id ? event->tool_id : "");
+            snprintf(slot->name, sizeof(slot->name), "%s", event->tool_name ? event->tool_name : "");
+            __atomic_store_n(&slot->cancelled, 0U, __ATOMIC_RELEASE);
+            post(EV_TOOL, i, 0);
+            return;
+        }
+    }
+    ESP_LOGW(TAG, "tool call %s dropped: %d calls already pending", event->tool_name, TOOL_SLOTS);
+}
+
+static void cancel_tool(const char *id)
+{
+    for (int i = 0; i < TOOL_SLOTS; ++i) {
+        if (__atomic_load_n(&s.tool_busy[i], __ATOMIC_ACQUIRE) && id &&
+                strcmp(s.tools[i].id, id) == 0) {
+            __atomic_store_n(&s.tools[i].cancelled, 1U, __ATOMIC_RELEASE);
+        }
+    }
+}
+
+static void update_photo_count(void)
+{
+    if (s.config.ui.set_photo_count) {
+        s.config.ui.set_photo_count(s.config.ui.ui, (unsigned)app_photos_count());
+    }
+}
+
+static void gallery_close(void)
+{
+    if (s.gallery_open && s.config.ui.hide_gallery) {
+        s.config.ui.hide_gallery(s.config.ui.ui);
+    }
+    s.gallery_open = false;
+}
+
+/* Read photo gallery_pos from flash and hand it to the UI (GSP copies it). */
+static void gallery_show(void)
+{
+    const size_t count = app_photos_count();
+    if (count == 0 || !s.photo_buf || !s.config.ui.show_photo) {
+        gallery_close();
+        return;
+    }
+    if (s.gallery_pos >= count) {
+        s.gallery_pos = count - 1;
+    }
+    size_t size = 0;
+    const esp_err_t err = app_photos_read(s.gallery_pos, s.photo_buf, app_photos_max_size(), &size);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "photo %u unreadable (%s)", (unsigned)(s.gallery_pos + 1), esp_err_to_name(err));
+    }
+    s.config.ui.show_photo(s.config.ui.ui, err == ESP_OK ? s.photo_buf : NULL,
+                           err == ESP_OK ? size : 0, (unsigned)(s.gallery_pos + 1), (unsigned)count);
+    s.gallery_open = true;
+    s.gallery_touch_us = esp_timer_get_time();
+}
+
+static void on_gallery(app_vox_session_gallery_t action)
+{
+    const size_t count = app_photos_count();
+    switch (action) {
+    case APP_VOX_SESSION_GALLERY_OPEN:
+        /* Not while VOX is answering: the conversation keeps the screen. */
+        if (s.gallery_open || count == 0 || s.state == ST_SPEAKING || s.state == ST_PROCESSING ||
+                s.state == ST_CONNECTING) {
+            return;
+        }
+        s.gallery_pos = count - 1; /* newest first */
+        gallery_show();
+        break;
+    case APP_VOX_SESSION_GALLERY_PREV:
+    case APP_VOX_SESSION_GALLERY_NEXT:
+        if (!s.gallery_open || count == 0) {
+            return;
+        }
+        if (action == APP_VOX_SESSION_GALLERY_PREV) {
+            s.gallery_pos = s.gallery_pos == 0 ? count - 1 : s.gallery_pos - 1;
+        } else {
+            s.gallery_pos = s.gallery_pos + 1 >= count ? 0 : s.gallery_pos + 1;
+        }
+        gallery_show();
+        break;
+    case APP_VOX_SESSION_GALLERY_CLOSE:
+        gallery_close();
+        break;
+    case APP_VOX_SESSION_GALLERY_DELETE_ALL:
+        if (!s.gallery_open) {
+            return;
+        }
+        gallery_close();
+        if (s.config.ui.set_status) {
+            s.config.ui.set_status(s.config.ui.ui, "BORRANDO...");
+        }
+        if (app_photos_clear() == ESP_OK) {
+            ESP_LOGI(TAG, "all photos deleted by the owner");
+        }
+        update_photo_count();
+        if (s.config.ui.set_status) {
+            s.config.ui.set_status(s.config.ui.ui, "FOTOS BORRADAS");
+        }
+        s.notice_until_us = esp_timer_get_time() + NOTICE_US;
+        break;
+    case APP_VOX_SESSION_GALLERY_TOUCH:
+    default:
+        s.gallery_touch_us = esp_timer_get_time();
+        break;
+    }
+}
+
 static void session_task(void *arg)
 {
     (void)arg;
@@ -769,8 +1023,15 @@ static void session_task(void *arg)
                     enter(ST_SPEAKING);
                 }
                 break;
+            case EV_TOOL:
+                run_tool(ev.value);
+                break;
+            case EV_GALLERY:
+                on_gallery((app_vox_session_gallery_t)ev.value);
+                break;
             case EV_WAKE:
                 if (s.state == ST_CLOSED) {
+                    gallery_close();
                     ESP_LOGI(TAG, "\"Hola ESP\" detected; opening conversation");
                     if (s.config.ui.acknowledge) {
                         s.config.ui.acknowledge(s.config.ui.ui);
@@ -826,6 +1087,13 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
     case APP_GL_EVT_GROUNDING:
         __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
         break;
+    case APP_GL_EVT_TOOL_CALL:
+        __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
+        queue_tool(event);
+        return;
+    case APP_GL_EVT_TOOL_CANCEL:
+        cancel_tool(event->tool_id);
+        return;
     default:
         break;
     }
@@ -874,6 +1142,11 @@ static void on_mic(const int16_t *pcm, size_t samples, void *ctx)
 void app_vox_session_tap(void)
 {
     post(EV_TAP, 0, 0);
+}
+
+void app_vox_session_gallery(app_vox_session_gallery_t action)
+{
+    post(EV_GALLERY, (int)action, 0);
 }
 
 void app_vox_session_wifi_changed(int app_wifi_state)
@@ -926,11 +1199,18 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         .language = CONFIG_VOX_GEMINI_LANGUAGE,
         .system_instruction = PERSONA,
         .google_search = VOX_GOOGLE_SEARCH,
+#if CONFIG_VOX_CAMERA
+        .function_declarations = FUNCTION_DECLARATIONS,
+#endif
         .on_event = gl_event,
     };
     esp_err_t err = app_gemini_live_create(&gl_config, &s.gl);
     if (err != ESP_OK) {
         goto fail_queue;
+    }
+    /* Photo store (optional: without the partition stills are only sent). */
+    if (app_photos_init() == ESP_OK) {
+        s.photo_buf = heap_caps_malloc(app_photos_max_size(), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
     /* Optional: without it grounded answers simply show no source line. */
     s.items = heap_caps_calloc(1, GROUNDING_ITEMS_CAPACITY + GROUNDING_RAW_CAPACITY,
@@ -965,6 +1245,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         s.config.ui.set_view(s.config.ui.ui, APP_VOX_VIEW_IDLE);
     }
     set_wake_listening(true); /* starts CLOSED: arm local listening */
+    update_photo_count();
     ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s, search %s); tap%s to talk", primary,
              fallback, VOX_GOOGLE_SEARCH ? "on" : "off",
              s.wake_available ? " or say \"Hola ESP\"" : "");
