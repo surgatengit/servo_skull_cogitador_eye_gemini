@@ -707,9 +707,29 @@ static bool check_silent_model(void)
     return true;
 }
 
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+/* Diagnostic still while idle, once per boot: tells conversation load apart
+ * from a camera/driver problem. Logged only, never sent. */
+static void camera_boot_test(int64_t now)
+{
+    static bool done;
+    if (done || now < 8LL * 1000 * 1000 || s.state != ST_CLOSED) {
+        return;
+    }
+    done = true;
+    ESP_LOGI(TAG, "camera boot test: taking one still while idle");
+    app_camera_still_t still;
+    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    ESP_LOGI(TAG, "camera boot test: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
+}
+#endif
+
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
+#if CONFIG_VOX_CAMERA_BOOT_TEST
+    camera_boot_test(now);
+#endif
     log_diagnostics(now);
     if (check_silent_model()) {
         return;

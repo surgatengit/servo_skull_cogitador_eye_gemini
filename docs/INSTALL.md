@@ -352,6 +352,30 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
 7. Repetir la foto 3 veces seguidas y comprobar que no hay fugas: `int_dma_free` debe volver al mismo
    valor en reposo.
 
+**Primer intento (2026-11-25, instalación autorizada, firmware `30b15ccc1351…`):**
+
+- Funciona:
+  - Google acepta la función: `toolCall capturar_imagen`, 3 veces.
+  - El módulo se identifica como **SC101IOT** (`PID=0xda4a`, leído del propio sensor por SCCB).
+  - La cámara se abre a 1280×720, se libera bien y Gemini recibe el error.
+  - Sin fugas (`int_dma_free` 83 379 estable) y `largest=` de 63 488 mientras habla.
+- **Falla:** `VIDIOC_DQBUF … timed out`, ningún fotograma en 1 s.
+- El propietario confirma que la cámara funciona perfectamente en Vibe Mode, así que el hardware está
+  bien.
+- El LED rojo está encendido en reposo y se apaga al liberar la cámara, que queda en power-down.
+
+**Hipótesis:** contención del ancho de banda de la PSRAM. VOX ejecutaba el código desde PSRAM
+(`SPIRAM_XIP_FROM_PSRAM=y`), mientras que los ejemplos del BSP con cámara y Wi-Fi (`wifi_http_cam`,
+`camera_lcd_preview`) lo desactivan.
+
+**Compilación de diagnóstico (commit siguiente):**
+
+- Código desde flash.
+- Tiempo de espera del fotograma de 2 s.
+- Una foto de prueba 8 s después del arranque, sin conversación (`VOX_CAMERA_BOOT_TEST`): solo se
+  registra y no se envía.
+- Coste: unos 19 KB más de RAM interna, porque los búferes de ESP-Iris dejan la PSRAM.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

@@ -22,6 +22,7 @@ static const char *TAG = "app_camera";
 #define OUT_W               CONFIG_VOX_CAMERA_WIDTH
 #define OUT_H               CONFIG_VOX_CAMERA_HEIGHT
 #define SETTLE_FRAMES       CONFIG_VOX_CAMERA_SETTLE_FRAMES
+#define FRAME_TIMEOUT_MS    2000
 #define CAPTURE_W           1280
 #define CAPTURE_H           720
 #define JPEG_TIMEOUT_MS     1000
@@ -141,6 +142,7 @@ static esp_err_t grab_converted_frame(void)
 {
     mosaico_camera_config_t cfg = MOSAICO_CAMERA_DEFAULT_CONFIG();
     cfg.buffer_count = 2;
+    cfg.frame_timeout_ms = FRAME_TIMEOUT_MS;
     /* Both modules support 1280x720 UYVY (SC101IOT default; the OV3640 default
      * is RGB565 640x480, which the PPA path below does not take). */
     cfg.width = CAPTURE_W;
