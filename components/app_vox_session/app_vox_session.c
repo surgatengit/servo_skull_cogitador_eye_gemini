@@ -72,6 +72,9 @@ static const char *TAG = "vox_session";
 #define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_VOX_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
 #define PLAYER_DICE             2       /* D20 badge: the player rolls 2d20 */
 #define PLAYER_SIDES            20
+#define ROLL_TEXT_CAPACITY      480     /* pending player rolls (about three) */
+#define ROLL_RETRY_US           (500 * 1000)        /* after a failed send */
+#define ROLL_EXPIRE_US          (90 * 1000 * 1000)  /* undelivered rolls are dropped */
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
 #define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
@@ -262,6 +265,12 @@ static struct {
     char voice[APP_SECRETS_VOICE_CAPACITY]; /* voice of the next/current conversation */
     bool voice_reconnect;   /* cambiar_voz: reconnect once the reply has been spoken */
     bool role_mode;
+    /* Player rolls (D20 badge) not yet delivered to the master: the WebSocket
+     * client is busy while the model streams a reply, so they wait for
+     * turnComplete and are retried until sent or expired. */
+    char roll_text[ROLL_TEXT_CAPACITY];
+    int64_t roll_since_us;  /* first pending roll */
+    int64_t roll_retry_us;  /* earliest next attempt */
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -633,9 +642,42 @@ static void roll(uint16_t *values, int count, int sides)
     }
 }
 
+/* Pending player rolls belong to the open conversation only. */
+static void drop_rolls(const char *why)
+{
+    if (s.roll_text[0]) {
+        ESP_LOGW(TAG, "player roll not delivered (%s): %s", why, s.roll_text);
+        s.roll_text[0] = '\0';
+    }
+}
+
+/* Send the pending player rolls once the model is not streaming a reply. */
+static void flush_rolls(int64_t now)
+{
+    if (!s.roll_text[0]) {
+        return;
+    }
+    if (now - s.roll_since_us > ROLL_EXPIRE_US) {
+        drop_rolls("expired");
+        return;
+    }
+    if (now < s.roll_retry_us || s.reply_pending || !app_gemini_live_is_ready(s.gl)) {
+        return;
+    }
+    if (app_gemini_live_send_text(s.gl, s.roll_text) == ESP_OK) {
+        ESP_LOGI(TAG, "player roll delivered");
+        s.roll_text[0] = '\0';
+        s.last_activity_us = now;
+        begin_reply(); /* the master answers the roll */
+    } else {
+        s.roll_retry_us = now + ROLL_RETRY_US;
+    }
+}
+
 static void close_conversation(void)
 {
     set_mic(false);
+    drop_rolls("conversation closed");
     s.voice_reconnect = false;
     set_role_mode(false);
     (void)app_gemini_live_disconnect(s.gl);
@@ -931,12 +973,14 @@ static void on_tick(void)
             enter(ST_LISTENING); /* the idle countdown starts now */
         }
     }
+    flush_rolls(now);
     if (s.voice_reconnect && s.state == ST_LISTENING && !s.reply_pending &&
             !app_audio_is_playing()) {
         /* cambiar_voz: the goodbye has been spoken; reopen with the new voice. */
         ESP_LOGI(TAG, "reconnecting with voice %s", s.voice);
         s.voice_reconnect = false;
         set_mic(false);
+        drop_rolls("voice change");
         (void)app_gemini_live_disconnect(s.gl);
         use_voice(s.voice);
         open_conversation();
@@ -1306,12 +1350,24 @@ static void on_action(app_vox_session_action_t action)
         uint16_t values[PLAYER_DICE];
         roll(values, PLAYER_DICE, PLAYER_SIDES);
         char text[160];
-        if (vox_rol_player_text(values, PLAYER_DICE, PLAYER_SIDES, text, sizeof(text)) > 0 &&
-                app_gemini_live_is_ready(s.gl)) {
-            s.last_activity_us = esp_timer_get_time();
-            (void)app_gemini_live_send_text(s.gl, text);
+        if (vox_rol_player_text(values, PLAYER_DICE, PLAYER_SIDES, text, sizeof(text)) <= 0) {
+            return;
         }
         ESP_LOGI(TAG, "player roll: %s", text);
+        const int64_t now = esp_timer_get_time();
+        s.last_activity_us = now;
+        const size_t used = strlen(s.roll_text);
+        if (used == 0) {
+            snprintf(s.roll_text, sizeof(s.roll_text), "%s", text);
+            s.roll_since_us = now;
+            s.roll_retry_us = 0;
+        } else if (used + 1 + strlen(text) < sizeof(s.roll_text)) {
+            /* Several players rolled while the master spoke: one message. */
+            snprintf(s.roll_text + used, sizeof(s.roll_text) - used, " %s", text);
+        } else {
+            ESP_LOGW(TAG, "player roll queue full; roll not sent");
+        }
+        flush_rolls(now); /* now if the model is quiet, else after its reply */
     }
 }
 

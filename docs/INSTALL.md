@@ -612,7 +612,8 @@ En el dispositivo, por orden:
    - Abre esa dirección en el móvil, en la misma Wi-Fi, y escribe tu nombre.
 5. **Secreto:** cuando el máster reparta secretos, el tuyo llega al móvil (vibra; mantén pulsado
    para leerlo). El de un jugador sin móvil sale en la pantalla hasta tocarla.
-6. **Tirada del jugador:** toca «D20». Salen tus 2d20 y el máster los usa.
+6. **Tirada del jugador:** toca «D20», también mientras el máster habla. Salen tus 2d20 y el
+   máster los usa: si estaba hablando, la tirada le llega en cuanto termina su frase.
 7. Deja de hablar 2–3 minutos en modo rol: no debe cerrarse antes de unos 180 s.
 8. En modo rol, un toque mientras escucha no cierra (pone «MANTÉN PARA SALIR»). Mantén el dedo
    1,5 s sobre el ojo: sale de la partida.
@@ -625,13 +626,24 @@ En el dispositivo, por orden:
 - Corrección: en modo rol un toque ya no cierra; se sale manteniendo pulsado o pidiéndoselo al
   máster.
 
+**Segundo intento (2026-11-26, commit `1f7153b`):**
+- Correcto: el alta desde el móvil, el secreto en el móvil, los dados del D20 en pantalla, que un
+  toque no cierre la partida, la salida manteniendo pulsado y el cambio de voz.
+- Fallo: las dos tiradas del D20 se hicieron mientras VOX hablaba y no llegaron a Gemini
+  (`Could not lock ws-client`, `clientContent text ESP_FAIL`). Mientras llega el audio de la
+  respuesta, el cliente WebSocket está ocupado.
+- Corrección: la tirada se guarda y se envía al terminar la respuesta (`turnComplete`). Se
+  reintenta cada 0,5 s, se agrupan varias tiradas en un solo mensaje y se descartan a los 90 s o
+  al cerrar la conversación.
+
 En el registro (`iris logs`), busca:
 - `dice {...}`;
 - `voice … requested by the model` y `reconnecting with voice …`;
 - `role mode on`;
 - `phone page at http://…` y `player joined: …`;
 - `secret sent to the phone of …`;
-- `player roll: …`.
+- `player roll: …` y, justo después o al acabar la respuesta, `player roll delivered`;
+- `eye held in role mode; leaving the game`.
 
 ## 3. Volver al firmware actual (restauración)
 

@@ -99,6 +99,10 @@ closes the conversation and re-arms local listening.
     one happened.
   - D20 badge (role mode only): the player rolls 2d20 on the device. The roll is shown and sent to
     Gemini as a `clientContent` text turn (`app_gemini_live_send_text`).
+  - While the model streams a reply, the WebSocket client is busy and a send fails. Pending rolls
+    are therefore kept (up to 480 bytes, several rolls in one message) and sent once
+    `reply_pending` clears, retrying every 0.5 s. They are dropped after 90 s, on close, or on a
+    voice reconnect (`player roll delivered` / `player roll not delivered (…)`).
   - Tool arguments are copied into the slot (640 bytes each) by the WebSocket task. They are parsed
     with cJSON on the session task.
 - Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only

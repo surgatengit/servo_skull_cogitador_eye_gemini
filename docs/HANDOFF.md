@@ -45,7 +45,7 @@ ahora; queda para revisar. Google Search está implementado pero
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
 | App anterior | ESP-Claw = Mosaico-Claw 0.8.0, Idea **100000** (restaurable desde Vibe Mode → Mis Ideas) |
 
-### En curso: 1.6.0 RoleMaster (rama `feat/rolemaster`, sin instalar)
+### En curso: 1.6.0 RoleMaster (rama `feat/rolemaster`)
 
 - Cuatro voces (Charon, Algenib, Kore, Sulafat):
   - herramienta `cambiar_voz`, que reconecta con la voz nueva;
@@ -53,12 +53,15 @@ ahora; queda para revisar. Google Search está implementado pero
   - `provision_key.py --voice`.
 - Dados reales:
   - `tirar_dados` con RNG por hardware y panel animado;
-  - botón D20 para que tiren los jugadores en modo rol (se envía a Gemini como texto).
+  - botón D20 para que tiren los jugadores en modo rol (se envía a Gemini como texto; si el
+    modelo está hablando, se envía al terminar su respuesta).
 - `modo_rol`: máster de rol en la personalidad, espera de 180 s antes de cerrar.
 - `mostrar_secreto`: al móvil del jugador (página `app_rol_web` en la Wi-Fi de casa, solo en modo
   rol) o a la tarjeta de pantalla.
-- Probado en el PC (tests, simulador, página con servidor simulado). Falta la prueba 14 en el
-  dispositivo.
+- Probado en el PC (tests, simulador, página con servidor simulado).
+- Prueba 14 en el dispositivo (commit `1f7153b`): todo correcto salvo las tiradas del D20 hechas
+  mientras VOX hablaba, que no llegaban a Gemini. Ya está corregido, pero falta instalarlo y
+  probarlo.
 
 ## 2. Entorno
 
