@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img alt="versión" src="https://img.shields.io/badge/versión-1.6.0-00e5ff?style=flat-square">
+  <img alt="versión" src="https://img.shields.io/badge/versión-1.6.1-00e5ff?style=flat-square">
   <img alt="chip" src="https://img.shields.io/badge/chip-ESP32--S31-ffb300?style=flat-square">
   <img alt="IA" src="https://img.shields.io/badge/IA-Gemini%20Live-00e676?style=flat-square">
   <img alt="palabra" src="https://img.shields.io/badge/«Hola%20ESP»-local%20y%20offline-ff1744?style=flat-square">
@@ -73,7 +73,7 @@ Un toque en el ojo solo interrumpe al máster. Para salir de la partida, **mant�
 > [!IMPORTANT]
 > **RoleMaster está en beta.** Ya se ha probado en el dispositivo: voces, dados en los tres sistemas,
 > secretos en el móvil, la salida manteniendo pulsado y cargar una partida guardada. Viene incluido en
-> el firmware 1.6.0 de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-cogitador).
+> el firmware 1.6.1 de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-cogitador).
 
 ---
 
@@ -184,7 +184,7 @@ git clone https://github.com/surgatengit/servo_skull_cogitador_eye_gemini.git pr
 
 1. Entra en la página de **[Releases](https://github.com/surgatengit/servo_skull_cogitador_eye_gemini/releases/latest)**
    de este repositorio.
-2. Descarga el archivo **`cogitador-m01-v1.6.0.irisfw`**.
+2. Descarga el archivo **`cogitador-m01-v1.6.1.irisfw`**.
 3. Guárdalo dentro de la carpeta `esp-mosaico-vibe\projects\servocraneo_gemini_direct`.
 
 > [!TIP]
@@ -202,7 +202,7 @@ En la pantalla del ESP-Mosaico, entra en **Mis Ideas** y comprueba que aparece *
 2. En PowerShell, dentro de `esp-mosaico-vibe`, ejecuta:
 
 ```powershell
-python mosaico.py iris system-update --bundle projects/servocraneo_gemini_direct/cogitador-m01-v1.6.0.irisfw
+python mosaico.py iris system-update --bundle projects/servocraneo_gemini_direct/cogitador-m01-v1.6.1.irisfw
 ```
 
 3. La primera vez tardará un poco más (descarga sus herramientas). Espera a ver
