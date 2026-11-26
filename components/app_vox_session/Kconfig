@@ -49,6 +49,14 @@ menu "VOX M-01 Gemini Direct"
             "model" partition with the esp-sr model image; without it VOX keeps
             working with touch only.
 
+    config VOX_ROLE_IDLE_TIMEOUT_S
+        int "Seconds without activity before returning to idle in role mode"
+        range 30 900
+        default 180
+        help
+            Role-play players think, roll and talk among themselves: the
+            conversation waits longer before closing while modo_rol is on.
+
     config VOX_IDLE_TIMEOUT_S
         int "Seconds without activity before returning to idle"
         range 10 600

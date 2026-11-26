@@ -1,4 +1,4 @@
-idf_component_register(SRCS "app_vox_eye.c"
+idf_component_register(SRCS "app_vox_eye.c" "secret_text.c"
     INCLUDE_DIRS "include"
     REQUIRES esp-gsp)
 include("${MOSAICO_UTILS_ROOT}/mosaico-tools/cmake/gsp_bundle.cmake")

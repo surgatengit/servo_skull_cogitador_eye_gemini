@@ -326,6 +326,107 @@
     },
     {
       "type": "container",
+      "name": "voice_badge",
+      "x": 364,
+      "y": 60,
+      "w": 56,
+      "h": 56,
+      "parent": -1
+    },
+    {
+      "type": "container",
+      "x": 8,
+      "y": 8,
+      "w": 40,
+      "h": 40,
+      "radius": 20,
+      "bg_color": "#16181A",
+      "border_color": "#5A5F64",
+      "border_width": 2,
+      "parent": 25
+    },
+    {
+      "type": "label",
+      "name": "voice_badge_text",
+      "bind": "voice_badge_text",
+      "x": 8,
+      "y": 17,
+      "w": 40,
+      "h": 22,
+      "text": "C",
+      "font_size": 16,
+      "fg_color": "#B8C4C8",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+      "parent": 25
+    },
+    {
+      "type": "button",
+      "name": "voice_badge_btn",
+      "x": 0,
+      "y": 0,
+      "w": 56,
+      "h": 56,
+      "radius": 0,
+      "bg_color": "#00000000",
+      "callback": "voice_next",
+      "parent": 25
+    },
+    {
+      "type": "container",
+      "name": "role_badge",
+      "x": 404,
+      "y": 212,
+      "w": 56,
+      "h": 56,
+      "parent": -1,
+      "bind": "role_badge",
+      "bind_target": "visible",
+      "hidden": true
+    },
+    {
+      "type": "container",
+      "x": 8,
+      "y": 8,
+      "w": 40,
+      "h": 40,
+      "radius": 20,
+      "bg_color": "#16181A",
+      "border_color": "#FFB300",
+      "border_width": 2,
+      "parent": 29
+    },
+    {
+      "type": "label",
+      "name": "role_badge_text",
+      "bind": "role_badge_text",
+      "x": 8,
+      "y": 17,
+      "w": 40,
+      "h": 22,
+      "text": "D20",
+      "font_size": 13,
+      "fg_color": "#FFB300",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "D20",
+      "parent": 29
+    },
+    {
+      "type": "button",
+      "name": "role_badge_btn",
+      "x": 0,
+      "y": 0,
+      "w": 56,
+      "h": 56,
+      "radius": 0,
+      "bg_color": "#00000000",
+      "callback": "role_roll",
+      "parent": 29
+    },
+    {
+      "type": "container",
       "name": "gallery",
       "bind": "gallery",
       "bind_target": "visible",
@@ -347,7 +448,7 @@
       "radius": 0,
       "bg_color": "#00000000",
       "callback": "gallery_touch",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "container",
@@ -359,7 +460,7 @@
       "bg_color": "#0B0C0D",
       "border_color": "#3C4044",
       "border_width": 6,
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "image",
@@ -375,7 +476,7 @@
       "radius": 10,
       "border_color": "#3C4044",
       "border_width": 2,
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "container",
@@ -387,7 +488,7 @@
       "bg_color": "#16181A",
       "border_color": "#5A5F64",
       "border_width": 2,
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "label",
@@ -401,7 +502,7 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": "X",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "button",
@@ -413,7 +514,7 @@
       "radius": 0,
       "bg_color": "#00000000",
       "callback": "gallery_close",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "container",
@@ -423,7 +524,7 @@
       "h": 56,
       "radius": 14,
       "bg_color": "#16181A",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "label",
@@ -437,7 +538,7 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": "<>",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "button",
@@ -449,7 +550,7 @@
       "radius": 0,
       "bg_color": "#00000000",
       "callback": "gallery_prev",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "container",
@@ -459,7 +560,7 @@
       "h": 56,
       "radius": 14,
       "bg_color": "#16181A",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "label",
@@ -473,7 +574,7 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": "<>",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "button",
@@ -485,7 +586,7 @@
       "radius": 0,
       "bg_color": "#00000000",
       "callback": "gallery_next",
-      "parent": 25
+      "parent": 33
     },
     {
       "type": "label",
@@ -501,7 +602,375 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": "0123456789 /",
-      "parent": 25
+      "parent": 33
+    },
+    {
+      "type": "container",
+      "name": "dice",
+      "bind": "dice",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 480,
+      "bg_color": "#00000000",
+      "parent": -1
+    },
+    {
+      "type": "button",
+      "name": "dice_bg",
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 480,
+      "radius": 0,
+      "bg_color": "#00000000",
+      "callback": "dice_close",
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "x": 40,
+      "y": 136,
+      "w": 400,
+      "h": 208,
+      "radius": 28,
+      "bg_color": "#0B0F14",
+      "border_color": "#FFB300",
+      "border_width": 3,
+      "parent": 47
+    },
+    {
+      "type": "label",
+      "name": "dice_title",
+      "bind": "dice_title",
+      "x": 60,
+      "y": 150,
+      "w": 360,
+      "h": 28,
+      "text": "TIRADA",
+      "font_size": 20,
+      "fg_color": "#FFB300",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "parent": 47
+    },
+    {
+      "type": "label",
+      "name": "dice_total",
+      "bind": "dice_total",
+      "x": 60,
+      "y": 290,
+      "w": 360,
+      "h": 30,
+      "text": " ",
+      "font_size": 20,
+      "fg_color": "#E8D9FF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die0_slot",
+      "x": {
+        "default": 60,
+        "min": 0,
+        "max": 404
+      },
+      "y": 190,
+      "w": 76,
+      "h": 76,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die0",
+      "bind": "die0",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "parent": 52
+    },
+    {
+      "type": "container",
+      "name": "die0_face",
+      "bind": "die0_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "radius": 16,
+      "bg_color": "#1E2A33",
+      "parent": 53
+    },
+    {
+      "type": "label",
+      "name": "die0_value",
+      "bind": "die0_value",
+      "x": 0,
+      "y": 18,
+      "w": 76,
+      "h": 42,
+      "text": "20",
+      "font_size": 34,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 53
+    },
+    {
+      "type": "container",
+      "name": "die1_slot",
+      "x": {
+        "default": 152,
+        "min": 0,
+        "max": 404
+      },
+      "y": 190,
+      "w": 76,
+      "h": 76,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die1",
+      "bind": "die1",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "parent": 56
+    },
+    {
+      "type": "container",
+      "name": "die1_face",
+      "bind": "die1_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "radius": 16,
+      "bg_color": "#1E2A33",
+      "parent": 57
+    },
+    {
+      "type": "label",
+      "name": "die1_value",
+      "bind": "die1_value",
+      "x": 0,
+      "y": 18,
+      "w": 76,
+      "h": 42,
+      "text": "20",
+      "font_size": 34,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 57
+    },
+    {
+      "type": "container",
+      "name": "die2_slot",
+      "x": {
+        "default": 244,
+        "min": 0,
+        "max": 404
+      },
+      "y": 190,
+      "w": 76,
+      "h": 76,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die2",
+      "bind": "die2",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "parent": 60
+    },
+    {
+      "type": "container",
+      "name": "die2_face",
+      "bind": "die2_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "radius": 16,
+      "bg_color": "#1E2A33",
+      "parent": 61
+    },
+    {
+      "type": "label",
+      "name": "die2_value",
+      "bind": "die2_value",
+      "x": 0,
+      "y": 18,
+      "w": 76,
+      "h": 42,
+      "text": "20",
+      "font_size": 34,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 61
+    },
+    {
+      "type": "container",
+      "name": "die3_slot",
+      "x": {
+        "default": 336,
+        "min": 0,
+        "max": 404
+      },
+      "y": 190,
+      "w": 76,
+      "h": 76,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die3",
+      "bind": "die3",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "parent": 64
+    },
+    {
+      "type": "container",
+      "name": "die3_face",
+      "bind": "die3_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76,
+      "radius": 16,
+      "bg_color": "#1E2A33",
+      "parent": 65
+    },
+    {
+      "type": "label",
+      "name": "die3_value",
+      "bind": "die3_value",
+      "x": 0,
+      "y": 18,
+      "w": 76,
+      "h": 42,
+      "text": "20",
+      "font_size": 34,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 65
+    },
+    {
+      "type": "container",
+      "name": "secret",
+      "bind": "secret",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 480,
+      "bg_color": "#000000",
+      "parent": -1
+    },
+    {
+      "type": "button",
+      "name": "secret_bg",
+      "x": 0,
+      "y": 0,
+      "w": 480,
+      "h": 480,
+      "radius": 0,
+      "bg_color": "#00000000",
+      "callback": "secret_close",
+      "parent": 68
+    },
+    {
+      "type": "container",
+      "x": 4,
+      "y": 4,
+      "w": 472,
+      "h": 472,
+      "radius": 236,
+      "bg_color": "#120A16",
+      "border_color": "#D500F9",
+      "border_width": 6,
+      "parent": 68
+    },
+    {
+      "type": "label",
+      "name": "secret_title",
+      "bind": "secret_title",
+      "x": 60,
+      "y": 64,
+      "w": 360,
+      "h": 30,
+      "text": "SECRETO",
+      "font_size": 22,
+      "fg_color": "#D500F9",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "parent": 68
+    },
+    {
+      "type": "label",
+      "name": "secret_text",
+      "bind": "secret_text",
+      "x": 74,
+      "y": 110,
+      "w": 332,
+      "h": 268,
+      "text": " ",
+      "font_size": 20,
+      "fg_color": "#F2E8FF",
+      "text_align": "left",
+      "overflow": "clip",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜabcdefghijklmnopqrstuvwxyzáéíóúñü0123456789.,;:¡!¿?-'\"()·/%+=",
+      "parent": 68
+    },
+    {
+      "type": "label",
+      "x": 90,
+      "y": 396,
+      "w": 300,
+      "h": 24,
+      "text": "TOCA PARA OCULTAR",
+      "font_size": 16,
+      "fg_color": "#8A7F99",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "parent": 68
     }
   ]
 }

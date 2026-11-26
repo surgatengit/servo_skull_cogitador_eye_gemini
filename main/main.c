@@ -64,6 +64,33 @@ static void ui_hide_gallery(void *ui)
     (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
 }
 
+static void ui_set_voice_initial(void *ui, char initial)
+{
+    (void)app_vox_eye_set_voice_initial((app_vox_eye_handle_t)ui, initial);
+}
+
+static void ui_set_role_mode(void *ui, bool enabled)
+{
+    (void)app_vox_eye_set_role_mode((app_vox_eye_handle_t)ui, enabled);
+}
+
+static void ui_show_dice(void *ui, const uint16_t *values, unsigned count, unsigned sides)
+{
+    (void)app_vox_eye_show_dice((app_vox_eye_handle_t)ui, values, count, sides);
+}
+
+static void ui_show_secret(void *ui, const char *player, const char *text)
+{
+    (void)app_vox_eye_show_secret((app_vox_eye_handle_t)ui, player, text);
+}
+
+/* GSP framework task: only enqueue. The enums share their values. */
+static void eye_action(app_vox_eye_action_t action, void *ctx)
+{
+    (void)ctx;
+    app_vox_session_action((app_vox_session_action_t)action);
+}
+
 /* GSP framework task: only enqueue. The enums share their values. */
 static void eye_gallery(app_vox_gallery_action_t action, void *ctx)
 {
@@ -131,6 +158,7 @@ static esp_err_t start_eye(void)
     const app_vox_eye_config_t eye = {
         .on_tap = eye_tapped,
         .on_gallery = eye_gallery,
+        .on_action = eye_action,
         .level = eye_level,
         .seed = esp_random() | 1U,
     };
@@ -168,6 +196,10 @@ void app_main(void)
             .set_photo_count = eye_ready ? ui_set_photo_count : NULL,
             .show_photo = eye_ready ? ui_show_photo : NULL,
             .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
+            .set_voice_initial = eye_ready ? ui_set_voice_initial : NULL,
+            .set_role_mode = eye_ready ? ui_set_role_mode : NULL,
+            .show_dice = eye_ready ? ui_show_dice : NULL,
+            .show_secret = eye_ready ? ui_show_secret : NULL,
             .ui = application.eye,
         },
     };

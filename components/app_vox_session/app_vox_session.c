@@ -13,6 +13,9 @@
 #include "app_secrets.h"
 #include "app_wake.h"
 #include "app_wifi.h"
+#include "cJSON.h"
+#include "esp_random.h"
+#include "vox_rol.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -60,6 +63,14 @@ static const char *TAG = "vox_session";
 #define TOOL_ID_CAPACITY        96
 #define TOOL_NAME_CAPACITY      32
 #define TOOL_CAPTURE            "capturar_imagen"
+#define TOOL_DICE               "tirar_dados"
+#define TOOL_VOICE              "cambiar_voz"
+#define TOOL_ROLE               "modo_rol"
+#define TOOL_SECRET             "mostrar_secreto"
+#define TOOL_ARGS_CAPACITY      640     /* function call arguments (JSON), secrets included */
+#define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_VOX_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
+#define PLAYER_DICE             2       /* D20 badge: the player rolls 2d20 */
+#define PLAYER_SIDES            20
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
 #define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
@@ -71,6 +82,28 @@ static const char PERSONA[] =
     "pregunta legítima, incluidas operaciones matemáticas sencillas, datos, explicaciones y "
     "conversación cotidiana. Tus respuestas habladas son breves, normalmente de dos a cuatro "
     "frases, salvo que se te pida más detalle. Si no sabes algo, lo reconoces y no inventas."
+    " Si te piden cambiar de voz, usa cambiar_voz: Charon y Algenib son voces de chico "
+    "(Algenib, más grave) y Kore y Sulafat de chica (Kore, firme; Sulafat, cálida). Si te piden "
+    "tirar dados, usa siempre tirar_dados y nunca inventes un resultado."
+    " MODO ROL: si te piden jugar una partida de rol, llama a modo_rol con activar a verdadero y "
+    "haz de máster. Pregunta cuántos jugadores son, sus nombres y a qué juego quieren jugar; si "
+    "no lo saben, propón uno corto. Son principiantes: explica en pocas frases la ambientación y "
+    "las reglas básicas, cómo se tira y qué significa el resultado. Crea de palabra una ficha "
+    "breve de cada personaje con habilidades, puntos de vida y equipo. Da a cada personaje un "
+    "secreto con mostrar_secreto, pidiendo antes a los demás que no miren la pantalla; nunca "
+    "digas un secreto en voz alta y haz que los secretos choquen en algún momento. La partida "
+    "dura unos diez minutos, tres o cuatro turnos, y si está muy interesante puedes alargarla "
+    "dos a cuatro turnos más. Prepara un guion con un giro sorpresa y un desenlace claro, sin "
+    "revelarlo. En cada turno narra de forma viva y breve, interpreta a cada personaje con una "
+    "voz propia cambiando tono, ritmo y actitud (narrador, villano, criaturas), añade un consejo "
+    "de máster de una frase sobre una regla o idea del juego, y termina preguntando qué hace "
+    "cada jugador, por orden. Cuando hagan algo arriesgado, di qué habilidad usan y qué número "
+    "necesitan y tira con tirar_dados; si un jugador quiere tirar él, espera su resultado (puede "
+    "usar el botón D20 de la pantalla). En el d20, un 20 es crítico y un 1 es pifia: explícalo "
+    "la primera vez que salga. Acepta cualquier acción, aunque sea absurda o de humor, y hazla "
+    "encajar con consecuencias. Al terminar narra el desenlace y un epílogo, resume cómo queda "
+    "cada personaje y qué han aprendido del juego, deja un cabo suelto para otro día y llama a "
+    "modo_rol con activar a falso. Todo es hablado: sin títulos, listas ni símbolos."
 #if CONFIG_VOX_GOOGLE_SEARCH
     " Responde de inmediato con lo que sabes. Usa la búsqueda de Google solo cuando el "
     "operador te lo pida o cuando no conozcas la respuesta por ser un dato reciente; en ese "
@@ -106,21 +139,52 @@ typedef enum {
     EV_WAKE,
     EV_TOOL,        /* value = tool slot */
     EV_GALLERY,     /* value = app_vox_session_gallery_t */
+    EV_ACTION,      /* value = app_vox_session_action_t */
 } event_kind_t;
 
 /* Functions Gemini may call (Live setup functionDeclarations). */
-#if CONFIG_VOX_CAMERA
 static const char FUNCTION_DECLARATIONS[] =
-    "[{\"name\":\"" TOOL_CAPTURE "\","
+    "["
+#if CONFIG_VOX_CAMERA
+    "{\"name\":\"" TOOL_CAPTURE "\","
     "\"description\":\"Toma una fotografía con la cámara de VOX y la envía como imagen para "
     "que puedas ver lo que hay delante. Úsala solo cuando el operador te pida que mires, que "
     "describas lo que ves, que leas algo o que identifiques un objeto. Tras la respuesta, la "
-    "imagen es el último fotograma de vídeo que has recibido.\"}]";
+    "imagen es el último fotograma de vídeo que has recibido.\"},"
 #endif
+    "{\"name\":\"" TOOL_DICE "\","
+    "\"description\":\"Tira dados reales con el generador aleatorio de VOX y los muestra "
+    "animados en la pantalla. Úsala siempre que haya que tirar dados. Devuelve cada resultado, "
+    "el total y si hay crítico o pifia en un d20.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"cantidad\":{\"type\":\"INTEGER\",\"description\":\"Número de dados, de 1 a 4.\"},"
+    "\"caras\":{\"type\":\"INTEGER\",\"description\":\"Caras de cada dado: 4, 6, 8, 10, 12, "
+    "20 o 100.\"}},\"required\":[\"cantidad\",\"caras\"]}},"
+    "{\"name\":\"" TOOL_VOICE "\","
+    "\"description\":\"Cambia la voz de VOX. Al terminar tu respuesta la conversación se "
+    "reconecta con la voz nueva (se pierde lo hablado).\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"voz\":{\"type\":\"STRING\",\"enum\":[\"Charon\",\"Algenib\",\"Kore\",\"Sulafat\"],"
+    "\"description\":\"Charon y Algenib: chico. Kore y Sulafat: chica.\"}},"
+    "\"required\":[\"voz\"]}},"
+    "{\"name\":\"" TOOL_ROLE "\","
+    "\"description\":\"Activa o desactiva el modo rol: más paciencia antes de cerrar la "
+    "conversación y botón de dados para los jugadores en la pantalla.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"activar\":{\"type\":\"BOOLEAN\"}},\"required\":[\"activar\"]}},"
+    "{\"name\":\"" TOOL_SECRET "\","
+    "\"description\":\"Muestra en la pantalla un secreto que solo debe leer un jugador, hasta "
+    "que toque la pantalla. No lo digas en voz alta.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"jugador\":{\"type\":\"STRING\",\"description\":\"Nombre del jugador.\"},"
+    "\"texto\":{\"type\":\"STRING\",\"description\":\"El secreto, máximo 250 caracteres.\"}},"
+    "\"required\":[\"jugador\",\"texto\"]}}"
+    "]";
 
 typedef struct {
     char id[TOOL_ID_CAPACITY];
     char name[TOOL_NAME_CAPACITY];
+    char args[TOOL_ARGS_CAPACITY]; /* JSON object, "{}" when none */
     uint32_t cancelled;     /* atomic: toolCallCancellation for this id */
 } tool_slot_t;
 
@@ -191,6 +255,10 @@ static struct {
     int64_t gallery_touch_us;
     uint8_t *photo_buf;     /* PSRAM, app_photos_max_size() */
     int64_t notice_until_us; /* transient status text, 0 = none */
+    /* RoleMaster (session task only). */
+    char voice[APP_SECRETS_VOICE_CAPACITY]; /* voice of the next/current conversation */
+    bool voice_reconnect;   /* cambiar_voz: reconnect once the reply has been spoken */
+    bool role_mode;
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -319,6 +387,10 @@ static void refresh_status(void)
     }
     if (s.error != ERR_NONE) {
         s.config.ui.set_status(s.config.ui.ui, status_for(s.error));
+        return;
+    }
+    if (s.role_mode && s.item_count == 0) {
+        s.config.ui.set_status(s.config.ui.ui, "MODO ROL");
         return;
     }
     char text[STATUS_CAPACITY] = "";
@@ -489,10 +561,68 @@ static void fail(session_error_t err)
     enter(ST_ERROR);
 }
 
+static void set_role_mode(bool on)
+{
+    if (s.role_mode == on) {
+        return;
+    }
+    s.role_mode = on;
+    ESP_LOGI(TAG, "role mode %s", on ? "on" : "off");
+    if (s.config.ui.set_role_mode) {
+        s.config.ui.set_role_mode(s.config.ui.ui, on);
+    }
+    refresh_status();
+}
+
+/* Voice for the next connection; the Gemini client takes it only while
+ * disconnected (the open conversation keeps its voice). */
+static void use_voice(const char *name)
+{
+    snprintf(s.voice, sizeof(s.voice), "%s", name);
+    (void)app_gemini_live_set_voice(s.gl, s.voice);
+    if (s.config.ui.set_voice_initial) {
+        s.config.ui.set_voice_initial(s.config.ui.ui, s.voice[0]);
+    }
+}
+
+static void load_stored_voice(void)
+{
+    char stored[APP_SECRETS_VOICE_CAPACITY];
+    use_voice(app_secrets_load_voice(stored, sizeof(stored)) == ESP_OK ? stored
+                                                                     : CONFIG_VOX_GEMINI_VOICE);
+}
+
+static void show_notice(const char *text)
+{
+    if (s.config.ui.set_status) {
+        s.config.ui.set_status(s.config.ui.ui, text);
+    }
+    s.notice_until_us = esp_timer_get_time() + NOTICE_US;
+}
+
+static uint32_t hw_rand32(void *ctx)
+{
+    (void)ctx;
+    return esp_random(); /* hardware RNG (true random while the radio is on) */
+}
+
+static void roll(uint16_t *values, int count, int sides)
+{
+    for (int i = 0; i < count; ++i) {
+        values[i] = (uint16_t)vox_rol_die(hw_rand32, NULL, (unsigned)sides);
+    }
+    if (s.config.ui.show_dice) {
+        s.config.ui.show_dice(s.config.ui.ui, values, (unsigned)count, (unsigned)sides);
+    }
+}
+
 static void close_conversation(void)
 {
     set_mic(false);
+    s.voice_reconnect = false;
+    set_role_mode(false);
     (void)app_gemini_live_disconnect(s.gl);
+    use_voice(s.voice); /* a voice chosen during the conversation applies now */
     app_audio_flush_playback();
     __atomic_store_n(&s.squelch, 0U, __ATOMIC_RELEASE);
     clear_grounding();
@@ -778,9 +908,22 @@ static void on_tick(void)
             enter(ST_LISTENING); /* the idle countdown starts now */
         }
     }
+    if (s.voice_reconnect && s.state == ST_LISTENING && !s.reply_pending &&
+            !app_audio_is_playing()) {
+        /* cambiar_voz: the goodbye has been spoken; reopen with the new voice. */
+        ESP_LOGI(TAG, "reconnecting with voice %s", s.voice);
+        s.voice_reconnect = false;
+        set_mic(false);
+        (void)app_gemini_live_disconnect(s.gl);
+        use_voice(s.voice);
+        open_conversation();
+        return;
+    }
+    const int64_t idle_limit = s.role_mode ? ROLE_IDLE_TIMEOUT_US : IDLE_TIMEOUT_US;
     if (s.state == ST_LISTENING && !s.reply_pending && !app_audio_is_playing() &&
-            now - s.last_activity_us > IDLE_TIMEOUT_US) {
-        ESP_LOGI(TAG, "%d s without activity; back to idle", CONFIG_VOX_IDLE_TIMEOUT_S);
+            now - s.last_activity_us > idle_limit) {
+        ESP_LOGI(TAG, "%d s without activity; back to idle",
+                 (int)(idle_limit / (1000 * 1000)));
         close_conversation();
         return;
     }
@@ -856,6 +999,76 @@ static void run_capture(const tool_slot_t *slot)
     refresh_status();
 }
 
+static int arg_int(const cJSON *args, const char *name, int fallback)
+{
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, name);
+    return cJSON_IsNumber(v) ? (int)v->valuedouble : fallback;
+}
+
+static const char *arg_str(const cJSON *args, const char *name)
+{
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, name);
+    return cJSON_IsString(v) ? v->valuestring : NULL;
+}
+
+static void run_dice(const tool_slot_t *slot, const cJSON *args)
+{
+    int count = arg_int(args, "cantidad", 1);
+    int sides = arg_int(args, "caras", 20);
+    vox_rol_clamp(&count, &sides);
+    uint16_t values[VOX_ROL_MAX_DICE];
+    roll(values, count, sides);
+    char json[200];
+    if (vox_rol_roll_json(values, (unsigned)count, (unsigned)sides, json, sizeof(json)) == 0) {
+        snprintf(json, sizeof(json), "{\"error\":\"No se pudo formatear la tirada.\"}");
+    }
+    ESP_LOGI(TAG, "dice %s", json);
+    answer_tool(slot, json);
+}
+
+static void run_voice(const tool_slot_t *slot, const cJSON *args)
+{
+    const char *name = arg_str(args, "voz");
+    if (!name || vox_rol_voice_index(name) < 0) {
+        answer_tool(slot, "{\"error\":\"Voz no disponible: usa Charon, Algenib, Kore o Sulafat.\"}");
+        return;
+    }
+    (void)app_secrets_store_voice(name);
+    snprintf(s.voice, sizeof(s.voice), "%s", name);
+    if (s.config.ui.set_voice_initial) {
+        s.config.ui.set_voice_initial(s.config.ui.ui, s.voice[0]);
+    }
+    s.voice_reconnect = true;
+    ESP_LOGI(TAG, "voice %s requested by the model", name);
+    answer_tool(slot, "{\"result\":\"Voz cambiada. Despídete con una frase muy corta: al "
+                "terminar de hablar VOX se reconecta con la voz nueva y el operador vuelve a "
+                "hablarte.\"}");
+}
+
+static void run_role(const tool_slot_t *slot, const cJSON *args)
+{
+    const cJSON *on = cJSON_GetObjectItemCaseSensitive(args, "activar");
+    set_role_mode(cJSON_IsTrue(on));
+    answer_tool(slot, s.role_mode
+                ? "{\"result\":\"Modo rol activado: la conversación espera más antes de "
+                  "cerrarse y los jugadores tienen un botón D20 en la pantalla.\"}"
+                : "{\"result\":\"Modo rol desactivado.\"}");
+}
+
+static void run_secret(const tool_slot_t *slot, const cJSON *args)
+{
+    const char *player = arg_str(args, "jugador");
+    const char *text = arg_str(args, "texto");
+    if (!text || !text[0] || !s.config.ui.show_secret) {
+        answer_tool(slot, "{\"error\":\"No se puede mostrar el secreto.\"}");
+        return;
+    }
+    s.config.ui.show_secret(s.config.ui.ui, player ? player : "", text);
+    ESP_LOGI(TAG, "secret shown for %s", player ? player : "?");
+    answer_tool(slot, "{\"result\":\"Secreto mostrado en la pantalla hasta que el jugador la "
+                "toque. No lo digas en voz alta.\"}");
+}
+
 static void run_tool(int index)
 {
     if (index < 0 || index >= TOOL_SLOTS) {
@@ -863,11 +1076,21 @@ static void run_tool(int index)
     }
     const tool_slot_t *slot = &s.tools[index];
     const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
+    cJSON *args = open ? cJSON_Parse(slot->args) : NULL;
     if (open && strcmp(slot->name, TOOL_CAPTURE) == 0 && VOX_CAMERA) {
         run_capture(slot);
+    } else if (open && strcmp(slot->name, TOOL_DICE) == 0) {
+        run_dice(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_VOICE) == 0) {
+        run_voice(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_ROLE) == 0) {
+        run_role(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_SECRET) == 0) {
+        run_secret(slot, args);
     } else if (open) {
         answer_tool(slot, "{\"error\":\"Función desconocida.\"}");
     }
+    cJSON_Delete(args);
     __atomic_store_n(&s.tool_busy[index], 0U, __ATOMIC_RELEASE);
 }
 
@@ -879,6 +1102,7 @@ static void queue_tool(const app_gemini_live_event_t *event)
             tool_slot_t *slot = &s.tools[i];
             snprintf(slot->id, sizeof(slot->id), "%s", event->tool_id ? event->tool_id : "");
             snprintf(slot->name, sizeof(slot->name), "%s", event->tool_name ? event->tool_name : "");
+            snprintf(slot->args, sizeof(slot->args), "%s", event->text ? event->text : "{}");
             __atomic_store_n(&slot->cancelled, 0U, __ATOMIC_RELEASE);
             post(EV_TOOL, i, 0);
             return;
@@ -986,6 +1210,43 @@ static void on_gallery(app_vox_session_gallery_t action)
     }
 }
 
+static void on_action(app_vox_session_action_t action)
+{
+    if (action == APP_VOX_SESSION_ACTION_VOICE_NEXT) {
+        const vox_rol_voice_t *next = vox_rol_voice_next(s.voice);
+        (void)app_secrets_store_voice(next->name);
+        const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
+        use_voice(next->name); /* the open conversation keeps its voice until it closes */
+        /* Closed: "KORE · CHICA · FIRME". Open: it applies when this conversation ends. */
+        char text[STATUS_CAPACITY];
+        if (open) {
+            snprintf(text, sizeof(text), "PRÓXIMA VOZ: %s", next->name);
+        } else {
+            snprintf(text, sizeof(text), "%s · %s", next->name, next->label);
+        }
+        for (char *c = text; *c; ++c) {   /* ASCII names to the status charset */
+            if (*c >= 'a' && *c <= 'z') {
+                *c = (char)(*c - 32);
+            }
+        }
+        show_notice(text);
+        ESP_LOGI(TAG, "voice %s (%s)%s", next->name, next->label,
+                 open ? " from the next conversation" : "");
+        return;
+    }
+    if (action == APP_VOX_SESSION_ACTION_ROLE_ROLL && s.role_mode) {
+        uint16_t values[PLAYER_DICE];
+        roll(values, PLAYER_DICE, PLAYER_SIDES);
+        char text[160];
+        if (vox_rol_player_text(values, PLAYER_DICE, PLAYER_SIDES, text, sizeof(text)) > 0 &&
+                app_gemini_live_is_ready(s.gl)) {
+            s.last_activity_us = esp_timer_get_time();
+            (void)app_gemini_live_send_text(s.gl, text);
+        }
+        ESP_LOGI(TAG, "player roll: %s", text);
+    }
+}
+
 static void session_task(void *arg)
 {
     (void)arg;
@@ -1005,6 +1266,9 @@ static void session_task(void *arg)
                 }
                 break;
             case EV_SECRETS:
+                if (s.state == ST_CLOSED || s.state == ST_ERROR) {
+                    load_stored_voice(); /* --voice over USB */
+                }
                 if (s.state == ST_ERROR && (s.error == ERR_NO_KEY || s.error == ERR_KEY_REJECTED) &&
                         app_secrets_has_api_key()) {
                     enter(ST_CLOSED);
@@ -1028,6 +1292,9 @@ static void session_task(void *arg)
                 break;
             case EV_GALLERY:
                 on_gallery((app_vox_session_gallery_t)ev.value);
+                break;
+            case EV_ACTION:
+                on_action((app_vox_session_action_t)ev.value);
                 break;
             case EV_WAKE:
                 if (s.state == ST_CLOSED) {
@@ -1149,6 +1416,11 @@ void app_vox_session_gallery(app_vox_session_gallery_t action)
     post(EV_GALLERY, (int)action, 0);
 }
 
+void app_vox_session_action(app_vox_session_action_t action)
+{
+    post(EV_ACTION, (int)action, 0);
+}
+
 void app_vox_session_wifi_changed(int app_wifi_state)
 {
     post(EV_WIFI, app_wifi_state, 0);
@@ -1192,16 +1464,18 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
             fallback = CONFIG_VOX_GEMINI_MODEL;
         }
     }
+    char stored_voice[APP_SECRETS_VOICE_CAPACITY];
+    snprintf(s.voice, sizeof(s.voice), "%s",
+             app_secrets_load_voice(stored_voice, sizeof(stored_voice)) == ESP_OK
+             ? stored_voice : CONFIG_VOX_GEMINI_VOICE);
     const app_gemini_live_config_t gl_config = {
         .model = primary,
         .fallback_model = fallback,
-        .voice = CONFIG_VOX_GEMINI_VOICE,
+        .voice = s.voice,
         .language = CONFIG_VOX_GEMINI_LANGUAGE,
         .system_instruction = PERSONA,
         .google_search = VOX_GOOGLE_SEARCH,
-#if CONFIG_VOX_CAMERA
         .function_declarations = FUNCTION_DECLARATIONS,
-#endif
         .on_event = gl_event,
     };
     esp_err_t err = app_gemini_live_create(&gl_config, &s.gl);
@@ -1246,8 +1520,11 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     }
     set_wake_listening(true); /* starts CLOSED: arm local listening */
     update_photo_count();
-    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s, search %s); tap%s to talk", primary,
-             fallback, VOX_GOOGLE_SEARCH ? "on" : "off",
+    if (s.config.ui.set_voice_initial) {
+        s.config.ui.set_voice_initial(s.config.ui.ui, s.voice[0]);
+    }
+    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s, voice %s, search %s); tap%s to talk",
+             primary, fallback, s.voice, VOX_GOOGLE_SEARCH ? "on" : "off",
              s.wake_available ? " or say \"Hola ESP\"" : "");
     return ESP_OK;
 

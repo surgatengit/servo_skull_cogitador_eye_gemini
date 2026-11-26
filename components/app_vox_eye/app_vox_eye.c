@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "bundle_gsp.h"
+#include "secret_text.h"
 
 /* Scene geometry (authored in ui/main.json; keep in sync). */
 #define EYE_TICK_MS            33
@@ -28,6 +29,18 @@
 #define CLOSE_Y0               0
 #define CLOSE_Y1               64
 #define DELETE_HOLD_TICKS      45       /* ~1.5 s holding the X deletes every photo */
+/* Dice panel (ui/main.json "dice"; keep in sync). */
+#define DIE_SIZE               76
+#define DIE_GAP                16
+#define DICE_ROLL_TICKS        24       /* ~0.8 s of tumbling numbers */
+#define DICE_SHOW_TICKS        180      /* ~6 s with the result */
+#define DIE_COLOR_NORMAL       0x1E2A33
+#define DIE_COLOR_MAX          0xB37800 /* gold: critical on a d20 */
+#define DIE_COLOR_ONE          0xA0102A /* red: fumble on a d20 */
+/* Secret card text box: 332 px wide at 20 px, 11 lines of 24 px. */
+#define SECRET_COLUMNS         27
+#define SECRET_LINES           11
+#define SECRET_CAPACITY        480
 
 /* Blink phases in ticks (~66 ms close, ~33 ms hold, ~100 ms open). */
 #define BLINK_CLOSE_TICKS      2
@@ -67,6 +80,19 @@ struct app_vox_eye {
     bool x_held;
     bool x_fired;
     uint32_t x_since;
+    /* Dice: the producer fills dice_req_* and then bumps dice_req_seq (release);
+     * the render task copies them when it sees a new sequence (acquire). */
+    uint16_t dice_req_values[APP_VOX_EYE_MAX_DICE];
+    uint32_t dice_req_count;
+    uint32_t dice_req_sides;
+    uint32_t dice_req_seq;
+    uint32_t dice_seen_seq;         /* render task only from here on */
+    uint16_t dice_values[APP_VOX_EYE_MAX_DICE];
+    uint32_t dice_count;
+    uint32_t dice_sides;
+    uint32_t dice_tick;
+    bool dice_active;
+    volatile int32_t secret_open;   /* set by any task, cleared on the render task */
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -237,6 +263,125 @@ static void step_blink(struct app_vox_eye *eye)
     eye->double_blink = eye->double_blink || (rng_next(eye) % 5U) == 0U;
 }
 
+static void set_die_visible(struct app_vox_eye *eye, unsigned i, bool visible)
+{
+    switch (i) {
+    case 0: remember(eye, gsp_vox_die0_set_visible(eye->ui, visible)); break;
+    case 1: remember(eye, gsp_vox_die1_set_visible(eye->ui, visible)); break;
+    case 2: remember(eye, gsp_vox_die2_set_visible(eye->ui, visible)); break;
+    default: remember(eye, gsp_vox_die3_set_visible(eye->ui, visible)); break;
+    }
+}
+
+static void set_die_x(struct app_vox_eye *eye, unsigned i, int32_t x)
+{
+    switch (i) {
+    case 0: remember(eye, gsp_vox_die0_slot_set_x(eye->ui, x)); break;
+    case 1: remember(eye, gsp_vox_die1_slot_set_x(eye->ui, x)); break;
+    case 2: remember(eye, gsp_vox_die2_slot_set_x(eye->ui, x)); break;
+    default: remember(eye, gsp_vox_die3_slot_set_x(eye->ui, x)); break;
+    }
+}
+
+static void set_die_color(struct app_vox_eye *eye, unsigned i, uint32_t rgb)
+{
+    switch (i) {
+    case 0: remember(eye, gsp_vox_die0_face_set_color_rgb888(eye->ui, rgb)); break;
+    case 1: remember(eye, gsp_vox_die1_face_set_color_rgb888(eye->ui, rgb)); break;
+    case 2: remember(eye, gsp_vox_die2_face_set_color_rgb888(eye->ui, rgb)); break;
+    default: remember(eye, gsp_vox_die3_face_set_color_rgb888(eye->ui, rgb)); break;
+    }
+}
+
+static void set_die_value(struct app_vox_eye *eye, unsigned i, unsigned value)
+{
+    char text[8];
+    snprintf(text, sizeof(text), "%u", value);
+    switch (i) {
+    case 0: remember(eye, (esp_gsp_err_t)gsp_vox_die0_value_set_text(eye->ui, text)); break;
+    case 1: remember(eye, (esp_gsp_err_t)gsp_vox_die1_value_set_text(eye->ui, text)); break;
+    case 2: remember(eye, (esp_gsp_err_t)gsp_vox_die2_value_set_text(eye->ui, text)); break;
+    default: remember(eye, (esp_gsp_err_t)gsp_vox_die3_value_set_text(eye->ui, text)); break;
+    }
+}
+
+static void hide_dice(struct app_vox_eye *eye)
+{
+    eye->dice_active = false;
+    remember(eye, gsp_vox_dice_set_visible(eye->ui, false));
+}
+
+/* Render task: start a new roll, tumble, settle on the results, hide. */
+static void step_dice(struct app_vox_eye *eye)
+{
+    const uint32_t seq = __atomic_load_n(&eye->dice_req_seq, __ATOMIC_ACQUIRE);
+    if (seq != eye->dice_seen_seq) {
+        eye->dice_seen_seq = seq;
+        eye->dice_count = eye->dice_req_count;
+        eye->dice_sides = eye->dice_req_sides;
+        memcpy(eye->dice_values, eye->dice_req_values, sizeof(eye->dice_values));
+        char title[24];
+        snprintf(title, sizeof(title), "TIRADA %uD%u", (unsigned)eye->dice_count,
+                 (unsigned)eye->dice_sides);
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_title_set_text(eye->ui, title));
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, " "));
+        const int32_t width = (int32_t)eye->dice_count * DIE_SIZE +
+                              ((int32_t)eye->dice_count - 1) * DIE_GAP;
+        const int32_t x0 = 240 - width / 2;
+        for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+            const bool used = i < eye->dice_count;
+            if (used) {
+                set_die_x(eye, i, x0 + (int32_t)i * (DIE_SIZE + DIE_GAP));
+                set_die_color(eye, i, DIE_COLOR_NORMAL);
+            }
+            set_die_visible(eye, i, used);
+        }
+        eye->dice_tick = 0;
+        eye->dice_active = true;
+        remember(eye, gsp_vox_dice_set_visible(eye->ui, true));
+    }
+    if (!eye->dice_active) {
+        return;
+    }
+    eye->dice_tick++;
+    if (eye->dice_tick < DICE_ROLL_TICKS) {
+        if ((eye->dice_tick & 1U) == 0U) {
+            for (unsigned i = 0; i < eye->dice_count; ++i) {
+                set_die_value(eye, i, rng_range(eye, 1, eye->dice_sides));
+            }
+        }
+    } else if (eye->dice_tick == DICE_ROLL_TICKS) {
+        unsigned total = 0;
+        bool any_max = false;
+        bool any_one = false;
+        for (unsigned i = 0; i < eye->dice_count; ++i) {
+            const unsigned v = eye->dice_values[i];
+            const bool max = v == eye->dice_sides;
+            const bool one = v == 1U;
+            total += v;
+            any_max = any_max || max;
+            any_one = any_one || one;
+            set_die_value(eye, i, v);
+            set_die_color(eye, i, max ? DIE_COLOR_MAX : (one ? DIE_COLOR_ONE : DIE_COLOR_NORMAL));
+        }
+        const char *mark = "";
+        if (eye->dice_sides == 20U && any_max) {
+            mark = eye->dice_count > 1 ? " · CRÍTICO" : "CRÍTICO";
+        } else if (eye->dice_sides == 20U && any_one) {
+            mark = eye->dice_count > 1 ? " · PIFIA" : "PIFIA";
+        }
+        char text[40];
+        if (eye->dice_count > 1) {
+            snprintf(text, sizeof(text), "TOTAL %u%s", total, mark);
+        } else {
+            snprintf(text, sizeof(text), "%s", mark[0] ? mark : " ");
+        }
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, text));
+    } else if (eye->dice_tick > DICE_ROLL_TICKS + DICE_SHOW_TICKS) {
+        hide_dice(eye);
+    }
+}
+
 static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
@@ -248,8 +393,9 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
             eye->config.on_gallery(APP_VOX_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
         }
     }
-    if (eye->gallery_open) {
-        return; /* hidden under the gallery: no repaints, no DMA traffic */
+    step_dice(eye);
+    if (eye->gallery_open || eye->dice_active || eye->secret_open) {
+        return; /* covered by an overlay: no eye repaints, less DMA traffic */
     }
     eye->stats.frames++;
 
@@ -391,14 +537,43 @@ static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, vo
 }
 #endif
 
+/* Overlays and bezel buttons (1.6.0). Returns true when the event was consumed. */
+static bool rol_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
+{
+    if (gsp_vox_event_is_dice_close(event)) {
+        if (eye->dice_tick >= DICE_ROLL_TICKS) {
+            hide_dice(eye); /* keep it while tumbling */
+        }
+        return true;
+    }
+    if (gsp_vox_event_is_secret_close(event)) {
+        remember(eye, gsp_vox_secret_set_visible(eye->ui, false));
+        eye->secret_open = 0;
+        return true;
+    }
+    app_vox_eye_action_t action;
+    if (gsp_vox_event_is_voice_next(event)) {
+        action = APP_VOX_EYE_ACTION_VOICE_NEXT;
+    } else if (gsp_vox_event_is_role_roll(event)) {
+        action = APP_VOX_EYE_ACTION_ROLE_ROLL;
+    } else {
+        return false;
+    }
+    if (!eye->gallery_open && eye->config.on_action) {
+        eye->config.on_action(action, eye->config.action_ctx);
+    }
+    return true;
+}
+
 static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
-    if (gallery_event(eye, event)) {
+    if (gallery_event(eye, event) || rol_event(eye, event)) {
         return;
     }
-    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open) {
+    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open || eye->dice_active ||
+            eye->secret_open) {
         return;
     }
     eye->stats.taps++;
@@ -528,6 +703,62 @@ esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle)
     const esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, false);
     handle->gallery_open = 0;
     return err;
+}
+
+esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char initial)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    if (initial >= 'a' && initial <= 'z') {
+        initial = (char)(initial - 32);
+    }
+    const char text[2] = { (initial >= 'A' && initial <= 'Z') ? initial : 'V', '\0' };
+    return (esp_gsp_err_t)gsp_vox_voice_badge_text_set_text(handle->ui, text);
+}
+
+esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enabled)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    return (esp_gsp_err_t)gsp_vox_role_badge_set_visible(handle->ui, enabled);
+}
+
+esp_gsp_err_t app_vox_eye_show_dice(app_vox_eye_handle_t handle, const uint16_t *values,
+                                    unsigned count, unsigned sides)
+{
+    if (!handle || !values || count == 0 || count > APP_VOX_EYE_MAX_DICE || sides < 2 ||
+            sides > 100) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    memcpy(handle->dice_req_values, values, count * sizeof(values[0]));
+    handle->dice_req_count = count;
+    handle->dice_req_sides = sides;
+    __atomic_add_fetch(&handle->dice_req_seq, 1U, __ATOMIC_RELEASE);
+    return ESP_GSP_OK;
+}
+
+esp_gsp_err_t app_vox_eye_show_secret(app_vox_eye_handle_t handle, const char *player,
+                                      const char *text)
+{
+    if (!handle || !text) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    char clean[SECRET_CAPACITY];
+    char wrapped[SECRET_CAPACITY];
+    char name[40];
+    char title[64];
+    secret_text_sanitize(player, name, sizeof(name), true);
+    snprintf(title, sizeof(title), "SOLO PARA %s", name[0] ? name : "TI");
+    secret_text_sanitize(text, clean, sizeof(clean), false);
+    secret_text_wrap(clean, SECRET_COLUMNS, SECRET_LINES, wrapped, sizeof(wrapped));
+    esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_secret_title_set_text(handle->ui, title);
+    const esp_gsp_err_t body = (esp_gsp_err_t)gsp_vox_secret_text_set_text(
+        handle->ui, wrapped[0] ? wrapped : " ");
+    handle->secret_open = 1;
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_secret_set_visible(handle->ui, true);
+    return err != ESP_GSP_OK ? err : (body != ESP_GSP_OK ? body : vis);
 }
 
 esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot_t *out_snapshot)

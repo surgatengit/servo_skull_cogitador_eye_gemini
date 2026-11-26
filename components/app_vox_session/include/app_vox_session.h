@@ -29,6 +29,11 @@ typedef struct {
     void (*show_photo)(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
                        unsigned count);
     void (*hide_gallery)(void *ui);
+    /* Optional RoleMaster controls (1.6.0). */
+    void (*set_voice_initial)(void *ui, char initial);
+    void (*set_role_mode)(void *ui, bool enabled);
+    void (*show_dice)(void *ui, const uint16_t *values, unsigned count, unsigned sides);
+    void (*show_secret)(void *ui, const char *player, const char *text);
     void *ui;
 } app_vox_session_ui_t;
 
@@ -41,6 +46,12 @@ typedef enum {
     APP_VOX_SESSION_GALLERY_TOUCH,
     APP_VOX_SESSION_GALLERY_DELETE_ALL,
 } app_vox_session_gallery_t;
+
+/** Bezel buttons from the UI (same values as app_vox_eye_action_t). */
+typedef enum {
+    APP_VOX_SESSION_ACTION_VOICE_NEXT = 0, /**< voice badge: next voice */
+    APP_VOX_SESSION_ACTION_ROLE_ROLL,      /**< D20 badge (role mode): player roll 2d20 */
+} app_vox_session_action_t;
 
 typedef struct {
     app_vox_session_ui_t ui;
@@ -59,10 +70,13 @@ void app_vox_session_tap(void);
 /** Photo counter / gallery control. Non-blocking; safe from the GSP framework task. */
 void app_vox_session_gallery(app_vox_session_gallery_t action);
 
+/** Bezel button. Non-blocking; safe from the GSP framework task. */
+void app_vox_session_action(app_vox_session_action_t action);
+
 /** Wi-Fi state notification (app_wifi_state_t value). Non-blocking. */
 void app_vox_session_wifi_changed(int app_wifi_state);
 
-/** Secrets (API key/model) changed via provisioning RPC. Non-blocking. */
+/** Secrets (API key/model/voice) changed via provisioning RPC. Non-blocking. */
 void app_vox_session_secrets_changed(void);
 
 /** Output loudness for the eye (0..100), lock-free. */

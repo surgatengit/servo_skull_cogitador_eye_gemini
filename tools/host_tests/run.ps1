@@ -42,4 +42,13 @@ $ring = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX /I`"$root\components\app_
 cmd /c $ring
 if ($LASTEXITCODE -ne 0) { throw "photo ring build failed" }
 & "$out\test_photos_ring.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$rol = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX " +
+       "/I`"$root\components\app_vox_session`" /I`"$root\components\app_vox_eye`" " +
+       "`"$here\test_rol.c`" `"$root\components\app_vox_session\vox_rol.c`" " +
+       "`"$root\components\app_vox_eye\secret_text.c`" " +
+       "/Fo`"$out\\`" /Fe`"$out\test_rol.exe`""
+cmd /c $rol
+if ($LASTEXITCODE -ne 0) { throw "rol build failed" }
+& "$out\test_rol.exe"
 exit $LASTEXITCODE

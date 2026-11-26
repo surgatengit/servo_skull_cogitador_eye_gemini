@@ -732,6 +732,57 @@ esp_err_t app_gemini_live_send_tool_response(app_gemini_live_handle_t gl, const 
     return err;
 }
 
+esp_err_t app_gemini_live_send_text(app_gemini_live_handle_t gl, const char *utf8)
+{
+    if (!gl || !utf8 || !utf8[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!gl->ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    /* One complete user turn in the conversation history (clientContent). */
+    cJSON *root = cJSON_CreateObject();
+    cJSON *content = cJSON_AddObjectToObject(root, "clientContent");
+    cJSON *turns = cJSON_AddArrayToObject(content, "turns");
+    cJSON *turn = cJSON_CreateObject();
+    cJSON_AddStringToObject(turn, "role", "user");
+    cJSON *parts = cJSON_AddArrayToObject(turn, "parts");
+    cJSON *part = cJSON_CreateObject();
+    cJSON_AddStringToObject(part, "text", utf8);
+    cJSON_AddItemToArray(parts, part);
+    cJSON_AddItemToArray(turns, turn);
+    cJSON_AddBoolToObject(content, "turnComplete", true);
+    char *text = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!text) {
+        return ESP_ERR_NO_MEM;
+    }
+    xSemaphoreTake(gl->lock, portMAX_DELAY);
+    const esp_err_t err = send_locked_timeout(gl, text, strlen(text), GL_TOOL_TIMEOUT_MS);
+    xSemaphoreGive(gl->lock);
+    cJSON_free(text);
+    ESP_LOGI(TAG, "clientContent text %s", err == ESP_OK ? "sent" : esp_err_to_name(err));
+    return err;
+}
+
+esp_err_t app_gemini_live_set_voice(app_gemini_live_handle_t gl, const char *voice)
+{
+    if (!gl || !voice || !voice[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (gl->client) {
+        return ESP_ERR_INVALID_STATE; /* the voice is fixed by the setup message */
+    }
+    char *copy = dup_or_null(voice);
+    if (!copy) {
+        return ESP_ERR_NO_MEM;
+    }
+    psram_free(gl->voice);
+    gl->voice = copy;
+    ESP_LOGI(TAG, "next conversations use voice %s", voice);
+    return ESP_OK;
+}
+
 void app_gemini_live_get_stats(app_gemini_live_handle_t gl, app_gemini_live_stats_t *out)
 {
     if (!gl || !out) {

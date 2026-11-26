@@ -40,6 +40,18 @@ typedef enum {
 /** Gallery notification. Runs on the GSP framework task: return quickly, never block. */
 typedef void (*app_vox_gallery_cb_t)(app_vox_gallery_action_t action, void *ctx);
 
+/** Bezel buttons added in 1.6.0 (RoleMaster). */
+typedef enum {
+    APP_VOX_EYE_ACTION_VOICE_NEXT = 0, /**< voice badge (top right) tapped */
+    APP_VOX_EYE_ACTION_ROLE_ROLL,      /**< "D20" badge (role mode, right) tapped */
+} app_vox_eye_action_t;
+
+/** Bezel button notification. Runs on the GSP framework task: never block. */
+typedef void (*app_vox_eye_action_cb_t)(app_vox_eye_action_t action, void *ctx);
+
+/** Most dice shown at once by app_vox_eye_show_dice(). */
+#define APP_VOX_EYE_MAX_DICE 4
+
 /** Output loudness 0..100 sampled at the animation rate on the render task.
  * Must be lock-free and non-blocking. */
 typedef uint8_t (*app_vox_eye_level_fn_t)(void *ctx);
@@ -52,6 +64,8 @@ typedef struct {
     uint32_t seed;                   /**< Non-zero random seed for gaze and blinks. */
     app_vox_gallery_cb_t on_gallery; /**< Optional; NULL ignores the photo controls. */
     void *gallery_ctx;               /**< Passed to on_gallery; must outlive the controller. */
+    app_vox_eye_action_cb_t on_action; /**< Optional; NULL ignores the bezel buttons. */
+    void *action_ctx;                /**< Passed to on_action; must outlive the controller. */
 } app_vox_eye_config_t;
 
 /** Diagnostic value copy. */
@@ -92,6 +106,29 @@ esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t 
 
 /** Hide the gallery and resume the eye. Any task. */
 esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle);
+
+/** Voice badge letter (A-Z, usually the voice's initial). Any task. */
+esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char initial);
+
+/** Show or hide the role-mode "D20" badge. Any task. */
+esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enabled);
+
+/**
+ * Show a dice roll: the render task animates ~0.8 s of tumbling numbers, then
+ * the results (maximum in gold, 1 in red), the total, and hides it after ~6 s
+ * or on a tap. values[0..count-1] are copied; count 1..APP_VOX_EYE_MAX_DICE,
+ * sides 2..100. A newer roll replaces the current one. Single producer task.
+ */
+esp_gsp_err_t app_vox_eye_show_dice(app_vox_eye_handle_t handle, const uint16_t *values,
+                                    unsigned count, unsigned sides);
+
+/**
+ * Show a private card "SOLO PARA <player>" with `text` (UTF-8; mapped to the
+ * card charset and word-wrapped) until it is tapped. The eye pauses meanwhile.
+ * Any task.
+ */
+esp_gsp_err_t app_vox_eye_show_secret(app_vox_eye_handle_t handle, const char *player,
+                                      const char *text);
 
 /** Copy diagnostics; call on the UI loop or after dispatch stops. */
 esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot_t *out_snapshot);
