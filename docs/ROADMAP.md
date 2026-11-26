@@ -1,4 +1,4 @@
-# VOX M-01 — Ampliaciones futuras (no implementadas)
+# Cogitador M-01 — Ampliaciones futuras (no implementadas)
 
 Registro de ideas aprobadas para estudio. **Nada de este documento está implementado** en 1.2.0.
 Cada punto necesita diseño propio, la confirmación del propietario y su propia rama.
@@ -6,7 +6,7 @@ Notas redactadas el 2026-11-25.
 
 ## 1. Cámara oficial con capturas bajo demanda
 
-**Objetivo.** Que VOX pueda «mirar» cuando el usuario lo pida («VOX, ¿qué ves?»): una única
+**Objetivo.** Que Cogitador pueda «mirar» cuando el usuario lo pida («Co, ¿qué ves?»): una única
 fotografía enviada a Gemini Live. Sin vídeo continuo y sin capturas en segundo plano.
 
 **Hardware y software disponibles** (BSP `esp-mosaico-bsp`, componente `mosaico_module_camera`):
@@ -27,7 +27,7 @@ búsqueda: «¿qué es esto?» y luego Google.
 
 1. **USB.** En el ejemplo oficial `camera_photo_app`, **GPIO33 es compartido entre la cámara (D2) y
    USB Serial/JTAG**, que es el enlace que usa `mosaico.py iris` (instalación, logs, provisión de la
-   clave). Hay que verificar si la cámara inutiliza la consola USB de VOX y cómo seguir instalando
+   clave). Hay que verificar si la cámara inutiliza la consola USB de Cogitador y cómo seguir instalando
    y diagnosticando (UART, o liberar el pin al cerrar la cámara).
 2. **DMA interna.** La captura DVP y el JPEG usan DMA. Hay que medir el bloque interno más grande
    (`largest=` ≥ 8192, ver HANDOFF §5) con la cámara abierta durante una conversación. Abrir la

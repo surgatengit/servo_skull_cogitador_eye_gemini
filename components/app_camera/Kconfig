@@ -1,11 +1,11 @@
-menu "VOX M-01 camera (on-demand stills)"
+menu "Cogitador M-01 camera (on-demand stills)"
 
     config VOX_CAMERA
         bool "Let Gemini take a picture on request (capturar_imagen)"
         default y
         help
             Declare the capturar_imagen function in the Live setup. When Gemini
-            calls it, VOX opens the left-slot camera, takes one still, closes
+            calls it, Cogitador opens the left-slot camera, takes one still, closes
             the camera and sends the JPEG as realtimeInput video. No video
             stream, nothing stored. Without a camera module the function
             answers that the camera is unavailable.
@@ -67,7 +67,7 @@ menu "VOX M-01 camera (on-demand stills)"
         default n
         help
             Checks the camera without a conversation: one still is taken while
-            VOX is idle and only logged (result and JPEG size). Used to find
+            Cogitador is idle and only logged (result and JPEG size). Used to find
             the USB Serial/JTAG conflict in test 12; off in normal builds.
 
     config VOX_CAMERA_JPEG_MAX_KB

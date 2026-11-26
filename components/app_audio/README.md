@@ -1,6 +1,6 @@
 # app_audio
 
-ES8311 audio for VOX M-01 on the BSP's shared 48 kHz / 16-bit / stereo I2S bus.
+ES8311 audio for Cogitador M-01 on the BSP's shared 48 kHz / 16-bit / stereo I2S bus.
 Depends on `esp-mosaico-bsp` (codec devices), FreeRTOS and esp_timer.
 
 ```

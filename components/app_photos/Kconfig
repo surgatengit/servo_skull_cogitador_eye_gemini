@@ -1,4 +1,4 @@
-menu "VOX M-01 photo store"
+menu "Cogitador M-01 photo store"
 
     config VOX_PHOTOS_SLOTS
         int "Stills kept in the photos partition (oldest replaced)"

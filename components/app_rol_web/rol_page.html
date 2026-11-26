@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VOX · Partida</title>
+<title>Co · Partida</title>
 <style>
 :root{--bg:#0b0f14;--panel:#141a21;--line:#2a333d;--text:#e8e3d6;--dim:#8d97a3;--amber:#ffb300;--violet:#d500f9;--red:#ff1744;--green:#20ff60}
 *{box-sizing:border-box}
@@ -37,7 +37,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
 </head>
 <body>
 <main>
-  <h1>VOX M-01 · PARTIDA</h1>
+  <h1>COGITADOR M-01 · PARTIDA</h1>
   <p class="sub">Modo rol. Lo que aparezca aquí es solo para ti.</p>
 
   <section id="join" class="card hidden">
@@ -68,12 +68,12 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
   <section class="card">
     <details>
       <summary>Partida guardada (para quien organiza)</summary>
-      <p>Cuando el máster guarda la partida, queda en VOX. Puedes bajarla como archivo para
+      <p>Cuando el máster guarda la partida, queda en Co. Puedes bajarla como archivo para
          guardarla tú, y subir otra de otro día para continuarla.</p>
-      <a class="btn ghost" href="/partida" download="partida_vox.json">Descargar la partida de VOX</a>
+      <a class="btn ghost" href="/partida" download="partida_cogitador.json">Descargar la partida de Co</a>
       <label for="file" style="margin-top:16px">Subir una partida (.json)</label>
       <input id="file" type="file" accept=".json,application/json">
-      <button id="upBtn" type="button" class="ghost">Subir a VOX</button>
+      <button id="upBtn" type="button" class="ghost">Subir a Co</button>
       <div id="upMsg" class="ok"></div>
     </details>
   </section>
@@ -111,7 +111,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
         token = j.token; save(token); lastSeq = 0; lastSheet = 0; seenSent = 0;
         toPlayer(j.nombre); poll();
       })
-      .catch(function () { $('joinErr').textContent = 'Sin conexión con VOX. ¿Estás en la misma Wi-Fi?'; });
+      .catch(function () { $('joinErr').textContent = 'Sin conexión con Co. ¿Estás en la misma Wi-Fi?'; });
   }
 
   function poll() {
@@ -143,7 +143,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
           $('state').className = j.leido ? 'wait' : 'new';
         }
       })
-      .catch(function () { $('state').textContent = 'Sin conexión con VOX… reintentando.'; $('state').className = 'wait'; })
+      .catch(function () { $('state').textContent = 'Sin conexión con Co… reintentando.'; $('state').className = 'wait'; })
       .then(function () { timer = setTimeout(poll, 2000); });
   }
 
@@ -166,7 +166,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
         if (!j.ok) { msg.className = 'err'; msg.textContent = j.error || 'No se ha podido subir.'; return; }
         msg.textContent = 'Subida: «' + (j.titulo || 'sin título') + '». Pide al máster que la cargue.';
       })
-      .catch(function () { msg.className = 'err'; msg.textContent = 'Sin conexión con VOX.'; });
+      .catch(function () { msg.className = 'err'; msg.textContent = 'Sin conexión con Co.'; });
   }
 
   var hold = $('hold');

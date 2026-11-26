@@ -81,12 +81,13 @@ static const char *TAG = "vox_session";
 #define NOTES_CAPACITY          1024    /* pending notes for the master (rolls, phone notices) */
 #define NOTES_RETRY_US          (500 * 1000)        /* after a failed send */
 #define NOTES_EXPIRE_US         (90 * 1000 * 1000)  /* undelivered notes are dropped */
-#define NOTICE_PREFIX           "Aviso de VOX (no lo dice un jugador): "
+#define NOTICE_PREFIX           "Aviso de Co (no lo dice un jugador): "
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
 #define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
 static const char PERSONA[] =
-    "Eres VOX M-01, un servocráneo del Adeptus Mechanicus al servicio de tu operador. "
+    "Eres el Cogitador M-01, al que todos llaman Co, un servocráneo del Adeptus Mechanicus al "
+    "servicio de tu operador. Si te llaman Co o Cogitador, te hablan a ti. "
     "Hablas siempre en español de España, con tono solemne, ceremonial y preciso, como un "
     "archivo vivo de la Forja. De vez en cuando, sin abusar, haces referencias al Omnissiah "
     "o al Dios Máquina. Ante todo eres útil: respondes con claridad y exactitud a cualquier "
@@ -101,7 +102,7 @@ static const char PERSONA[] =
     "no lo saben, propón uno corto. Son principiantes: explica en pocas frases la ambientación y "
     "las reglas básicas, cómo se tira y qué significa el resultado. Al empezar, diles que vas a "
     "facilitarles una dirección para el móvil donde verán su ficha y lo que solo deben saber "
-    "ellos, y espera a que entren. VOX te avisa con mensajes que empiezan por «Aviso de VOX», "
+    "ellos, y espera a que entren. Co te avisa con mensajes que empiezan por «Aviso de Co», "
     "que no dice ningún jugador: responde a cada uno con una bienvenida muy breve. Empieza "
     "cuando digan que están listos; quien llegue tarde puede entrar después. Si hay una partida "
     "guardada, pregunta antes si quieren una nueva, continuarla o una aventura nueva con los "
@@ -185,13 +186,13 @@ static const char FUNCTION_DECLARATIONS[] =
     "["
 #if CONFIG_VOX_CAMERA
     "{\"name\":\"" TOOL_CAPTURE "\","
-    "\"description\":\"Toma una fotografía con la cámara de VOX y la envía como imagen para "
+    "\"description\":\"Toma una fotografía con la cámara de Co y la envía como imagen para "
     "que puedas ver lo que hay delante. Úsala solo cuando el operador te pida que mires, que "
     "describas lo que ves, que leas algo o que identifiques un objeto. Tras la respuesta, la "
     "imagen es el último fotograma de vídeo que has recibido.\"},"
 #endif
     "{\"name\":\"" TOOL_DICE "\","
-    "\"description\":\"Tira dados reales con el generador aleatorio de VOX y los muestra "
+    "\"description\":\"Tira dados reales con el generador aleatorio de Co y los muestra "
     "animados en la pantalla. Úsala siempre que haya que tirar dados. Devuelve cada resultado "
     "y, según el modo, el total (con crítico o pifia en un d20), el porcentaje o los éxitos.\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":" DICE_PARAMS "}},"
@@ -202,7 +203,7 @@ static const char FUNCTION_DECLARATIONS[] =
     "que la cambies; al empezar la partida es 2d20 en suma.\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":" DICE_PARAMS "}},"
     "{\"name\":\"" TOOL_VOICE "\","
-    "\"description\":\"Cambia la voz de VOX. Al terminar tu respuesta la conversación se "
+    "\"description\":\"Cambia la voz de Co. Al terminar tu respuesta la conversación se "
     "reconecta con la voz nueva (se pierde lo hablado).\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
     "\"voz\":{\"type\":\"STRING\",\"enum\":[\"Charon\",\"Algenib\",\"Kore\",\"Sulafat\"],"
@@ -216,7 +217,7 @@ static const char FUNCTION_DECLARATIONS[] =
     "{\"name\":\"" TOOL_SECRET "\","
     "\"description\":\"Da a un jugador un secreto que solo debe saber él. Llega a su móvil; si "
     "aún no ha entrado en la página, le espera hasta que entre con su nombre. Con en_pantalla "
-    "verdadero se muestra en la pantalla de VOX hasta que la toquen (para quien no tiene "
+    "verdadero se muestra en la pantalla de Co hasta que la toquen (para quien no tiene "
     "móvil). No lo digas en voz alta.\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
     "\"jugador\":{\"type\":\"STRING\",\"description\":\"Nombre del jugador.\"},"
@@ -226,7 +227,7 @@ static const char FUNCTION_DECLARATIONS[] =
     "\"required\":[\"jugador\",\"texto\"]}},"
     "{\"name\":\"" TOOL_STATUS "\","
     "\"description\":\"Modo rol: quién está en la página del móvil, quién tiene un secreto sin "
-    "leer y quién tiene ficha, y si hay una partida guardada en VOX.\"},"
+    "leer y quién tiene ficha, y si hay una partida guardada en Co.\"},"
     "{\"name\":\"" TOOL_SHEET "\","
     "\"description\":\"Modo rol: escribe o sustituye la ficha de personaje que el jugador ve en "
     "su móvil. Úsala al crear el personaje y cada vez que cambie algo (vida, equipo, "
@@ -238,7 +239,7 @@ static const char FUNCTION_DECLARATIONS[] =
     "su valor, puntos de vida actuales y máximos, equipo y notas.\"}},"
     "\"required\":[\"jugador\",\"ficha\"]}},"
     "{\"name\":\"" TOOL_SAVE "\","
-    "\"description\":\"Guarda la partida en VOX para continuarla otro día: fichas y secretos "
+    "\"description\":\"Guarda la partida en Co para continuarla otro día: fichas y secretos "
     "de los jugadores, el tipo de tirada y tu resumen. Sustituye a la partida guardada "
     "anterior. También se puede descargar desde la página del móvil.\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
@@ -250,7 +251,7 @@ static const char FUNCTION_DECLARATIONS[] =
     "giros pendientes, cabos sueltos y tu guion previsto.\"}},"
     "\"required\":[\"titulo\",\"resumen\"]}},"
     "{\"name\":\"" TOOL_LOAD "\","
-    "\"description\":\"Carga la partida guardada en VOX: activa el modo rol, devuelve tu "
+    "\"description\":\"Carga la partida guardada en Co: activa el modo rol, devuelve tu "
     "resumen, las fichas y los secretos, y prepara las fichas en los móviles (cada jugador "
     "entra con el mismo nombre).\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
@@ -856,7 +857,7 @@ static void on_tap(void)
         open_conversation();
         break;
     case ST_SPEAKING:
-        /* Interrupt VOX without closing: drop queued speech and listen again. */
+        /* Interrupt Co without closing: drop queued speech and listen again. */
         __atomic_store_n(&s.squelch, 1U, __ATOMIC_RELEASE);
         s.squelch_since = esp_timer_get_time();
         app_audio_flush_playback();
@@ -1269,7 +1270,7 @@ static void run_voice(const tool_slot_t *slot, const cJSON *args)
     s.voice_reconnect = true;
     ESP_LOGI(TAG, "voice %s requested by the model", name);
     answer_tool(slot, "{\"result\":\"Voz cambiada. Despídete con una frase muy corta: al "
-                "terminar de hablar VOX se reconecta con la voz nueva y el operador vuelve a "
+                "terminar de hablar Co se reconecta con la voz nueva y el operador vuelve a "
                 "hablarte.\"}");
 }
 
@@ -1295,7 +1296,7 @@ static void run_role(const tool_slot_t *slot, const cJSON *args)
                                 "Diles que vas a facilitarles una dirección: que la abran en el "
                                 "móvil, conectados a la misma Wi-Fi (sale en la parte de abajo de "
                                 "la pantalla), y escriban su nombre; allí verán su ficha y los "
-                                "secretos que solo deben saber ellos. Espera a que entren: VOX "
+                                "secretos que solo deben saber ellos. Espera a que entren: Co "
                                 "te avisará de cada uno. Empieza cuando te digan que están "
                                 "listos; quien llegue tarde o cambie de móvil puede entrar "
                                 "después con el mismo nombre.");
@@ -1357,7 +1358,7 @@ static void run_secret(const tool_slot_t *slot, const cJSON *args)
     app_rol_web_players(joined, sizeof(joined));
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "result",
-                            "El secreto se muestra en la pantalla de VOX hasta que la toquen. "
+                            "El secreto se muestra en la pantalla de Co hasta que la toquen. "
                             "Pide a los demás que no miren y no lo digas en voz alta.");
     cJSON_AddStringToObject(root, "jugadores_con_movil", joined);
     answer_json(slot, root, "{\"result\":\"Secreto mostrado en la pantalla.\"}");
@@ -1443,7 +1444,7 @@ static void run_save(const tool_slot_t *slot, const cJSON *args)
         .dice_sides = s.player_roll.sides,
         .dice_target = s.player_roll.target,
     };
-    snprintf(meta.title, sizeof(meta.title), "%s", title && title[0] ? title : "Partida de VOX");
+    snprintf(meta.title, sizeof(meta.title), "%s", title && title[0] ? title : "Partida de Co");
     snprintf(meta.game, sizeof(meta.game), "%s", game ? game : "");
     snprintf(meta.dice_mode, sizeof(meta.dice_mode), "%s", mode_name(&s.player_roll));
     char *json = app_rol_web_build_game(&meta, summary);
@@ -1458,7 +1459,7 @@ static void run_save(const tool_slot_t *slot, const cJSON *args)
     }
     ESP_LOGI(TAG, "game saved: %s (%u bytes)", meta.title, (unsigned)bytes);
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "result", "Partida guardada en VOX. Para continuarla otro "
+    cJSON_AddStringToObject(root, "result", "Partida guardada en Co. Para continuarla otro "
                             "día pedidme continuar la partida.");
     char address[40];
     if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
@@ -1479,7 +1480,7 @@ static void run_load(const tool_slot_t *slot, const cJSON *args)
     cJSON *game = json ? cJSON_Parse(json) : NULL;
     if (!game) {
         free(json);
-        answer_tool(slot, "{\"error\":\"No hay ninguna partida guardada en VOX. Se puede subir "
+        answer_tool(slot, "{\"error\":\"No hay ninguna partida guardada en Co. Se puede subir "
                     "un archivo desde la página del móvil.\"}");
         return;
     }
@@ -1623,7 +1624,7 @@ static void on_gallery(app_vox_session_gallery_t action)
     const size_t count = app_photos_count();
     switch (action) {
     case APP_VOX_SESSION_GALLERY_OPEN:
-        /* Not while VOX is answering: the conversation keeps the screen. */
+        /* Not while Co is answering: the conversation keeps the screen. */
         if (s.gallery_open || count == 0 || s.state == ST_SPEAKING || s.state == ST_PROCESSING ||
                 s.state == ST_CONNECTING) {
             return;
@@ -1974,7 +1975,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         goto fail_gl;
     }
 #if CONFIG_VOX_WAKE_WORD
-    /* Optional: without the model partition VOX keeps working with touch only. */
+    /* Optional: without the model partition Co keeps working with touch only. */
     s.preroll = heap_caps_calloc((size_t)PREROLL_FRAMES * APP_AUDIO_MIC_FRAME, sizeof(int16_t),
                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     s.wake_available = app_wake_init(on_wake, NULL) == ESP_OK;
@@ -1997,7 +1998,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     if (s.config.ui.set_voice_initial) {
         s.config.ui.set_voice_initial(s.config.ui.ui, s.voice[0]);
     }
-    ESP_LOGI(TAG, "VOX M-01 ready (model %s, fallback %s, voice %s, search %s); tap%s to talk",
+    ESP_LOGI(TAG, "Cogitador M-01 ready (model %s, fallback %s, voice %s, search %s); tap%s to talk",
              primary, fallback, s.voice, VOX_GOOGLE_SEARCH ? "on" : "off",
              s.wake_available ? " or say \"Hola ESP\"" : "");
     return ESP_OK;

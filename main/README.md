@@ -1,6 +1,6 @@
 # main: device composition root
 
-Initializes platform services and wires the VOX M-01 components, in order:
+Initializes platform services and wires the Cogitador M-01 components, in order:
 ESP-Iris boot probe, NVS, Recovery support (`iris_ota_support_start`, always
 first so Recovery stays reachable), `app_secrets` (provisioning RPC),
 `app_wifi`, the GSP display with `app_vox_eye`, and finally `app_vox_session`.

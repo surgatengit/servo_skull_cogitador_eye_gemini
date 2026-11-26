@@ -1,4 +1,4 @@
-# VOX M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
+# Cogitador M-01 GEMINI DIRECT — traspaso para retomar el desarrollo
 
 Última actualización: **2026-11-25**, al cierre de la sesión de 1.4.0 (cámara) y 1.5.0 (galería).
 `main` = **1.5.0** (etiqueta `v1.5.0`, publicada como *Release* con el `.irisfw` compilado).
@@ -13,7 +13,7 @@ el historial completo de las pruebas físicas).
 
 ## 1. Estado en una frase
 
-VOX M-01 **1.5.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
+Cogitador M-01 **1.5.0** funciona en el ESP-Mosaico. Es un ojo mecánico GSP que:
 - conversa con **Gemini Live directamente por Wi-Fi y WebSocket seguro**, sin Windows ni servicios
   intermedios;
 - se despierta con **«Hola ESP»** en local;
@@ -62,7 +62,7 @@ ahora; queda para revisar. Google Search está implementado pero
   rol) o a la tarjeta de pantalla.
 - Probado en el PC (tests, simulador, página con servidor simulado).
 - Prueba 14 en el dispositivo (commit `1f7153b`): todo correcto salvo las tiradas del D20 hechas
-  mientras VOX hablaba, que no llegaban a Gemini. Corregido en `06dfd94` y comprobado en el
+  mientras Cogitador hablaba, que no llegaban a Gemini. Corregido en `06dfd94` y comprobado en el
   dispositivo.
 - Modos de tirada: probados en el dispositivo (reserva y preparar porcentaje). Fallo de 2
   peticiones a la vez corregido con 8 (`c9b40e4`).
@@ -155,7 +155,7 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   `SPIRAM_MALLOC_RESERVE_INTERNAL=65536`, búferes propios en PSRAM, brillo cuantizado y la salvaguarda
   del detector. Mínimo observado: **8 192 B** (margen ajustado). Vigila `largest=` en los logs `diag`
   al añadir cualquier función. La solución de fondo sería que el BSP active `psram_dma_direct`.
-  **Desde 1.3.0 (rama `feat/display-dma`):** VOX usa una copia del BSP en `third_party/esp-mosaico-bsp`
+  **Desde 1.3.0 (rama `feat/display-dma`):** Cogitador usa una copia del BSP en `third_party/esp-mosaico-bsp`
   con `trans_queue_depth = 2` en la pantalla, el mismo arreglo que openai-live-esp32 (RESEARCH.md §2).
   Comprueba la copia con `python tools/check_bsp_fork.py` y rehazla si se actualiza el submódulo.
   El `diag` avisa además de cualquier reserva de memoria fallida (`allocation failures: …`).
@@ -163,7 +163,7 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   `mosaico_module_camera` aplica `patches/esp-idf-dvp-frame-capture-stability.patch` (157 líneas del
   driver DVP `esp_driver_cam`) **sobre `C:\esp\esp-idf-master`**. Además aplica un parche del sensor
   SC101IOT en `managed_components`, dentro del proyecto.
-  - Se aceptó la opción 2 (dejar que parchee) porque en este PC solo se compila VOX.
+  - Se aceptó la opción 2 (dejar que parchee) porque en este PC solo se compila Cogitador.
   - El commit de ESP-IDF sigue siendo `7b9cc1ac79f8`, pero su árbol queda modificado.
   - Compruébalo con `git -C C:\esp\esp-idf-master status`. Para deshacerlo:
     `git -C C:\esp\esp-idf-master checkout components/esp_driver_cam`.
@@ -174,7 +174,7 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   - Tras `iris restart` o una instalación, la cámara no entrega fotogramas hasta apagar y encender.
   - El README oficial lo explica: hay que esperar a que terminen la LCD y la PPA antes de
     `esp_restart()`.
-  - VOX registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Probado: **no
+  - Cogitador registra un manejador de apagado que pausa GSP (`esp_gsp_esp_lcd_pause`). Probado: **no
     basta**.
   - Causa más probable: el sensor no se apaga en un reinicio por software (mismo `VCC_3V3` que la
     pantalla, reloj propio, sin pin de reset) y `esp_video` nunca le manda un reset; `esp32-camera` sí
@@ -192,7 +192,7 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   15 fps (prueba 13).
 - **USB Serial/JTAG debe seguir desactivado (cámara, 1.4.0).** `# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set`
   en `sdkconfig.defaults`. GPIO33/34 son D2 y el flash de la cámara: con el USJ activo, el SC101IOT
-  transmite pero ningún fotograma se completa (`VIDIOC_DQBUF` agota el tiempo; prueba 12). VOX no usa el
+  transmite pero ningún fotograma se completa (`VIDIOC_DQBUF` agota el tiempo; prueba 12). Cogitador no usa el
   USJ: la consola va por UART y ESP-Iris por el USB-OTG HS.
 - **Cambiar valores por defecto de Kconfig o de `sdkconfig*.defaults` no afecta a un `build/sdkconfig`
   existente.** Borra `build/sdkconfig` (es generado) y recompila; compara después el diff de `CONFIG_`.
@@ -202,7 +202,7 @@ Particiones (1.5.0): prefijo inmutable de Vibe Mode, `nvs` 0x200000, `main_app` 
   es intermitente. El vigilante de modelo mudo cambia una vez por arranque tras 10 s de voz sin respuesta.
 - Errores `409 Conflict` en Google AI Studio = reconexiones rápidas con *handle* de reanudación;
   ya gestionados (se descarta el *handle*).
-- «Hola ESP» está apagado a propósito mientras VOX habla (la interrupción es por toque).
+- «Hola ESP» está apagado a propósito mientras Cogitador habla (la interrupción es por toque).
 - La aplicación ocupa 2,51 MB: no cabría en `vibe_mode` (1,75 MB); ESP-IDF solo avisa y es correcto.
 - Los avisos `CMake Warning … object file directory … 250 characters` y los de `component_validation`
   vienen de la ruta larga y de ESP-IDF; no son errores.
@@ -216,7 +216,7 @@ El plan principal está en [RESEARCH.md](RESEARCH.md) §9. Estado:
 
 Siguientes, en el orden recomendado:
 
-1. **Fase 2, cámara bajo demanda** («VOX, ¿qué ves?»): captura única, JPEG por hardware y
+1. **Fase 2, cámara bajo demanda** («Co, ¿qué ves?»): captura única, JPEG por hardware y
    `realtimeInput.video`.
 2. **Fase 3, funciones propias:** emoción del ojo, sensores y mensaje «CUOTA AGOTADA» sin reintentos.
    Es independiente de la fase 2.

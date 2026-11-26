@@ -1,4 +1,4 @@
-# VOX M-01 GEMINI DIRECT — diseño del cliente Gemini Live nativo
+# Cogitador M-01 GEMINI DIRECT — diseño del cliente Gemini Live nativo
 
 Estado: **v1.1 (2026-11-24)**. Decisiones técnicas aprobadas por el propietario; versión 1.1.0
 validada en el hardware. Para retomar el desarrollo, empieza por [HANDOFF.md](HANDOFF.md).
@@ -19,7 +19,7 @@ intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Liv
 | Duración | Sin límite artificial (no hay grabación de 8 s); sesión continua con reanudación |
 | Idioma | Español de España (`es-ES`) |
 | Voz | `Charon` |
-| Personalidad | VOX M-01, servocráneo del Adeptus Mechanicus: solemne, ceremonial, con referencias ocasionales al Omnissiah. Útil y directo con cualquier pregunta legítima, incluidas las matemáticas sencillas |
+| Personalidad | Cogitador M-01, servocráneo del Adeptus Mechanicus: solemne, ceremonial, con referencias ocasionales al Omnissiah. Útil y directo con cualquier pregunta legítima, incluidas las matemáticas sencillas |
 
 ### 1.2 Clave de API
 
@@ -40,10 +40,10 @@ intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Liv
   | Reposo | Cian `#00E5FF` | Conversación cerrada o en espera |
   | Escuchando | Rojo `#FF1A1A` | Micrófono abierto y enviando audio |
   | Procesando | Ámbar `#FFB000` | Turno enviado; esperando la respuesta del modelo |
-  | Hablando | Verde `#20FF60` | Reproduciendo la voz de VOX |
+  | Hablando | Verde `#20FF60` | Reproduciendo la voz de Cogitador |
   | Error | Violeta `#B040FF` | Sin Wi-Fi, sin clave, error de red o de sesión |
 
-- **Un toque en la pantalla abre o cierra la conversación.** Mientras VOX habla, un toque la
+- **Un toque en la pantalla abre o cierra la conversación.** Mientras Cogitador habla, un toque la
   interrumpe y vuelve a escuchar (sección 3.4).
 - Una línea de estado discreta en la parte inferior solo para errores accionables
   (por ejemplo «SIN WI-FI» o «SIN CLAVE»).
@@ -204,7 +204,7 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
 
 1. ✅ Entorno, compilación y simulador.
 2. ✅ Wi-Fi, secretos y RPC de provisión, cliente Gemini Live, audio y ojo (compilado y en el simulador).
-3. ✅ Primera prueba física (2026-11-24): VOX conversa con Gemini Live directamente por Wi-Fi.
+3. ✅ Primera prueba física (2026-11-24): Cogitador conversa con Gemini Live directamente por Wi-Fi.
    Se corrigieron la RAM interna de la pantalla y el modelo; detalles en [INSTALL.md](INSTALL.md).
 4. Ajustes: ganancia del micrófono de 30 a 24 dB (saturaba), vigilante de modelo mudo,
    y después latencia, VAD, pruebas de larga duración y reanudación.
@@ -246,7 +246,7 @@ porque chocaba con el audio entrante.
 
 «Inactividad» significa que no llega ninguna transcripción del usuario ni audio del modelo,
 no hay ningún toque y no hay reproducción en curso. Cada uno de esos eventos, y también la voz detectada localmente, reinicia el plazo de 15 s.
-El plazo no corre mientras VOX habla.
+El plazo no corre mientras Cogitador habla.
 
 ### 7.2 Compatibilidad verificada (2026-11-24)
 
@@ -259,7 +259,7 @@ El plazo no corre mientras VOX habla.
 | Tamaño del modelo | Dos variantes cuantizadas a 8 bits (p1 375 KB, p2 418 KB); el empaquetador incluye **417,76 KB** | Salida de `movemodel` en la compilación de prueba |
 | RAM y CPU en S31 | WakeNet10 cuantizado, 3 canales: **16 KB de RAM interna, 523 KB de PSRAM, 6,4 ms por trama de 32 ms, 19,9 % de un núcleo**. Con 1 canal se espera menos; no hay cifra publicada | Benchmark oficial de ESP-SR para esp32s31 |
 | Entrada | PCM 16 kHz, mono, 16 bit (trama de 32 ms = 512 muestras). Ya la producimos: `app_audio` entrega 16 kHz mono en tramas de 640 | Documentación de WakeNet |
-| Tamaño de la app | El ejemplo completo (WakeNet + MultiNet + TTS) ocupa 1,25 MB; el aumento estimado para VOX solo con WakeNet es de +0,3–0,6 MB (por medir). `main_app` tiene margen de sobra | Compilación de prueba |
+| Tamaño de la app | El ejemplo completo (WakeNet + MultiNet + TTS) ocupa 1,25 MB; el aumento estimado para Cogitador solo con WakeNet es de +0,3–0,6 MB (por medir). `main_app` tiene margen de sobra | Compilación de prueba |
 
 ### 7.3 Almacenamiento: cambio de particiones necesario
 
@@ -302,7 +302,7 @@ que este proyecto no usa. Plan:
 
 - Soporte preliminar de ESP32-S31 en ESP-SR: validar la tasa de aciertos y de falsos disparos en el
   hardware (por ejemplo, 20 activaciones a 1 y 3 m y 1 h de ruido doméstico).
-- PSRAM: VOX ya reserva ≈ 832 KB (RX WebSocket 256 KB, PCM 192 KB, ring 384 KB) más la UI.
+- PSRAM: Cogitador ya reserva ≈ 832 KB (RX WebSocket 256 KB, PCM 192 KB, ring 384 KB) más la UI.
   Medir con `iris memory` en la primera prueba física antes de sumar unos 0,5 MB para WakeNet.
 - CPU: unos 20 % de un núcleo en el peor caso publicado. Solo funciona en reposo,
   así que no compite con la conversación.

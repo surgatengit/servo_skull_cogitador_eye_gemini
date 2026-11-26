@@ -115,7 +115,7 @@ size_t vox_rol_roll_json(const vox_rol_spec_t *spec, const uint16_t *values, cha
 
 /**
  * Spanish text sent to the model for a roll made with the on-screen button, e.g.
- * "Tirada del jugador con los dados de VOX: 2d20, resultados 14 y 7, total 21."
+ * "Tirada del jugador con los dados de Co: 2d20, resultados 14 y 7, total 21."
  * Returns the length, or 0 if cap is too small.
  */
 size_t vox_rol_player_text(const vox_rol_spec_t *spec, const uint16_t *values, char *out,

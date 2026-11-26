@@ -29,7 +29,7 @@ MODELS = ("gemini-3.1-flash-live-preview", "gemini-3.8-live")
 
 
 def base_setup(model: str) -> dict:
-    """Same fields VOX sends (app_gemini_live.c, build_setup)."""
+    """Same fields Co sends (app_gemini_live.c, build_setup)."""
     return {
         "model": f"models/{model}",
         "generationConfig": {
@@ -37,7 +37,7 @@ def base_setup(model: str) -> dict:
             "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Charon"}},
                              "languageCode": "es-ES"},
         },
-        "systemInstruction": {"parts": [{"text": "Eres VOX M-01. Responde en español."}]},
+        "systemInstruction": {"parts": [{"text": "Eres Cogitador M-01. Responde en español."}]},
         "inputAudioTranscription": {},
         "outputAudioTranscription": {},
         "realtimeInputConfig": {"automaticActivityDetection": {"disabled": False}},
@@ -48,7 +48,7 @@ def base_setup(model: str) -> dict:
 
 CAPTURE_DECLARATION = {
     "name": "capturar_imagen",
-    "description": "Toma una fotografía con la cámara de VOX y la envía como imagen.",
+    "description": "Toma una fotografía con la cámara de Co y la envía como imagen.",
 }
 
 

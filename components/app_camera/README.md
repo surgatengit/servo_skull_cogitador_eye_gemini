@@ -24,13 +24,13 @@ Kconfig: `VOX_CAMERA*`.
      *exactly* to the output: 854×640 at 6/16 for 1280×720.
    - The pure function is tested on the PC (`tools/host_tests/run.ps1`).
 4. Return the frame and **delete the camera**. This releases the DMA buffers, the module lease and
-   the USB Serial/JTAG pads (camera D2 = GPIO33). VOX's `iris` link uses USB-OTG and is not affected.
+   the USB Serial/JTAG pads (camera D2 = GPIO33). Cogitador's `iris` link uses USB-OTG and is not affected.
 5. **Hardware JPEG** (`esp_driver_jpeg`), RGB565 in and YUV420 out. Quality steps 80, 65, 50, 35, 20
    until the still fits `max_bytes` (`VOX_CAMERA_JPEG_MAX_KB`, 24 KiB by default).
 
 ## Contract
 
-- Blocking, about 1–2 s. Call from one task only (the VOX session task).
+- Blocking, about 1–2 s. Call from one task only (the Cogitador session task).
 - The returned `data` stays valid until the next capture.
 - Buffers are allocated on the first call and kept, in PSRAM with JPEG/DMA2D alignment: an RGB565
   frame of 150 KiB and a 64 KiB JPEG output.

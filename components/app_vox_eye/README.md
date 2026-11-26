@@ -1,6 +1,6 @@
 # app_vox_eye
 
-Mechanical eye of VOX M-01: a full-screen GSP scene (`ui/main.json`) with an
+Mechanical eye of Cogitador M-01: a full-screen GSP scene (`ui/main.json`) with an
 animated iris group, pupil, eyelids, status glow ring and a transparent
 full-screen tap target. The same controller runs on the device and on the Host
 simulator (`host/`). It depends only on the public ESP-GSP API and the bindings

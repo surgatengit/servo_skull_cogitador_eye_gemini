@@ -1,4 +1,4 @@
-# VOX M-01 — Instalación, restauración y seguridad
+# Cogitador M-01 — Instalación, restauración y seguridad
 
 Estado: **v1.0 (2026-11-24)**. Verificado sobre el código del espacio de trabajo
 (`esp-mosaico-utils` en `f58f4f9`, Vibe Mode empaquetado 0.4.1, ABI 2, layout 5).
@@ -21,7 +21,7 @@ exactamente **tres componentes**:
 
 | # | Componente | Destino | Contenido |
 |---|---|---|---|
-| 1 | `partition_table` | `0x8000` (4 KiB) | Tabla de VOX (abajo) |
+| 1 | `partition_table` | `0x8000` (4 KiB) | Tabla de Cogitador (abajo) |
 | 2 | `application` | `main_app` `0x210000` | `servocraneo_gemini_direct.bin` (≈2,0 MB) |
 | 3 | `data` `ui_apps` | `0xF00000` (1 MiB) | Paquete GSP del ojo (≈18 KB) |
 
@@ -32,9 +32,9 @@ particiones NVS (`nvs`, `nvs_keys`). Vibe Mode vuelve a validar el manifiesto en
 **No se escriben:** bootloader (`0x2000`), `otadata`, `phy_init`, `sysmeta`, `vibe_mode`,
 `coredump`, `nvs` (`0x200000`) ni la memoria NAND.
 
-### Tabla de particiones: base (`recover`) frente a VOX
+### Tabla de particiones: base (`recover`) frente a Cogitador
 
-| Partición | Base | VOX | ¿Cambia? |
+| Partición | Base | Cogitador | ¿Cambia? |
 |---|---|---|---|
 | otadata, phy_init, sysmeta, vibe_mode, coredump | prefijo inmutable | idéntico | No (lo impone el contrato) |
 | nvs `0x200000` | 64 K | 64 K | No |
@@ -47,22 +47,22 @@ particiones NVS (`nvs`, `nvs_keys`). Vibe Mode vuelve a validar el manifiesto en
   (`mosaico-vibe-rec-ver.esp-claw.com`: recomendaciones y OTA estable). Esos servicios forman
   parte de **Vibe Mode**, que `system-update` **no toca**.
 - Si ESP-Claw es **la aplicación que arranca hoy** (en `main_app`), **sí la sustituye**:
-  VOX ocupa `main_app` y la tabla pasa a la de VOX. La aplicación queda inactiva,
+  Cogitador ocupa `main_app` y la tabla pasa a la de Cogitador. La aplicación queda inactiva,
   pero su copia descargada en la NAND (`/nand/ideas/<código>/current/`) no se borra.
 - La primera prueba física empieza con `iris device-status` (solo lectura) para confirmar
   qué firmware y qué versión de Vibe Mode hay realmente instalados.
 
 ## 2. Qué se conserva y qué se pierde
 
-| Dato | Ubicación | Con `system-update` de VOX | Al volver a ESP-Claw desde Mis Ideas | Con `recover` |
+| Dato | Ubicación | Con `system-update` de Cogitador | Al volver a ESP-Claw desde Mis Ideas | Con `recover` |
 |---|---|---|---|---|
 | Vibe Mode y su versión | `vibe_mode` | Se conserva | Se conserva | Se reescribe con el paquete revisado 0.4.1 |
 | Bootloader | `0x2000` | Se conserva | Se conserva | Se reescribe |
 | Wi-Fi e información compartida de Vibe | `sysmeta` | Se conserva | Se conserva | No se escribe |
 | Identidad del dispositivo y emparejamientos | `sysmeta` / NVS protegida | Se conserva | Se conserva | No se escribe |
 | Ideas descargadas (Mis Ideas) | NAND | Se conserva | Se conserva | No se escribe |
-| Datos de ESP-Claw en NVS de app | `nvs` `0x200000` | Se conservan (VOX usa su propio espacio de nombres `vox_secret`) | Siguen ahí | No se escribe |
-| Clave de Gemini de VOX | `nvs` `vox_secret` | — | **Sigue ahí si no se borra antes** | No se escribe |
+| Datos de ESP-Claw en NVS de app | `nvs` `0x200000` | Se conservan (Cogitador usa su propio espacio de nombres `vox_secret`) | Siguen ahí | No se escribe |
+| Clave de Gemini de Cogitador | `nvs` `vox_secret` | — | **Sigue ahí si no se borra antes** | No se escribe |
 | Binario de ESP-Claw en NOR | `main_app` | **Se sobrescribe** | Se reinstala desde la NAND | Ver nota |
 | Volcados de memoria previos | `coredump` | Se conservan; `mosaico.py` los guarda antes de escribir | — | — |
 
@@ -88,14 +88,14 @@ Lectura con `iris list` y `iris device-status` por USB, sin escrituras ni reinic
 Conclusión: ESP-Claw es la aplicación que arranca hoy y **será sustituida** en `main_app`.
 Su código Ideas es 100000; sus datos en la NAND, el Wi-Fi y Vibe Mode se conservan.
 
-### Instalación de VOX 1.0.0 (2026-11-24, autorizada)
+### Instalación de Cogitador 1.0.0 (2026-11-24, autorizada)
 
 | Evidencia | Valor |
 |---|---|
 | Operación | `iris system-update`, operation `17e90e9e8ac14518b4dcb5b58bf26d20`, `status: succeeded`, `validated: true`, `healthy: true` |
 | Componentes escritos | Tabla `0x8000` (sha `3c26b245…`), aplicación `0x210000` (2 040 192 B, sha `b92d1c0a…`), `ui_apps` `0xF00000` (17 744 B) |
 | Bootloader | Sin cambios (`46ebaa95…` antes y después) |
-| Boot IDs | ESP-Claw `5011400773332120379` → Vibe Mode (escritor) `7763685529854875385` → VOX `14452938182979607246` |
+| Boot IDs | ESP-Claw `5011400773332120379` → Vibe Mode (escritor) `7763685529854875385` → Cogitador `14452938182979607246` |
 | Estado en vivo | `normal`, `servocraneo_gemini_direct` 1.0.0, firmware sha `d82574ec…` (igual al ELF), `crash_count 0` |
 | Arranque | `app_secrets` (clave ausente), GSP 480×480 en marcha, audio 48/16/24 kHz, sesión con `gemini-3.8-live`, Wi-Fi conectado en 8,4 s |
 | Memoria | RAM interna libre 101 KB (mínimo 52 KB); PSRAM 29,8 MB libres de 31,6 MB |
@@ -128,7 +128,7 @@ Conclusiones:
   El dispositivo usa ahora `gemini-3.1-flash-live-preview` mediante el override guardado en NVS.
   El paso automático al modelo alternativo no se activó porque 3.8 completa `setupComplete` y luego calla;
   solo se detectaban fallos de conexión.
-- **El micrófono satura:** picos de 0 dBFS al hablar y por el eco del altavoz mientras VOX habla.
+- **El micrófono satura:** picos de 0 dBFS al hablar y por el eco del altavoz mientras Cogitador habla.
   Bajar la ganancia de 30 dB.
 - Hay cortes de transporte esporádicos (código 0) que se recuperan con `sessionResumption`.
 
@@ -137,7 +137,7 @@ Conclusiones:
 - Instalación por `system-update`: validada, sana, firmware `d5c4c7b3…`; la clave y el override se conservan.
 - **4 turnos completos** con `gemini-3.1-flash-live-preview`, 0 errores de pantalla, sin bloqueos.
 - Micrófono a 24 dB: voz con picos de unos **−12 dBFS** (antes −3/0 dBFS). Los 0 dBFS restantes son
-  eco del altavoz mientras VOX habla, con el micrófono silenciado (no se envía).
+  eco del altavoz mientras Cogitador habla, con el micrófono silenciado (no se envía).
 - 2 × `websocket_client: Could not lock ws-client within 20 timeout`: el `audioStreamEnd` coincide con la
   llegada del audio del modelo y se descarta. Inofensivo; pendiente de mejora menor.
 
@@ -215,11 +215,11 @@ Rama `feat/google-search`; diseño en [GOOGLE_SEARCH.md](GOOGLE_SEARCH.md). Inst
   - Boot ID nuevo, `15367548457134334378`;
   - firmware `84d60693d603…`, `crash_count=0`.
 - Logs de arranque:
-  - `VOX M-01 ready (model gemini-3.1-flash-live-preview, fallback gemini-3.8-live, search on)`;
+  - `Cogitador M-01 ready (model gemini-3.1-flash-live-preview, fallback gemini-3.8-live, search on)`;
   - `app_wake: listening for "Hola ESP"`;
   - en reposo, `diag st=0 … largest=12288`, igual que en 1.1.0.
 
-**Primera prueba de voz:** el propietario notó VOX **muy lento**. Los logs de esa conversación se
+**Primera prueba de voz:** el propietario notó al Cogitador **muy lento**. Los logs de esa conversación se
 perdieron (`log_dropped_bytes`: el búfer del dispositivo no los retuvo) y una captura en directo
 posterior no registró ninguna conversación de 1.2.0, así que no hay medida de latencia.
 Causa probable: la frase añadida a la personalidad («busca ante hechos actuales y cita la fuente»)
@@ -227,7 +227,7 @@ empujaba a buscar y a alargar las respuestas.
 
 **Búsqueda discreta (2026-11-25, autorizada; commit `10a6eaf`):**
 
-- Cambios: VOX responde de inmediato, busca solo si se le pide o ante un dato reciente que desconoce,
+- Cambios: Cogitador responde de inmediato, busca solo si se le pide o ante un dato reciente que desconoce,
   y no cita fuentes ni muestra nada en pantalla (`VOX_SHOW_SEARCH_SOURCES=n`).
 - `iris system-update` correcto en 42 s.
 - Después:
@@ -235,7 +235,7 @@ empujaba a buscar y a alargar las respuestas.
   - Boot ID `6174699672841644746`, firmware `66658c0065a5…`, `crash_count=0`.
 - Logs de arranque: `search on`, «Hola ESP» escuchando y `largest=12288` en reposo.
 
-**Prueba de voz (2026-11-25): FALLA. VOX no llega a conectar.** Captura en directo:
+**Prueba de voz (2026-11-25): FALLA. Cogitador no llega a conectar.** Captura en directo:
 
 - Cada `setup` con `tools:[{"googleSearch":{}}]` recibe `closed (close code 1011)` unos 150 ms
   después.
@@ -256,7 +256,7 @@ disponible.
 
 **Corrección:**
 
-- `VOX_GOOGLE_SEARCH` desactivado por defecto: VOX conecta como en 1.1.0 y conserva el resto de 1.2.0.
+- `VOX_GOOGLE_SEARCH` desactivado por defecto: Cogitador conecta como en 1.1.0 y conserva el resto de 1.2.0.
 - El cliente registra ahora `server close reason: …` en las tramas de cierre.
 - `tools/test_live_setup.py`: el propietario lo ejecuta en el PC con su clave para ver qué
   variante del `setup` acepta Google y con qué motivo rechaza las demás.
@@ -268,7 +268,7 @@ disponible.
   - mismo Device ID, `app_version=1.2.0`;
   - Boot ID `5146913244462897174`, firmware `42ff0083c79c…`, `crash_count=0`.
 - Logs de arranque: `search off`, «Hola ESP» escuchando y `largest=12288` en reposo.
-- Prueba de voz (2026-11-25): **VOX habla y funciona perfectamente**, según el propietario.
+- Prueba de voz (2026-11-25): **Cogitador habla y funciona perfectamente**, según el propietario.
   **1.2.0 con la búsqueda desactivada queda validada en el hardware.**
 
 Pendiente de la búsqueda discreta, si se activa con cuota disponible:
@@ -279,7 +279,7 @@ Pendiente de la búsqueda discreta, si se activa con cuota disponible:
 - el toque para interrumpir y el reposo a los 15 s.
 
 1. Arranque: `device-status` con `app_version=1.2.0` y `crash_count=0`. En los logs aparece
-   `VOX M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
+   `Cogitador M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
 2. «Hola ESP» → `connected; setup sent (model gemini-3.1-flash-live-preview, google search)` →
    `session ready`. **Si no llega `session ready`, el servidor rechaza el campo `tools`**: se anota y
    se recompila con `VOX_GOOGLE_SEARCH=n`.
@@ -339,9 +339,9 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
 1. Arranque: `app_version=1.4.0`, `crash_count=0` y `largest=` en reposo de unos 63 488 B.
 2. «Hola ESP» → `connected; setup sent` → `session ready`. El servidor acepta la declaración de la
    función.
-3. «VOX, ¿qué ves?» o «Mira lo que tengo en la mano»:
+3. «Co, ¿qué ves?» o «Mira lo que tengo en la mano»:
    - el ojo parpadea, muestra «OBSERVANDO» y se enciende el LED rojo de la cámara;
-   - VOX describe la escena.
+   - Cogitador describe la escena.
    - Logs: `toolCall capturar_imagen` → `app_camera: still 240x320 JPEG … B (q…) in … ms` →
      `image … B … sent` → `toolResponse capturar_imagen sent`.
 4. **Orientación y color:** pregunta por un objeto de color conocido y si la imagen está derecha. Si sale
@@ -364,7 +364,7 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
   bien.
 - El LED rojo está encendido en reposo y se apaga al liberar la cámara, que queda en power-down.
 
-**Hipótesis:** contención del ancho de banda de la PSRAM. VOX ejecutaba el código desde PSRAM
+**Hipótesis:** contención del ancho de banda de la PSRAM. Cogitador ejecutaba el código desde PSRAM
 (`SPIRAM_XIP_FROM_PSRAM=y`), mientras que los ejemplos del BSP con cámara y Wi-Fi (`wifi_http_cam`,
 `camera_lcd_preview`) lo desactivan.
 
@@ -378,7 +378,7 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
 
 **Diagnóstico 1 (firmware `bc4aab0b28d9…`):** con el código desde flash, la foto de prueba del
 arranque, sin conversación, **también falla** (`VIDIOC_DQBUF` tras 2 s). No es contención de PSRAM, así
-que se revierte. Tampoco hay conflicto de pines con el BSP ni con VOX.
+que se revierte. Tampoco hay conflicto de pines con el BSP ni con Cogitador.
 
 **Diagnóstico 2 (commit siguiente):** el resolvedor eligió `esp_video` 2.6.0 / `esp_cam_sensor` 2.7.0,
 mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
@@ -407,7 +407,7 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
 **Diagnóstico 4 (commit siguiente):**
 
 - `CONFIG_USJ_ENABLE_USB_SERIAL_JTAG` desactivado. Lo hacen los ejemplos con cámara y Wi-Fi y
-  openai-live-esp32, porque GPIO33/34 son D2 y el flash de la cámara; VOX no usa el USJ.
+  openai-live-esp32, porque GPIO33/34 son D2 y el flash de la cámara; Cogitador no usa el USJ.
 - Las medidas de la sonda se escriben después de cerrar la cámara, con pausas.
 
 **Diagnóstico 4 (firmware de `9263419`): RESUELTO.**
@@ -416,14 +416,14 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
   (q80) in 1911 ms`.
 - La sonda mide unos 241 000 flancos en PCLK, unos 35 en VSYNC (≈ 25 fps) y actividad en DE y D0: el
   sensor siempre transmitió.
-- **Causa:** el periférico USJ, activo aunque VOX no lo usaba, tiene los pads GPIO33/34, que son D2 y
+- **Causa:** el periférico USJ, activo aunque Cogitador no lo usaba, tiene los pads GPIO33/34, que son D2 y
   el flash de la cámara. Con él activo ningún fotograma llegaba a completarse.
 
 **Prueba de voz (2026-11-25):** 3 fotos en una conversación.
 
 - Cada una: `toolCall capturar_imagen` → `still 240x320 JPEG 13–14 KB (q80) in ~1370 ms` →
   `image … sent` → `toolResponse … sent`.
-- VOX describe la escena.
+- Cogitador describe la escena.
 - Según el propietario, **la orientación y los colores son correctos** (270° con espejo vertical,
   RGB565).
 - `largest=` entre 47 104 y 63 488 B, sin `allocation failures` ni errores de pantalla.
@@ -445,13 +445,13 @@ escribe `iris system-update`, como en 1.1.0.
 
 1. Arranque: `app_version=1.5.0`, `crash_count=0` y `app_photos: 0 stored still(s) of 10`. El contador
    no se ve.
-2. «VOX, ¿qué ves?»: la foto llega a Gemini como en la 1.4.0. Después aparece
+2. «Co, ¿qué ves?»: la foto llega a Gemini como en la 1.4.0. Después aparece
    `app_photos: still saved in slot 0`, y en el bisel, arriba a la izquierda, el contador «1».
 3. Tocar el contador: galería con la foto real, «1 / 1», X, ‹ y ›.
 4. Hacer 2 o 3 fotos más: ‹ y › recorren todas y la posición cambia («2 / 3»…).
 5. X vuelve al ojo; a los 30 s sin tocar, la galería se cierra sola; «Hola ESP» la cierra y abre la
    conversación.
-6. Mientras VOX habla, tocar el contador no abre la galería.
+6. Mientras Cogitador habla, tocar el contador no abre la galería.
 7. Reiniciar el dispositivo: el contador mantiene el número de fotos.
 8. Memoria: `largest=` con la galería abierta y ningún `allocation failures`.
 
@@ -541,7 +541,7 @@ Al leer el código salió que la premisa era falsa:
     realidad, **cualquier reinicio por software deja la cámara sin fotogramas hasta apagar y encender**.
 - **Causa según el README oficial del componente:** el reinicio por software puede dejar activo el DMA
   de la cámara **o de la pantalla**. Antes de `esp_restart()`, la aplicación debe esperar a que
-  terminen la PPA y la LCD. VOX no paraba la pantalla, y los reinicios los lanza ESP-Iris
+  terminen la PPA y la LCD. Cogitador no paraba la pantalla, y los reinicios los lanza ESP-Iris
   (`iris restart` y System Update).
 - **Corrección (commit siguiente):** se registra un manejador de apagado
   (`esp_register_shutdown_handler`) que llama a `esp_gsp_esp_lcd_pause()`. Esa función detiene el
@@ -605,9 +605,9 @@ En el dispositivo, por orden:
 1. **Voz por botón:** con el ojo en reposo, toca el círculo de arriba a la derecha. Cambia la letra
    (C, A, K, S) y la línea de estado dice la voz («KORE · CHICA FIRME»). Di «Hola ESP»: habla con
    esa voz.
-2. **Voz por voz:** «Ponte una voz de chico grave». VOX se despide, se reconecta (ámbar) y vuelve a
+2. **Voz por voz:** «Ponte una voz de chico grave». Cogitador se despide, se reconecta (ámbar) y vuelve a
    escuchar con Algenib.
-3. **Dados:** «Tira dos dados de veinte». Salen animados en pantalla y VOX dice el resultado.
+3. **Dados:** «Tira dos dados de veinte». Salen animados en pantalla y Cogitador dice el resultado.
 4. **Modo rol:** «Vamos a jugar una partida de rol».
    - Aparece «2D20» a la derecha y «MÓVIL: 192.168.x.x» abajo.
    - Abre esa dirección en el móvil, en la misma Wi-Fi, y escribe tu nombre.
@@ -635,11 +635,11 @@ En el dispositivo, por orden:
 14. **Cambio de móvil:** entra con el mismo nombre desde otro móvil (o en otra pestaña). Lo
     recupera todo; el móvil anterior vuelve a la pantalla de entrada y el máster recibe el aviso.
 15. **Guardar:** «Guarda la partida». En el móvil, «Partida guardada» → «Descargar la partida de
-    VOX» baja `partida_vox.json`.
+    Co» baja `partida_cogitador.json`.
 16. **Continuar:** sal de la partida, empieza otra («Vamos a jugar a rol»). El máster pregunta si
     queréis continuar la guardada; di que sí. Resume lo ocurrido y cada jugador, al entrar con su
     nombre, recupera ficha y secreto. Prueba también «nueva aventura con los mismos personajes».
-17. **Subir:** en el móvil, «Subir a VOX» con el archivo descargado. El máster recibe un aviso.
+17. **Subir:** en el móvil, «Subir a Co» con el archivo descargado. El máster recibe un aviso.
 
 **Primer intento (2026-11-26, firmware `da1a7c52…`):**
 - Correcto: `cambiar_voz` (Kore), el botón de voz (Sulafat, guardada tras reiniciar), la reconexión
@@ -652,7 +652,7 @@ En el dispositivo, por orden:
 **Segundo intento (2026-11-26, commit `1f7153b`):**
 - Correcto: el alta desde el móvil, el secreto en el móvil, los dados del D20 en pantalla, que un
   toque no cierre la partida, la salida manteniendo pulsado y el cambio de voz.
-- Fallo: las dos tiradas del D20 se hicieron mientras VOX hablaba y no llegaron a Gemini
+- Fallo: las dos tiradas del D20 se hicieron mientras Cogitador hablaba y no llegaron a Gemini
   (`Could not lock ws-client`, `clientContent text ESP_FAIL`). Mientras llega el audio de la
   respuesta, el cliente WebSocket está ocupado.
 - Corrección: la tirada se guarda y se envía al terminar la respuesta (`turnComplete`). Se
@@ -667,7 +667,7 @@ tirada (paso 9).
 - Correcto: `preparar_tirada` a porcentaje (botón «D%») y a reserva 6d10; la tirada de reserva
   (2 éxitos) llegó al máster.
 - Fallo: el máster pidió a la vez preparar la tirada y dos secretos. Solo cabían 2 peticiones, se
-  perdió un secreto y VOX esperó 30 s sin respuesta (`tool call mostrar_secreto dropped`).
+  perdió un secreto y Cogitador esperó 30 s sin respuesta (`tool call mostrar_secreto dropped`).
 - Corrección: 8 peticiones a la vez (commit `c9b40e4`). Después se añadieron la sala de espera,
   las fichas y las partidas guardadas (pasos 10–17).
 
@@ -686,15 +686,15 @@ En el registro (`iris logs`), busca:
 
 ## 3. Volver al firmware actual (restauración)
 
-**Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):
+**Antes de instalar Cogitador** (en Vibe Mode, en la pantalla del dispositivo):
 
 1. Comprueba en **Mis Ideas** que ESP-Claw (o la aplicación actual) aparece descargada y apunta
    su código de seis dígitos. Si no aparece, **detente**: entonces la única vía de vuelta sería
    obtener su paquete.
 
-**Para volver** (cuando VOX esté instalado):
+**Para volver** (cuando Cogitador esté instalado):
 
-1. Con VOX en marcha, borra la clave del dispositivo:
+1. Con Cogitador en marcha, borra la clave del dispositivo:
    `python tools/provision_key.py --clear`
 2. Entra en Vibe Mode con `python mosaico.py iris test enter-recovery --project projects/servocraneo_gemini_direct`,
    o manteniendo pulsado el botón **AI** (GPIO7) al encender.

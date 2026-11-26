@@ -1,6 +1,6 @@
 # app_wake
 
-Local "Hola ESP" wake word for VOX M-01 with Espressif ESP-SR WakeNet10
+Local "Hola ESP" wake word for Cogitador M-01 with Espressif ESP-SR WakeNet10
 (`wn10_es_holaesp`, `espressif/esp-sr` 2.6.2, `lib/esp32s31`). Audio is processed
 only in RAM on the device; nothing is sent anywhere.
 
@@ -15,7 +15,7 @@ because esp-sr itself only flashes it through `idf.py flash`.
 
 - `app_wake_init(cb, ctx)`: singleton, once. Loads the model list with
   `esp_srmodel_init("model")`; returns `ESP_ERR_NOT_FOUND` when the partition or
-  model is missing (VOX then works with touch only). Starts `vox_wake`
+  model is missing (Cogitador then works with touch only). Starts `vox_wake`
   (core 1, prio 5, below audio capture/playback).
 - `app_wake_set_active(bool)`: any task. The wake task creates the WakeNet
   detector (≈16 KB internal RAM, ~0.5 MB PSRAM) only while active and destroys it

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/* VOX M-01 GEMINI DIRECT composition root: initialization, wiring and startup
+/* Cogitador M-01 GEMINI DIRECT composition root: initialization, wiring and startup
  * order only. Behavior lives in the app_* components. */
 #include <string.h>
 
@@ -231,5 +231,5 @@ void app_main(void)
         }
         return;
     }
-    ESP_LOGI(TAG, "VOX M-01 GEMINI DIRECT started");
+    ESP_LOGI(TAG, "Cogitador M-01 GEMINI DIRECT started");
 }

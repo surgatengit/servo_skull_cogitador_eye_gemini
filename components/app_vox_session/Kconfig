@@ -1,4 +1,4 @@
-menu "VOX M-01 Gemini Direct"
+menu "Cogitador M-01 Gemini Direct"
 
     config VOX_GEMINI_MODEL
         string "Primary Gemini Live model"
@@ -46,7 +46,7 @@ menu "VOX M-01 Gemini Direct"
         help
             Listen locally for "Hola ESP" while the conversation is closed. No
             WebSocket is open and no audio leaves the device while idle. Needs the
-            "model" partition with the esp-sr model image; without it VOX keeps
+            "model" partition with the esp-sr model image; without it Cogitador keeps
             working with touch only.
 
     config VOX_ROLE_PHONE_PAGE
@@ -73,7 +73,7 @@ menu "VOX M-01 Gemini Direct"
             While listening, close the conversation after this time with no local
             voice (uplink frames above VOX_VOICED_PEAK_THRESHOLD), user
             transcription, model output, turn or tap. Counted from the end of
-            VOX's speech. Suspended while a reply is pending (see
+            Cogitador's speech. Suspended while a reply is pending (see
             VOX_RESPONSE_TIMEOUT_S).
 
     config VOX_GOOGLE_SEARCH
@@ -82,7 +82,7 @@ menu "VOX M-01 Gemini Direct"
         help
             Optional, OFF by default (owner's decision, 2026-11-25): in test 10
             every setup declaring googleSearch was closed with code 1011 because
-            the free-tier quota was exceeded on both models, and VOX could not
+            the free-tier quota was exceeded on both models, and Cogitador could not
             connect. Enable only with quota available.
 
             Declare the googleSearch tool in the Live setup message so Gemini can
@@ -94,7 +94,7 @@ menu "VOX M-01 Gemini Direct"
         depends on VOX_GOOGLE_SEARCH
         default n
         help
-            Off by default at the owner's request: VOX searches quietly and never
+            Off by default at the owner's request: Cogitador searches quietly and never
             cites sources. When on, the status line rotates "GOOGLE: <query>" and
             "FUENTE n/m: <domain>" (see docs/GOOGLE_SEARCH.md section 4).
 

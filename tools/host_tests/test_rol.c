@@ -225,17 +225,17 @@ static void test_roll_text(void)
     CHECK(strstr(out, "\"total\":1000") != NULL);
 
     CHECK(vox_rol_player_text(&s, two, out, sizeof(out)) > 0);
-    CHECK(strcmp(out, "Tirada del jugador con los dados de VOX: 2d20, resultados 20 y 7, "
+    CHECK(strcmp(out, "Tirada del jugador con los dados de Co: 2d20, resultados 20 y 7, "
                       "total 27.") == 0);
     CHECK(vox_rol_player_text(&d6, six, out, sizeof(out)) > 0);
     CHECK(strstr(out, "resultados 6, 1 y 3, total 10.") != NULL);
     CHECK(vox_rol_player_text(&one_d20, one, out, sizeof(out)) > 0);
-    CHECK(strcmp(out, "Tirada del jugador con los dados de VOX: 1d20, resultado 1.") == 0);
+    CHECK(strcmp(out, "Tirada del jugador con los dados de Co: 1d20, resultado 1.") == 0);
     CHECK(vox_rol_player_text(&pct, p47, out, sizeof(out)) > 0);
-    CHECK(strcmp(out, "Tirada porcentual del jugador con los dados de VOX: decenas 4, "
+    CHECK(strcmp(out, "Tirada porcentual del jugador con los dados de Co: decenas 4, "
                       "unidades 7, resultado 47.") == 0);
     CHECK(vox_rol_player_text(&pool, dice, out, sizeof(out)) > 0);
-    CHECK(strcmp(out, "Tirada de reserva del jugador con los dados de VOX: 6d10, éxito con 8 "
+    CHECK(strcmp(out, "Tirada de reserva del jugador con los dados de Co: 6d10, éxito con 8 "
                       "o más; resultados 9, 3, 10, 8, 1 y 5; 3 éxitos, 1 uno y 1 máximo "
                       "(10).") == 0);
     CHECK(vox_rol_player_text(&big, hundreds, out, sizeof(out)) > 0);

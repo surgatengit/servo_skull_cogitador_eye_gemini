@@ -306,7 +306,7 @@ size_t vox_rol_player_text(const vox_rol_spec_t *spec, const uint16_t *values, c
     }
     if (spec->mode == VOX_ROL_PERCENT) {
         return finish(snprintf(out, cap,
-                               "Tirada porcentual del jugador con los dados de VOX: decenas %u, "
+                               "Tirada porcentual del jugador con los dados de Co: decenas %u, "
                                "unidades %u, resultado %u.",
                                (unsigned)(values[0] % 10U), (unsigned)(values[1] % 10U),
                                vox_rol_percent(values)), cap);
@@ -321,7 +321,7 @@ size_t vox_rol_player_text(const vox_rol_spec_t *spec, const uint16_t *values, c
         const unsigned ones = count_equal(spec, values, 1U);
         const unsigned tops = count_equal(spec, values, spec->sides);
         return finish(snprintf(out, cap,
-                               "Tirada de reserva del jugador con los dados de VOX: %ud%u, "
+                               "Tirada de reserva del jugador con los dados de Co: %ud%u, "
                                "éxito con %u o más; %s %s; %u %s, %u %s y %u %s (%u).",
                                (unsigned)spec->count, (unsigned)spec->sides,
                                (unsigned)spec->target, noun, list,
@@ -331,11 +331,11 @@ size_t vox_rol_player_text(const vox_rol_spec_t *spec, const uint16_t *values, c
                                (unsigned)spec->sides), cap);
     }
     if (spec->count == 1U) {
-        return finish(snprintf(out, cap, "Tirada del jugador con los dados de VOX: 1d%u, "
+        return finish(snprintf(out, cap, "Tirada del jugador con los dados de Co: 1d%u, "
                                "resultado %s.", (unsigned)spec->sides, list), cap);
     }
     return finish(snprintf(out, cap,
-                           "Tirada del jugador con los dados de VOX: %ud%u, resultados %s, "
+                           "Tirada del jugador con los dados de Co: %ud%u, resultados %s, "
                            "total %u.", (unsigned)spec->count, (unsigned)spec->sides, list,
                            total_of(spec, values)), cap);
 }

@@ -211,11 +211,11 @@ static esp_err_t game_get(httpd_req_t *req)
     char *json = app_rol_web_load_game();
     if (!json) {
         httpd_resp_set_status(req, "404 Not Found");
-        return send_error(req, "No hay ninguna partida guardada en VOX.");
+        return send_error(req, "No hay ninguna partida guardada en Co.");
     }
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"partida_vox.json\"");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"partida_cogitador.json\"");
     const esp_err_t err = httpd_resp_sendstr(req, json);
     free(json);
     return err;
@@ -224,11 +224,11 @@ static esp_err_t game_get(httpd_req_t *req)
 static esp_err_t game_post(httpd_req_t *req)
 {
     if (req->content_len == 0 || req->content_len >= ROL_GAME_MAX_BYTES) {
-        return send_error(req, "El archivo no es una partida de VOX o es demasiado grande.");
+        return send_error(req, "El archivo no es una partida de Co o es demasiado grande.");
     }
     char *body = heap_caps_malloc(ROL_GAME_MAX_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!body) {
-        return send_error(req, "VOX no tiene memoria libre ahora mismo.");
+        return send_error(req, "Co no tiene memoria libre ahora mismo.");
     }
     rol_game_meta_t meta;
     const bool ok = recv_body(req, body, ROL_GAME_MAX_BYTES) &&
@@ -236,7 +236,7 @@ static esp_err_t game_post(httpd_req_t *req)
                     app_rol_web_store_game(body) == ESP_OK;
     heap_caps_free(body);
     if (!ok) {
-        return send_error(req, "El archivo no es una partida de VOX o es demasiado grande.");
+        return send_error(req, "El archivo no es una partida de Co o es demasiado grande.");
     }
     ESP_LOGI(TAG, "saved game uploaded: %s", meta.title);
     char notice[160];

@@ -1,6 +1,6 @@
 # app_vox_session
 
-Conversation orchestrator for VOX M-01. Owns the session task (core 0, prio 8),
+Conversation orchestrator for Cogitador M-01. Owns the session task (core 0, prio 8),
 the Gemini Live client and the audio pipeline, and publishes views to a UI sink
 supplied by `main`. Depends on `app_audio`, `app_gemini_live`, `app_secrets` and
 `app_wifi`; it does not depend on GSP.
@@ -11,7 +11,7 @@ supplied by `main`. Depends on `app_audio`, `app_gemini_live`, `app_secrets` and
 |---|---|---|---|
 | CLOSED | idle (cyan) | local only: "Hola ESP" (`app_wake`) | boot, tap to close, 15 s idle |
 | CONNECTING | processing (amber) | off (pre-roll after wake word) | tap or "Hola ESP" to open, link lost (auto-resume) |
-| LISTENING | listening (red) | on | `setupComplete`, end of VOX speech, tap during speech |
+| LISTENING | listening (red) | on | `setupComplete`, end of Co speech, tap during speech |
 | PROCESSING | processing (amber) | on | first input transcription, non-audio model output (search, thinking), speech drained with the turn still open |
 | SPEAKING | speaking (green) | off | first model audio of a turn |
 | ERROR | error (violet) + status | off | no Wi-Fi, no key, repeated link failures |
@@ -119,7 +119,7 @@ closes the conversation and re-arms local listening.
     shown and sent to Gemini as a `clientContent` text turn (`app_gemini_live_send_text`), e.g.
     «Tirada de reserva del jugador…: 6d10, éxito con 8 o más; resultados …; 3 éxitos, 1 uno y 1
     máximo (10).»
-  - Notes for the master: player rolls and phone notices («Aviso de VOX (no lo dice un jugador):
+  - Notes for the master: player rolls and phone notices («Aviso de Co (no lo dice un jugador):
     Ana se ha conectado al móvil.», taken from `app_rol_web_take_notices` every tick) share one
     queue of 1 KiB. While the model streams a reply the WebSocket client is busy and a send fails,
     so notes are sent once `reply_pending` clears, several in one message, retrying every 0.5 s.

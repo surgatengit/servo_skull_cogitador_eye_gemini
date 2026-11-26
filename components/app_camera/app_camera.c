@@ -75,7 +75,7 @@ static const char *TAG = "app_camera";
 /* Quality ladder: the first that fits max_bytes wins. */
 static const uint8_t QUALITIES[] = { 80, 65, 50, 35, 20 };
 
-/* Single owner: the caller's task (the VOX session). Buffers are allocated on
+/* Single owner: the caller's task (the Cogitador session). Buffers are allocated on
  * the first capture, in PSRAM with the JPEG/DMA2D alignment, and kept. */
 static struct {
     uint8_t *rgb;          /* OUT_W x OUT_H RGB565: PPA output, JPEG input */

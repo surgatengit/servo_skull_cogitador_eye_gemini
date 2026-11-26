@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-/* Saved role-playing game (1.6.0): one JSON document, kept on VOX and offered
+/* Saved role-playing game (1.6.0): one JSON document, kept on Cogitador and offered
  * for download/upload on the phone page. Pure C + cJSON, host-tested.
  *
  * {"vox_partida":1,"titulo":"…","juego":"…","resumen":"…",
@@ -40,7 +40,7 @@ struct rol_players;
 char *rol_game_build(const rol_game_meta_t *meta, const char *summary,
                      const struct rol_players *players);
 
-/** True when json[0..len) is a VOX saved game of a known version within the size limit. */
+/** True when json[0..len) is a Cogitador saved game of a known version within the size limit. */
 bool rol_game_valid(const char *json, size_t len);
 
 /**

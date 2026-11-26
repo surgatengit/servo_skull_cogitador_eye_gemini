@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Check that the VOX fork of esp-mosaico-bsp differs from the submodule only by the
+"""Check that the Cogitador fork of esp-mosaico-bsp differs from the submodule only by the
 documented change (third_party/esp-mosaico-bsp/VOX_FORK.md). Exit 0 when it does.
 
 Usage (from the project root): python tools/check_bsp_fork.py

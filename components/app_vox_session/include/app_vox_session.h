@@ -77,7 +77,7 @@ typedef struct {
  * Requires nvs_flash_init(), ESP-Iris startup and app_wifi_start(). */
 esp_err_t app_vox_session_start(const app_vox_session_config_t *config);
 
-/** Screen tap: opens/closes the conversation, or interrupts VOX while speaking.
+/** Screen tap: opens/closes the conversation, or interrupts Cogitador while speaking.
  * Non-blocking; safe from the GSP framework task. */
 void app_vox_session_tap(void);
 

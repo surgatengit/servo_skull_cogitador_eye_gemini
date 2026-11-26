@@ -1,6 +1,6 @@
 # Application development
 
-**VOX M-01 GEMINI DIRECT:** read [docs/HANDOFF.md](docs/HANDOFF.md) first. It holds the
+**Cogitador M-01 GEMINI DIRECT:** read [docs/HANDOFF.md](docs/HANDOFF.md) first. It holds the
 current state, the owner's working rules (no device writes without explicit approval,
 install with `iris system-update`, never `recover`), the known pitfalls (panel DMA
 bounce buffers, regenerating `build/sdkconfig`) and the next steps.

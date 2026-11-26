@@ -9,7 +9,7 @@ screen. The same page offers the saved game for download and upload.
 - The server exists only while role mode is on. The session starts it when Gemini calls
   `modo_rol(activar=true)` (or `cargar_partida`) and stops it when role mode ends or the
   conversation closes.
-- It runs on the **home Wi-Fi** (the station interface VOX already uses for Gemini), port 80, at the
+- It runs on the **home Wi-Fi** (the station interface Cogitador already uses for Gemini), port 80, at the
   address shown on the status line (`MÓVIL: 192.168.1.36`).
   - No access point of its own. An AP would have to share the station's channel, uses more RAM, and
     phones joined to it lose Internet.
@@ -20,9 +20,9 @@ screen. The same page offers the saved game for download and upload.
   - `GET /me?t=TOKEN`: `{"ok":true,"nombre","secreto"|null,"seq","leido","ficha"|null,"ficha_seq"}`;
     `ok:false` for an unknown token (a new game, or the name moved to another phone).
   - `POST /seen?t=TOKEN&s=SEQ`: the player revealed secret number SEQ.
-  - `GET /partida`: the saved game as `partida_vox.json` (404 if none).
+  - `GET /partida`: the saved game as `partida_cogitador.json` (404 if none).
   - `POST /partida`: upload a saved game (JSON, < 16 KiB, `"vox_partida":1`); it replaces the
-    one on VOX.
+    one on Cogitador.
 - Players:
   - A name gets an entry when a phone joins, or earlier when the master gives it a secret or a sheet
     (or a game is loaded). Such a **reserved** entry is claimed by the first phone that joins with
@@ -49,7 +49,7 @@ screen. The same page offers the saved game for download and upload.
 
 ## Contract
 
-- Every public function is called from the VOX session task only. HTTP handlers run on the server
+- Every public function is called from the Cogitador session task only. HTTP handlers run on the server
   task. The player table and the notices are shared under a mutex.
 - The player table (6 players × name, token, a secret of up to 640 bytes and a sheet of up to
   1 KiB) lives in PSRAM while the server runs. It is zeroed and freed on stop. The server task
