@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cJSON.h"
+#include "rol_game.h"
 #include "rol_players.h"
 #include "secret_text.h"
 #include "vox_rol.h"
@@ -283,7 +285,6 @@ static void test_players(void)
     CHECK(rol_players_normalize("   ", key, sizeof(key)) == 0);
 
     CHECK(rol_players_join(&t, "Ana", "aaaa") == ROL_JOIN_OK);
-    CHECK(rol_players_join(&t, "  ANA ", "bbbb") == ROL_JOIN_TAKEN);
     CHECK(rol_players_join(&t, "Íñigo", "cccc") == ROL_JOIN_OK);
     CHECK(rol_players_join(&t, "", "dddd") == ROL_JOIN_BAD_NAME);
     CHECK(rol_players_join(&t, "Luis", "") == ROL_JOIN_BAD_NAME);
@@ -294,15 +295,54 @@ static void test_players(void)
     CHECK(ana && strcmp(ana->name, "Ana") == 0 && ana->secret[0] == '\0');
     CHECK(rol_players_by_token(&t, "zzzz") == NULL);
     CHECK(rol_players_by_token(&t, "") == NULL);
+    CHECK(rol_players_by_name(&t, "IÑIGO") != NULL);
+    CHECK(rol_players_by_name(&t, "Marta") == NULL);
 
-    CHECK(rol_players_deliver(&t, "ana", "Eres el traidor."));
-    CHECK(rol_players_deliver(&t, "Inigo", "Tienes la llave."));   /* accents ignored */
-    CHECK(!rol_players_deliver(&t, "Marta", "nadie"));
+    /* Secrets: on the phone, read tracking. */
+    CHECK(rol_players_deliver(&t, "ana", "Eres el traidor.") == ROL_PUT_PHONE);
+    CHECK(rol_players_deliver(&t, "Inigo", "Tienes la llave.") == ROL_PUT_PHONE); /* accents */
     CHECK(ana && strcmp(ana->secret, "Eres el traidor.") == 0 && ana->secret_seq == 1);
-    CHECK(rol_players_deliver(&t, "ANA", "Cambio de planes."));
-    CHECK(ana && ana->secret_seq == 2);
+    CHECK(rol_players_unread(ana));
+    CHECK(rol_players_mark_seen(&t, "aaaa", 1));
+    CHECK(!rol_players_unread(ana));
+    CHECK(!rol_players_mark_seen(&t, "zzzz", 1));
+    CHECK(rol_players_deliver(&t, "ANA", "Cambio de planes.") == ROL_PUT_PHONE);
+    CHECK(ana && ana->secret_seq == 2 && rol_players_unread(ana));
+    CHECK(rol_players_mark_seen(&t, "aaaa", 7));             /* a future seq is ignored */
+    CHECK(rol_players_unread(ana));
+    CHECK(rol_players_mark_seen(&t, "aaaa", 2) && !rol_players_unread(ana));
 
-    for (int i = 0; i < 4; ++i) {
+    /* A player who has not joined yet: reserved, then claimed by name. */
+    CHECK(rol_players_deliver(&t, "Marta", "Llegas tarde.") == ROL_PUT_PENDING);
+    CHECK(rol_players_set_sheet(&t, "marta", "Pícara, 8 PV") == ROL_PUT_PENDING);
+    const rol_player_t *marta = rol_players_by_name(&t, "Marta");
+    CHECK(marta && !marta->joined && marta->sheet_seq == 1 && rol_players_unread(marta));
+    rol_players_list(&t, list, sizeof(list));
+    CHECK(strcmp(list, "Ana, Íñigo") == 0);                 /* only phones are listed */
+    CHECK(rol_players_by_token(&t, "") == NULL);             /* reserved entries have no token */
+    CHECK(rol_players_join(&t, "MARTA", "mmmm") == ROL_JOIN_OK);
+    marta = rol_players_by_token(&t, "mmmm");
+    CHECK(marta && marta->joined && strcmp(marta->name, "MARTA") == 0);
+    CHECK(marta && strcmp(marta->secret, "Llegas tarde.") == 0 && rol_players_unread(marta));
+    CHECK(marta && strcmp(marta->sheet, "Pícara, 8 PV") == 0);
+
+    /* Same name from another phone: moved, the old phone loses access. */
+    CHECK(rol_players_join(&t, "  ANA ", "bbbb") == ROL_JOIN_REJOINED);
+    CHECK(rol_players_by_token(&t, "aaaa") == NULL);
+    ana = rol_players_by_token(&t, "bbbb");
+    CHECK(ana && strcmp(ana->name, "Ana") == 0 && ana->secret_seq == 2 && !rol_players_unread(ana));
+    CHECK(rol_players_count(&t) == 3);
+
+    /* Sheets and long texts are cut on a UTF-8 boundary. */
+    char longtext[ROL_PLAYER_SHEET_CAP + 40];
+    memset(longtext, 0, sizeof(longtext));
+    for (size_t i = 0; i + 2 < sizeof(longtext) - 1; i += 2) {
+        memcpy(longtext + i, "\xC3\xB1", 2);                  /* ñ */
+    }
+    CHECK(rol_players_set_sheet(&t, "Ana", longtext) == ROL_PUT_PHONE);
+    CHECK(ana && strlen(ana->sheet) < ROL_PLAYER_SHEET_CAP && strlen(ana->sheet) % 2 == 0);
+
+    for (int i = 0; i < 3; ++i) {
         char name[8];
         char token[8];
         snprintf(name, sizeof(name), "J%d", i);
@@ -310,13 +350,78 @@ static void test_players(void)
         CHECK(rol_players_join(&t, name, token) == ROL_JOIN_OK);
     }
     CHECK(rol_players_join(&t, "Extra", "eeee") == ROL_JOIN_FULL);
+    CHECK(rol_players_deliver(&t, "Extra", "nada") == ROL_PUT_FAILED);
+    CHECK(rol_players_set_sheet(&t, "", "nada") == ROL_PUT_FAILED);
     rol_players_clear(&t);
-    CHECK(rol_players_by_token(&t, "aaaa") == NULL);
+    CHECK(rol_players_by_token(&t, "bbbb") == NULL);
+}
+
+static void test_game(void)
+{
+    static rol_players_t t;
+    rol_players_clear(&t);
+    CHECK(rol_players_join(&t, "Ana", "aaaa") == ROL_JOIN_OK);
+    CHECK(rol_players_set_sheet(&t, "Ana", "Guerrera\nPV 12/12\nEspada") == ROL_PUT_PHONE);
+    CHECK(rol_players_deliver(&t, "Ana", "Eres la heredera.") == ROL_PUT_PHONE);
+    CHECK(rol_players_set_sheet(&t, "Íñigo", "Mago, PV 6") == ROL_PUT_PENDING);
+
+    rol_game_meta_t meta = { "La cripta de Vael", "Fantasía, d20", "reserva", 6, 10, 8 };
+    char *json = rol_game_build(&meta, "Entraron en la cripta \"sellada\".", &t);
+    CHECK(json != NULL);
+    if (!json) {
+        return;
+    }
+    CHECK(strstr(json, "\"vox_partida\":1") != NULL);
+    CHECK(strstr(json, "\"titulo\":\"La cripta de Vael\"") != NULL);
+    CHECK(strstr(json, "\"modo\":\"reserva\",\"cantidad\":6,\"caras\":10,\"exito_con\":8") != NULL);
+    CHECK(strstr(json, "\\\"sellada\\\"") != NULL);
+    CHECK(strstr(json, "\"nombre\":\"Íñigo\"") != NULL);
+    CHECK(rol_game_valid(json, strlen(json)));
+    CHECK(!rol_game_valid("{\"vox_partida\":2}", 17));
+    CHECK(!rol_game_valid("{\"titulo\":\"x\"}", 14));
+    CHECK(!rol_game_valid("no es json", 10));
+    CHECK(!rol_game_valid("{\"vox_partida\":1,\"jugadores\":5}", 31));
+    CHECK(rol_game_valid("{\"vox_partida\":1}", 17));
+
+    /* Continue: Ana is already on a phone again, Íñigo comes later. */
+    static rol_players_t next;
+    rol_players_clear(&next);
+    CHECK(rol_players_join(&next, "ana", "zzzz") == ROL_JOIN_OK);
+    rol_game_meta_t back;
+    CHECK(rol_game_restore(json, &back, &next, true));
+    CHECK(strcmp(back.title, "La cripta de Vael") == 0 && strcmp(back.game, "Fantasía, d20") == 0);
+    CHECK(strcmp(back.dice_mode, "reserva") == 0 && back.dice_count == 6 && back.dice_sides == 10 &&
+          back.dice_target == 8);
+    const rol_player_t *ana = rol_players_by_token(&next, "zzzz");
+    CHECK(ana && strcmp(ana->sheet, "Guerrera\nPV 12/12\nEspada") == 0);
+    CHECK(ana && strcmp(ana->secret, "Eres la heredera.") == 0 && rol_players_unread(ana));
+    const rol_player_t *inigo = rol_players_by_name(&next, "inigo");
+    CHECK(inigo && !inigo->joined && strcmp(inigo->sheet, "Mago, PV 6") == 0 && !inigo->secret[0]);
+
+    /* Same characters, new adventure: sheets only. */
+    rol_players_clear(&next);
+    CHECK(rol_game_restore(json, NULL, &next, false));
+    ana = rol_players_by_name(&next, "Ana");
+    CHECK(ana && ana->sheet[0] && !ana->secret[0]);
+    CHECK(!rol_game_restore("{\"vox_partida\":9}", &back, &next, true));
+
+    /* Too big: refused. */
+    char *huge = malloc(ROL_GAME_SUMMARY_CAP + 100);
+    if (huge) {
+        memset(huge, 'x', ROL_GAME_SUMMARY_CAP + 99);
+        huge[ROL_GAME_SUMMARY_CAP + 99] = '\0';
+        char *cut = rol_game_build(&meta, huge, &t);         /* summary is cut, still fits */
+        CHECK(cut != NULL && strlen(cut) < ROL_GAME_MAX_BYTES);
+        cJSON_free(cut);
+        free(huge);
+    }
+    cJSON_free(json);
 }
 
 int main(void)
 {
     test_players();
+    test_game();
     test_voices();
     test_dice();
     test_specs();

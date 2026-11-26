@@ -57,7 +57,7 @@ foto con su cámara y te la describe.
 | 🖼️ | **Galería de recuerdos** | Guarda las **10 últimas fotos** en su memoria flash, aunque lo apagues. Toca el contador para verlas, ‹ › para pasar, **X** para volver y **mantén la X 1,5 s** para borrarlas todas. |
 | 🔒 | **Privacidad y seguridad** | Las fotos no salen del aparato (Gemini solo recibe la que te describe). La clave de Gemini **no está** en el código, el binario ni GitHub: se guarda en el propio dispositivo y no se puede leer desde fuera. |
 | 🔁 | **Robusto** | Reconexión automática, modelo de reserva si el principal falla, avisos claros en pantalla y modo de recuperación siempre disponible. |
-| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y VOX hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. Sirve para tres tipos de juego: dados que se **suman** (2d20, 3d6), **porcentaje** (d100 con dos d10) y **reserva** (hasta 10 dados contando éxitos). |
+| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y VOX hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. Sirve para tres tipos de juego: dados que se **suman** (2d20, 3d6), **porcentaje** (d100 con dos d10) y **reserva** (hasta 10 dados contando éxitos). Cada jugador entra desde su **móvil** y ve allí su **ficha** y sus **secretos**; la partida se **guarda** en VOX para continuarla otro día, y se puede descargar o subir como archivo. |
 | 🤫 | **Secretos en el móvil** | En modo rol, cada jugador abre en su móvil la dirección que sale en pantalla, escribe su nombre y recibe **solo sus secretos**. Si alguien no tiene móvil, el suyo sale en pantalla hasta que la toca. |
 | 🎙️ | **Cuatro voces** | Charon y Algenib (chico), Kore y Sulafat (chica). Se cambian pidiéndoselo («ponte voz de chica»), tocando el círculo de arriba a la derecha o por USB. |
 | 🔎 | **Google Search opcional** | Puede buscar en Google datos recientes (desactivado por defecto: el plan gratuito agota la cuota). |
@@ -242,7 +242,7 @@ si el dispositivo va a cambiar de manos.
 | Componente | Responsabilidad |
 |---|---|
 | [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
-| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol` y `mostrar_secreto`; galería |
+| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, imágenes, herramientas, reanudación, grounding) |
 | [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda: cámara izquierda, reset del sensor, PPA y JPEG por hardware |
 | [`app_photos`](components/app_photos/README.md) | Últimas 10 fotos en la partición `photos` |

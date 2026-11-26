@@ -64,8 +64,12 @@ ahora; queda para revisar. Google Search está implementado pero
 - Prueba 14 en el dispositivo (commit `1f7153b`): todo correcto salvo las tiradas del D20 hechas
   mientras VOX hablaba, que no llegaban a Gemini. Corregido en `06dfd94` y comprobado en el
   dispositivo.
-- Modos de tirada y 10 dados: probados en el PC (tests y simulador); falta la prueba en el
-  dispositivo (prueba 14, paso 9).
+- Modos de tirada: probados en el dispositivo (reserva y preparar porcentaje). Fallo de 2
+  peticiones a la vez corregido con 8 (`c9b40e4`).
+- Sala de espera, fichas en el móvil, secretos para quien entra tarde, aviso de secretos sin
+  leer, cambio de móvil, guardar/cargar partida (NVS `vox_game`) y descargar/subir el archivo:
+  probados en el PC (tests y página con servidor simulado); falta la prueba 14, pasos 10–17, en
+  el dispositivo.
 
 ## 2. Entorno
 

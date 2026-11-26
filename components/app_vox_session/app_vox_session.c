@@ -71,12 +71,17 @@ static const char *TAG = "vox_session";
 #define TOOL_ROLE               "modo_rol"
 #define TOOL_SECRET             "mostrar_secreto"
 #define TOOL_PREPARE            "preparar_tirada"
-#define TOOL_ARGS_CAPACITY      640     /* function call arguments (JSON), secrets included */
+#define TOOL_STATUS             "estado_jugadores"
+#define TOOL_SHEET              "actualizar_ficha"
+#define TOOL_SAVE               "guardar_partida"
+#define TOOL_LOAD               "cargar_partida"
+#define TOOL_ARGS_CAPACITY      6144    /* function call arguments (JSON): the saved-game summary */
 #define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_VOX_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
 #define PLAYER_TEXT_CAPACITY    256     /* one player roll as text (10 dice fit) */
-#define ROLL_TEXT_CAPACITY      640     /* pending player rolls (three or more) */
-#define ROLL_RETRY_US           (500 * 1000)        /* after a failed send */
-#define ROLL_EXPIRE_US          (90 * 1000 * 1000)  /* undelivered rolls are dropped */
+#define NOTES_CAPACITY          1024    /* pending notes for the master (rolls, phone notices) */
+#define NOTES_RETRY_US          (500 * 1000)        /* after a failed send */
+#define NOTES_EXPIRE_US         (90 * 1000 * 1000)  /* undelivered notes are dropped */
+#define NOTICE_PREFIX           "Aviso de VOX (no lo dice un jugador): "
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
 #define NOTICE_US               (3 * 1000 * 1000)   /* "FOTOS BORRADAS" on the status line */
 
@@ -94,11 +99,19 @@ static const char PERSONA[] =
     " MODO ROL: si te piden jugar una partida de rol, llama a modo_rol con activar a verdadero y "
     "haz de máster. Pregunta cuántos jugadores son, sus nombres y a qué juego quieren jugar; si "
     "no lo saben, propón uno corto. Son principiantes: explica en pocas frases la ambientación y "
-    "las reglas básicas, cómo se tira y qué significa el resultado. Crea de palabra una ficha "
-    "breve de cada personaje con habilidades, puntos de vida y equipo. Al empezar, pide a los "
-    "jugadores que abran en el móvil la dirección que sale en la pantalla y escriban su nombre: "
-    "así reciben allí sus secretos. Da a cada personaje un secreto con mostrar_secreto; si un "
-    "jugador no tiene móvil, el secreto sale en la pantalla y pides a los demás que no miren. "
+    "las reglas básicas, cómo se tira y qué significa el resultado. Al empezar, diles que vas a "
+    "facilitarles una dirección para el móvil donde verán su ficha y lo que solo deben saber "
+    "ellos, y espera a que entren. VOX te avisa con mensajes que empiezan por «Aviso de VOX», "
+    "que no dice ningún jugador: responde a cada uno con una bienvenida muy breve. Empieza "
+    "cuando digan que están listos; quien llegue tarde puede entrar después. Si hay una partida "
+    "guardada, pregunta antes si quieren una nueva, continuarla o una aventura nueva con los "
+    "mismos personajes, y usa cargar_partida. Crea una ficha breve de cada personaje con "
+    "habilidades, puntos de vida y equipo, cuéntala en pocas palabras y escríbela con "
+    "actualizar_ficha; actualízala cuando cambie algo. Da a cada personaje un secreto con "
+    "mostrar_secreto; para quien no tenga móvil usa en_pantalla y pide a los demás que no "
+    "miren. Antes de un momento clave consulta estado_jugadores y avisa por su nombre a quien "
+    "tenga un secreto sin leer. Si piden guardar, y siempre al terminar, ofrece guardar la "
+    "partida con guardar_partida y un resumen completo para poder retomarla. "
     "Nunca digas un secreto en voz alta y haz que los secretos choquen en algún momento. La partida "
     "dura unos diez minutos, tres o cuatro turnos, y si está muy interesante puedes alargarla "
     "dos a cuatro turnos más. Prepara un guion con un giro sorpresa y un desenlace claro, sin "
@@ -201,12 +214,51 @@ static const char FUNCTION_DECLARATIONS[] =
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
     "\"activar\":{\"type\":\"BOOLEAN\"}},\"required\":[\"activar\"]}},"
     "{\"name\":\"" TOOL_SECRET "\","
-    "\"description\":\"Muestra en la pantalla un secreto que solo debe leer un jugador, hasta "
-    "que toque la pantalla. No lo digas en voz alta.\","
+    "\"description\":\"Da a un jugador un secreto que solo debe saber él. Llega a su móvil; si "
+    "aún no ha entrado en la página, le espera hasta que entre con su nombre. Con en_pantalla "
+    "verdadero se muestra en la pantalla de VOX hasta que la toquen (para quien no tiene "
+    "móvil). No lo digas en voz alta.\","
     "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
     "\"jugador\":{\"type\":\"STRING\",\"description\":\"Nombre del jugador.\"},"
-    "\"texto\":{\"type\":\"STRING\",\"description\":\"El secreto, máximo 250 caracteres.\"}},"
-    "\"required\":[\"jugador\",\"texto\"]}}"
+    "\"texto\":{\"type\":\"STRING\",\"description\":\"El secreto, máximo 400 caracteres.\"},"
+    "\"en_pantalla\":{\"type\":\"BOOLEAN\",\"description\":\"Verdadero solo para un jugador "
+    "sin móvil.\"}},"
+    "\"required\":[\"jugador\",\"texto\"]}},"
+    "{\"name\":\"" TOOL_STATUS "\","
+    "\"description\":\"Modo rol: quién está en la página del móvil, quién tiene un secreto sin "
+    "leer y quién tiene ficha, y si hay una partida guardada en VOX.\"},"
+    "{\"name\":\"" TOOL_SHEET "\","
+    "\"description\":\"Modo rol: escribe o sustituye la ficha de personaje que el jugador ve en "
+    "su móvil. Úsala al crear el personaje y cada vez que cambie algo (vida, equipo, "
+    "estado). Envía siempre la ficha completa.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"jugador\":{\"type\":\"STRING\",\"description\":\"Nombre del jugador.\"},"
+    "\"ficha\":{\"type\":\"STRING\",\"description\":\"Texto de la ficha, máximo 900 "
+    "caracteres, una línea por dato: personaje, clase u oficio, atributos o habilidades con "
+    "su valor, puntos de vida actuales y máximos, equipo y notas.\"}},"
+    "\"required\":[\"jugador\",\"ficha\"]}},"
+    "{\"name\":\"" TOOL_SAVE "\","
+    "\"description\":\"Guarda la partida en VOX para continuarla otro día: fichas y secretos "
+    "de los jugadores, el tipo de tirada y tu resumen. Sustituye a la partida guardada "
+    "anterior. También se puede descargar desde la página del móvil.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"titulo\":{\"type\":\"STRING\",\"description\":\"Título corto de la partida.\"},"
+    "\"juego\":{\"type\":\"STRING\",\"description\":\"Juego o ambientación y sistema de "
+    "dados.\"},"
+    "\"resumen\":{\"type\":\"STRING\",\"description\":\"Para que tú mismo puedas retomarla, "
+    "máximo 4000 caracteres: lo que ha pasado, dónde están, personajes no jugadores, pistas, "
+    "giros pendientes, cabos sueltos y tu guion previsto.\"}},"
+    "\"required\":[\"titulo\",\"resumen\"]}},"
+    "{\"name\":\"" TOOL_LOAD "\","
+    "\"description\":\"Carga la partida guardada en VOX: activa el modo rol, devuelve tu "
+    "resumen, las fichas y los secretos, y prepara las fichas en los móviles (cada jugador "
+    "entra con el mismo nombre).\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
+    "\"modo\":{\"type\":\"STRING\",\"enum\":[\"continuar\",\"mismos_personajes\"],"
+    "\"description\":\"continuar: retomar la misma historia con sus secretos. "
+    "mismos_personajes: nueva aventura con los mismos personajes; lo vivido es su pasado y "
+    "los secretos no se recuperan.\"}},"
+    "\"required\":[\"modo\"]}}"
     "]";
 
 typedef struct {
@@ -291,9 +343,9 @@ static struct {
      * client is busy while the model streams a reply, so they wait for
      * turnComplete and are retried until sent or expired. */
     vox_rol_spec_t player_roll; /* what the dice badge rolls (preparar_tirada) */
-    char roll_text[ROLL_TEXT_CAPACITY];
-    int64_t roll_since_us;  /* first pending roll */
-    int64_t roll_retry_us;  /* earliest next attempt */
+    char notes[NOTES_CAPACITY];
+    int64_t notes_since_us;  /* first pending note */
+    int64_t notes_retry_us;  /* earliest next attempt */
 } s;
 
 /* Last failed heap allocation anywhere in the firmware (any task or ISR): only
@@ -699,42 +751,63 @@ static vox_rol_spec_t spec_from_args(const cJSON *args, int default_count, int d
                              cJSON_IsNumber(target) ? (int)target->valuedouble : 0);
 }
 
-/* Pending player rolls belong to the open conversation only. */
-static void drop_rolls(const char *why)
+/* Notes for the master (player rolls, phone notices) belong to the open
+ * conversation only. */
+static void drop_notes(const char *why)
 {
-    if (s.roll_text[0]) {
-        ESP_LOGW(TAG, "player roll not delivered (%s): %s", why, s.roll_text);
-        s.roll_text[0] = '\0';
+    if (s.notes[0]) {
+        ESP_LOGW(TAG, "notes not delivered (%s): %s", why, s.notes);
+        s.notes[0] = '\0';
     }
 }
 
-/* Send the pending player rolls once the model is not streaming a reply. */
-static void flush_rolls(int64_t now)
+static void flush_notes(int64_t now);
+
+/* Queue a text turn for the master; it is sent at once if the model is quiet,
+ * otherwise when its reply ends (the WebSocket client is busy meanwhile). */
+static void queue_note(const char *text, int64_t now)
 {
-    if (!s.roll_text[0]) {
-        return;
-    }
-    if (now - s.roll_since_us > ROLL_EXPIRE_US) {
-        drop_rolls("expired");
-        return;
-    }
-    if (now < s.roll_retry_us || s.reply_pending || !app_gemini_live_is_ready(s.gl)) {
-        return;
-    }
-    if (app_gemini_live_send_text(s.gl, s.roll_text) == ESP_OK) {
-        ESP_LOGI(TAG, "player roll delivered");
-        s.roll_text[0] = '\0';
-        s.last_activity_us = now;
-        begin_reply(); /* the master answers the roll */
+    const size_t used = strlen(s.notes);
+    if (used == 0) {
+        snprintf(s.notes, sizeof(s.notes), "%s", text);
+        s.notes_since_us = now;
+        s.notes_retry_us = 0;
+    } else if (used + 1 + strlen(text) < sizeof(s.notes)) {
+        s.notes[used] = ' ';
+        memcpy(s.notes + used + 1, text, strlen(text) + 1); /* fits: checked above */
     } else {
-        s.roll_retry_us = now + ROLL_RETRY_US;
+        ESP_LOGW(TAG, "notes queue full; dropped: %s", text);
+    }
+    flush_notes(now);
+}
+
+/* Send the pending notes once the model is not streaming a reply. */
+static void flush_notes(int64_t now)
+{
+    if (!s.notes[0]) {
+        return;
+    }
+    if (now - s.notes_since_us > NOTES_EXPIRE_US) {
+        drop_notes("expired");
+        return;
+    }
+    if (now < s.notes_retry_us || s.reply_pending || !app_gemini_live_is_ready(s.gl)) {
+        return;
+    }
+    if (app_gemini_live_send_text(s.gl, s.notes) == ESP_OK) {
+        ESP_LOGI(TAG, "notes delivered");
+        s.notes[0] = '\0';
+        s.last_activity_us = now;
+        begin_reply(); /* the master answers */
+    } else {
+        s.notes_retry_us = now + NOTES_RETRY_US;
     }
 }
 
 static void close_conversation(void)
 {
     set_mic(false);
-    drop_rolls("conversation closed");
+    drop_notes("conversation closed");
     s.voice_reconnect = false;
     set_role_mode(false);
     (void)app_gemini_live_disconnect(s.gl);
@@ -1030,14 +1103,25 @@ static void on_tick(void)
             enter(ST_LISTENING); /* the idle countdown starts now */
         }
     }
-    flush_rolls(now);
+#if CONFIG_VOX_ROLE_PHONE_PAGE
+    if (s.role_mode && s.state != ST_CLOSED && s.state != ST_ERROR) {
+        char notice[384];
+        if (app_rol_web_take_notices(notice, sizeof(notice)) > 0) {
+            char note[sizeof(notice) + sizeof(NOTICE_PREFIX)];
+            snprintf(note, sizeof(note), NOTICE_PREFIX "%s", notice);
+            ESP_LOGI(TAG, "phone notice: %s", notice);
+            queue_note(note, now);
+        }
+    }
+#endif
+    flush_notes(now);
     if (s.voice_reconnect && s.state == ST_LISTENING && !s.reply_pending &&
             !app_audio_is_playing()) {
         /* cambiar_voz: the goodbye has been spoken; reopen with the new voice. */
         ESP_LOGI(TAG, "reconnecting with voice %s", s.voice);
         s.voice_reconnect = false;
         set_mic(false);
-        drop_rolls("voice change");
+        drop_notes("voice change");
         (void)app_gemini_live_disconnect(s.gl);
         use_voice(s.voice);
         open_conversation();
@@ -1129,6 +1213,9 @@ static const char *arg_str(const cJSON *args, const char *name)
     return cJSON_IsString(v) ? v->valuestring : NULL;
 }
 
+static void answer_json(const tool_slot_t *slot, cJSON *root, const char *fallback);
+static void saved_title(char *out, size_t cap);
+
 static void run_dice(const tool_slot_t *slot, const cJSON *args)
 {
     const vox_rol_spec_t spec = spec_from_args(args, 1, 0);
@@ -1200,19 +1287,38 @@ static void run_role(const tool_slot_t *slot, const cJSON *args)
                             "Modo rol activado: la conversación espera más antes de cerrarse y "
                             "los jugadores tienen un botón de dados en la pantalla, que tira 2d20 "
                             "sumados hasta que prepares otra tirada con preparar_tirada. Un "
-                            "toque solo te "
-                            "interrumpe; para salir de la partida se mantiene pulsada la pantalla "
-                            "o te lo piden.");
+                            "toque solo te interrumpe; para salir de la partida se mantiene "
+                            "pulsada la pantalla o te lo piden.");
     if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
         cJSON_AddStringToObject(root, "pagina_movil", address);
         cJSON_AddStringToObject(root, "instrucciones",
-                                "Pide a cada jugador que abra en su móvil, conectado a la misma "
-                                "Wi-Fi, la dirección que aparece en la parte de abajo de la "
-                                "pantalla y escriba su nombre. Los secretos les llegarán allí.");
+                                "Diles que vas a facilitarles una dirección: que la abran en el "
+                                "móvil, conectados a la misma Wi-Fi (sale en la parte de abajo de "
+                                "la pantalla), y escriban su nombre; allí verán su ficha y los "
+                                "secretos que solo deben saber ellos. Espera a que entren: VOX "
+                                "te avisará de cada uno. Empieza cuando te digan que están "
+                                "listos; quien llegue tarde o cambie de móvil puede entrar "
+                                "después con el mismo nombre.");
     }
-    char *json = cJSON_PrintUnformatted(root);
+    char title[ROL_GAME_TEXT_CAP];
+    saved_title(title, sizeof(title));
+    if (title[0]) {
+        cJSON_AddStringToObject(root, "partida_guardada", title);
+        cJSON_AddStringToObject(root, "pregunta",
+                                "Hay una partida guardada: pregunta si quieren una partida "
+                                "nueva, continuarla (cargar_partida modo continuar) o una "
+                                "aventura nueva con los mismos personajes (modo "
+                                "mismos_personajes).");
+    }
+    answer_json(slot, root, "{\"result\":\"Modo rol activado.\"}");
+}
+
+/* Answer with a cJSON object and free it. */
+static void answer_json(const tool_slot_t *slot, cJSON *root, const char *fallback)
+{
+    char *json = root ? cJSON_PrintUnformatted(root) : NULL;
     cJSON_Delete(root);
-    answer_tool(slot, json ? json : "{\"result\":\"Modo rol activado.\"}");
+    answer_tool(slot, json ? json : fallback);
     cJSON_free(json);
 }
 
@@ -1220,14 +1326,25 @@ static void run_secret(const tool_slot_t *slot, const cJSON *args)
 {
     const char *player = arg_str(args, "jugador");
     const char *text = arg_str(args, "texto");
+    const bool on_screen = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(args, "en_pantalla"));
     if (!text || !text[0]) {
         answer_tool(slot, "{\"error\":\"Falta el texto del secreto.\"}");
         return;
     }
-    if (player && app_rol_web_deliver(player, text)) {
+    const app_rol_web_put_t put = (player && !on_screen) ? app_rol_web_deliver(player, text)
+                                                         : APP_ROL_WEB_FAILED;
+    if (put == APP_ROL_WEB_PHONE) {
         ESP_LOGI(TAG, "secret sent to the phone of %s", player);
         answer_tool(slot, "{\"result\":\"Secreto enviado al móvil del jugador; solo él lo "
                     "ve. No lo digas en voz alta.\"}");
+        return;
+    }
+    if (put == APP_ROL_WEB_PENDING) {
+        ESP_LOGI(TAG, "secret kept for %s (no phone yet)", player);
+        answer_tool(slot, "{\"result\":\"Ese jugador aún no ha entrado en la página del móvil: "
+                    "el secreto le espera y lo verá en cuanto entre con su nombre. Si no tiene "
+                    "móvil, vuelve a llamar con en_pantalla verdadero. No lo digas en voz "
+                    "alta.\"}");
         return;
     }
     if (!s.config.ui.show_secret) {
@@ -1240,14 +1357,162 @@ static void run_secret(const tool_slot_t *slot, const cJSON *args)
     app_rol_web_players(joined, sizeof(joined));
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "result",
-                            "Ese jugador no tiene el móvil conectado: el secreto se muestra en "
-                            "la pantalla hasta que la toque. Pide a los demás que no miren y no "
-                            "lo digas en voz alta.");
+                            "El secreto se muestra en la pantalla de VOX hasta que la toquen. "
+                            "Pide a los demás que no miren y no lo digas en voz alta.");
     cJSON_AddStringToObject(root, "jugadores_con_movil", joined);
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    answer_tool(slot, json ? json : "{\"result\":\"Secreto mostrado en la pantalla.\"}");
+    answer_json(slot, root, "{\"result\":\"Secreto mostrado en la pantalla.\"}");
+}
+
+/* Saved game title ("" if none). */
+static void saved_title(char *out, size_t cap)
+{
+    out[0] = '\0';
+    char *json = app_rol_web_load_game();
+    rol_game_meta_t meta;
+    if (json && rol_game_restore(json, &meta, NULL, false)) {
+        snprintf(out, cap, "%s", meta.title[0] ? meta.title : "sin título");
+    }
+    free(json);
+}
+
+static void run_status(const tool_slot_t *slot)
+{
+    cJSON *root = cJSON_CreateObject();
+    char address[40];
+    char *players = app_rol_web_status_json();
+    if (!players) {
+        cJSON_AddStringToObject(root, "result", "El modo rol no está activo: no hay página "
+                                "del móvil.");
+    } else {
+        if (app_rol_web_address(address, sizeof(address)) == ESP_OK) {
+            cJSON_AddStringToObject(root, "pagina_movil", address);
+        }
+        cJSON_AddItemToObject(root, "jugadores", cJSON_Parse(players));
+        cJSON_free(players);
+    }
+    char title[ROL_GAME_TEXT_CAP];
+    saved_title(title, sizeof(title));
+    if (title[0]) {
+        cJSON_AddStringToObject(root, "partida_guardada", title);
+    }
+    answer_json(slot, root, "{\"error\":\"Sin memoria.\"}");
+}
+
+static void run_sheet(const tool_slot_t *slot, const cJSON *args)
+{
+    const char *player = arg_str(args, "jugador");
+    const char *sheet = arg_str(args, "ficha");
+    if (!player || !sheet || !sheet[0]) {
+        answer_tool(slot, "{\"error\":\"Faltan el jugador o la ficha.\"}");
+        return;
+    }
+    switch (app_rol_web_set_sheet(player, sheet)) {
+    case APP_ROL_WEB_PHONE:
+        ESP_LOGI(TAG, "sheet updated on the phone of %s", player);
+        answer_tool(slot, "{\"result\":\"Ficha actualizada en su móvil.\"}");
+        break;
+    case APP_ROL_WEB_PENDING:
+        ESP_LOGI(TAG, "sheet kept for %s (no phone yet)", player);
+        answer_tool(slot, "{\"result\":\"Ficha guardada: la verá en cuanto entre en la página "
+                    "del móvil con su nombre.\"}");
+        break;
+    default:
+        answer_tool(slot, "{\"error\":\"No se puede guardar la ficha: activa antes el modo rol "
+                    "o ya hay seis jugadores.\"}");
+        break;
+    }
+}
+
+static const char *mode_name(const vox_rol_spec_t *spec)
+{
+    return spec->mode == VOX_ROL_PERCENT ? "porcentaje"
+           : (spec->mode == VOX_ROL_POOL ? "reserva" : "suma");
+}
+
+static void run_save(const tool_slot_t *slot, const cJSON *args)
+{
+    const char *title = arg_str(args, "titulo");
+    const char *game = arg_str(args, "juego");
+    const char *summary = arg_str(args, "resumen");
+    if (!summary || !summary[0]) {
+        answer_tool(slot, "{\"error\":\"Falta el resumen de la partida.\"}");
+        return;
+    }
+    rol_game_meta_t meta = {
+        .dice_count = s.player_roll.count,
+        .dice_sides = s.player_roll.sides,
+        .dice_target = s.player_roll.target,
+    };
+    snprintf(meta.title, sizeof(meta.title), "%s", title && title[0] ? title : "Partida de VOX");
+    snprintf(meta.game, sizeof(meta.game), "%s", game ? game : "");
+    snprintf(meta.dice_mode, sizeof(meta.dice_mode), "%s", mode_name(&s.player_roll));
+    char *json = app_rol_web_build_game(&meta, summary);
+    const esp_err_t err = json ? app_rol_web_store_game(json) : ESP_ERR_INVALID_SIZE;
+    const size_t bytes = json ? strlen(json) : 0;
     cJSON_free(json);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "game not saved (%s)", esp_err_to_name(err));
+        answer_tool(slot, "{\"error\":\"No se ha podido guardar la partida: acorta el resumen "
+                    "y vuelve a intentarlo.\"}");
+        return;
+    }
+    ESP_LOGI(TAG, "game saved: %s (%u bytes)", meta.title, (unsigned)bytes);
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "result", "Partida guardada en VOX. Para continuarla otro "
+                            "día pedidme continuar la partida.");
+    char address[40];
+    if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
+        char url[56];
+        snprintf(url, sizeof(url), "%s/partida", address);
+        cJSON_AddStringToObject(root, "descarga", url);
+        cJSON_AddStringToObject(root, "como_descargar", "En la página del móvil, apartado "
+                                "Partida guardada, botón Descargar.");
+    }
+    answer_json(slot, root, "{\"result\":\"Partida guardada.\"}");
+}
+
+static void run_load(const tool_slot_t *slot, const cJSON *args)
+{
+    const char *mode = arg_str(args, "modo");
+    const bool keep_story = !mode || strcmp(mode, "mismos_personajes") != 0;
+    char *json = app_rol_web_load_game();
+    cJSON *game = json ? cJSON_Parse(json) : NULL;
+    if (!game) {
+        free(json);
+        answer_tool(slot, "{\"error\":\"No hay ninguna partida guardada en VOX. Se puede subir "
+                    "un archivo desde la página del móvil.\"}");
+        return;
+    }
+    set_role_mode(true);
+    rol_game_meta_t meta;
+    const bool on_phones = app_rol_web_restore_game(json, &meta, keep_story);
+    if (!on_phones) {
+        (void)rol_game_restore(json, &meta, NULL, false);
+    }
+    free(json);
+    set_player_roll(vox_rol_spec_make(vox_rol_mode_parse(meta.dice_mode), meta.dice_count,
+                                      meta.dice_sides, meta.dice_target));
+    if (!keep_story) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(game, "jugadores")) {
+            cJSON_DeleteItemFromObjectCaseSensitive(item, "secreto");
+        }
+    }
+    ESP_LOGI(TAG, "game loaded (%s): %s", keep_story ? "continue" : "same characters", meta.title);
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "result", keep_story
+        ? "Partida cargada. Haz un breve resumen de lo ocurrido sin revelar secretos y continúa "
+          "donde se quedó. Los jugadores entran en la página del móvil con el mismo nombre y "
+          "recuperan su ficha y su secreto."
+        : "Personajes cargados para una aventura nueva: lo vivido es su pasado. Prepara un guion "
+          "nuevo y nuevos secretos. Los jugadores entran en la página del móvil con el mismo "
+          "nombre y recuperan su ficha.");
+    char address[40];
+    if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
+        cJSON_AddStringToObject(root, "pagina_movil", address);
+    }
+    cJSON_AddItemToObject(root, "partida", game);
+    answer_json(slot, root, "{\"error\":\"Sin memoria para cargar la partida.\"}");
 }
 
 static void run_tool(int index)
@@ -1270,6 +1535,14 @@ static void run_tool(int index)
         run_secret(slot, args);
     } else if (open && strcmp(slot->name, TOOL_PREPARE) == 0) {
         run_prepare(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_STATUS) == 0) {
+        run_status(slot);
+    } else if (open && strcmp(slot->name, TOOL_SHEET) == 0) {
+        run_sheet(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_SAVE) == 0) {
+        run_save(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_LOAD) == 0) {
+        run_load(slot, args);
     } else if (open) {
         answer_tool(slot, "{\"error\":\"Función desconocida.\"}");
     }
@@ -1286,6 +1559,10 @@ static void queue_tool(const app_gemini_live_event_t *event)
             snprintf(slot->id, sizeof(slot->id), "%s", event->tool_id ? event->tool_id : "");
             snprintf(slot->name, sizeof(slot->name), "%s", event->tool_name ? event->tool_name : "");
             snprintf(slot->args, sizeof(slot->args), "%s", event->text ? event->text : "{}");
+            if (event->text && strlen(event->text) >= sizeof(slot->args)) {
+                ESP_LOGW(TAG, "tool call %s: arguments longer than %u bytes",
+                         slot->name, (unsigned)sizeof(slot->args));
+            }
             __atomic_store_n(&slot->cancelled, 0U, __ATOMIC_RELEASE);
             post(EV_TOOL, i, 0);
             return;
@@ -1434,18 +1711,7 @@ static void on_action(app_vox_session_action_t action)
         ESP_LOGI(TAG, "player roll: %s", text);
         const int64_t now = esp_timer_get_time();
         s.last_activity_us = now;
-        const size_t used = strlen(s.roll_text);
-        if (used == 0) {
-            snprintf(s.roll_text, sizeof(s.roll_text), "%s", text);
-            s.roll_since_us = now;
-            s.roll_retry_us = 0;
-        } else if (used + 1 + strlen(text) < sizeof(s.roll_text)) {
-            /* Several players rolled while the master spoke: one message. */
-            snprintf(s.roll_text + used, sizeof(s.roll_text) - used, " %s", text);
-        } else {
-            ESP_LOGW(TAG, "player roll queue full; roll not sent");
-        }
-        flush_rolls(now); /* now if the model is quiet, else after its reply */
+        queue_note(text, now); /* several rolls during a reply go as one message */
     }
 }
 

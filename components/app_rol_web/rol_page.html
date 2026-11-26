@@ -3,32 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VOX · Secretos</title>
+<title>VOX · Partida</title>
 <style>
-:root{--bg:#0b0f14;--panel:#141a21;--line:#2a333d;--text:#e8e3d6;--dim:#8d97a3;--amber:#ffb300;--violet:#d500f9;--red:#ff1744}
+:root{--bg:#0b0f14;--panel:#141a21;--line:#2a333d;--text:#e8e3d6;--dim:#8d97a3;--amber:#ffb300;--violet:#d500f9;--red:#ff1744;--green:#20ff60}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:17px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 main{max-width:480px;margin:0 auto;padding:24px 16px 40px}
 h1{font:700 22px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--amber);margin:0 0 4px}
+h2{font:700 13px ui-monospace,Consolas,monospace;letter-spacing:.1em;margin:0 0 10px}
 .sub{color:var(--dim);font-size:14px;margin:0 0 24px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
 label{display:block;font-size:14px;color:var(--dim);margin-bottom:8px}
 input{width:100%;font:inherit;color:var(--text);background:#0e1318;border:1px solid var(--line);border-radius:10px;padding:12px}
-button{width:100%;font:700 16px/1 system-ui,sans-serif;letter-spacing:.04em;border:0;border-radius:10px;padding:14px;margin-top:12px;cursor:pointer;background:var(--amber);color:#1a1200}
+input[type=file]{font-size:14px;padding:10px}
+button,.btn{display:block;width:100%;text-align:center;text-decoration:none;font:700 16px/1 system-ui,sans-serif;letter-spacing:.04em;border:0;border-radius:10px;padding:14px;margin-top:12px;cursor:pointer;background:var(--amber);color:#1a1200}
+.btn.ghost,button.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
 button.hold{background:#2b0f33;color:#f2e8ff;border:1px solid var(--violet);padding:22px 14px;user-select:none;-webkit-user-select:none;touch-action:none}
 .err{color:var(--red);font-size:14px;margin-top:10px;min-height:1em}
-.who{font:700 13px ui-monospace,Consolas,monospace;color:var(--violet);letter-spacing:.1em}
+.ok{color:var(--green);font-size:14px;margin-top:10px;min-height:1em}
+.who{font:700 13px ui-monospace,Consolas,monospace;color:var(--violet);letter-spacing:.1em;margin-bottom:6px}
+.sheet h2{color:var(--amber)}
+.secretbox h2{color:var(--violet)}
+.sheettext{white-space:pre-wrap;font:16px/1.5 ui-monospace,Consolas,monospace;margin:0}
 .secret{white-space:pre-wrap;font-size:19px;margin:14px 0 0;min-height:3em;filter:blur(9px);transition:filter .15s}
 .secret.show{filter:none}
 .wait{color:var(--dim)}
 .new{color:var(--amber);font-weight:700}
 .hidden{display:none}
+details summary{cursor:pointer;color:var(--dim);font-size:14px}
+details p{color:var(--dim);font-size:14px}
 footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
 </style>
 </head>
 <body>
 <main>
-  <h1>VOX M-01 · SECRETOS</h1>
+  <h1>VOX M-01 · PARTIDA</h1>
   <p class="sub">Modo rol. Lo que aparezca aquí es solo para ti.</p>
 
   <section id="join" class="card hidden">
@@ -38,23 +47,49 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
     <div id="joinErr" class="err"></div>
   </section>
 
-  <section id="player" class="card hidden">
-    <div class="who" id="who"></div>
-    <p id="state" class="wait">Esperando a que el máster te dé un secreto…</p>
-    <button id="hold" class="hold hidden" type="button">MANTÉN PULSADO PARA LEER</button>
-    <p id="secret" class="secret"></p>
+  <section id="player" class="hidden">
+    <div class="card">
+      <div class="who" id="who"></div>
+      <p class="wait" style="margin:0;font-size:14px">Estás dentro. El máster te avisará aquí.</p>
+    </div>
+    <div class="card sheet">
+      <h2>TU FICHA</h2>
+      <p id="sheetState" class="wait" style="margin:0 0 8px">El máster aún no ha escrito tu ficha.</p>
+      <pre id="sheet" class="sheettext hidden"></pre>
+    </div>
+    <div class="card secretbox">
+      <h2>SECRETO</h2>
+      <p id="state" class="wait">Esperando a que el máster te dé un secreto…</p>
+      <button id="hold" class="hold hidden" type="button">MANTÉN PULSADO PARA LEER</button>
+      <p id="secret" class="secret"></p>
+    </div>
   </section>
 
-  <footer>No compartas la pantalla. Si te sales, vuelve a abrir esta misma dirección.</footer>
+  <section class="card">
+    <details>
+      <summary>Partida guardada (para quien organiza)</summary>
+      <p>Cuando el máster guarda la partida, queda en VOX. Puedes bajarla como archivo para
+         guardarla tú, y subir otra de otro día para continuarla.</p>
+      <a class="btn ghost" href="/partida" download="partida_vox.json">Descargar la partida de VOX</a>
+      <label for="file" style="margin-top:16px">Subir una partida (.json)</label>
+      <input id="file" type="file" accept=".json,application/json">
+      <button id="upBtn" type="button" class="ghost">Subir a VOX</button>
+      <div id="upMsg" class="ok"></div>
+    </details>
+  </section>
+
+  <footer>No compartas la pantalla. Si te sales o cambias de móvil, vuelve a abrir esta dirección
+    y escribe el mismo nombre.</footer>
 </main>
 <script>
 (function () {
   var KEY = 'vox_rol_token';
-  var token = null, lastSeq = 0, timer = null;
+  var token = null, lastSeq = 0, lastSheet = 0, seenSent = 0, curSeq = 0, timer = null;
   function $(id) { return document.getElementById(id); }
   function load() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function save(t) { try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) {} }
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
+  function buzz() { if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch (e) {} } }
 
   function toJoin() {
     token = null; save(null);
@@ -73,7 +108,8 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j.ok) { $('joinErr').textContent = j.error || 'No se ha podido entrar.'; return; }
-        token = j.token; save(token); lastSeq = 0; toPlayer(j.nombre); poll();
+        token = j.token; save(token); lastSeq = 0; lastSheet = 0; seenSent = 0;
+        toPlayer(j.nombre); poll();
       })
       .catch(function () { $('joinErr').textContent = 'Sin conexión con VOX. ¿Estás en la misma Wi-Fi?'; });
   }
@@ -81,33 +117,66 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
   function poll() {
     clearTimeout(timer);
     if (!token) return;
-    fetch('/secret?t=' + encodeURIComponent(token), { cache: 'no-store' })
+    fetch('/me?t=' + encodeURIComponent(token), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (j) {
-        if (!j.ok) { toJoin(); $('joinErr').textContent = 'La partida ha terminado o ha empezado otra. Vuelve a entrar.'; return; }
+        if (!j.ok) { toJoin(); $('joinErr').textContent = 'La partida ha terminado o has entrado desde otro móvil. Vuelve a entrar con tu nombre.'; return; }
         toPlayer(j.nombre);
+        if (j.ficha) {
+          $('sheet').textContent = j.ficha; show('sheet', true);
+          if (j.ficha_seq !== lastSheet) {
+            $('sheetState').textContent = lastSheet ? 'Ficha actualizada.' : '';
+            $('sheetState').className = 'new';
+            if (lastSheet) buzz();
+            lastSheet = j.ficha_seq;
+          }
+        }
         if (j.secreto) {
           $('secret').textContent = j.secreto;
           show('hold', true);
+          curSeq = j.seq;
           if (j.seq !== lastSeq) {
-            $('state').textContent = '¡Tienes un secreto nuevo!';
-            $('state').className = 'new';
-            if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch (e) {} }
             lastSeq = j.seq;
+            if (!j.leido) { buzz(); }
           }
+          $('state').textContent = j.leido ? 'Ya lo has leído. Mantén pulsado para volver a verlo.' : '¡Tienes un secreto sin leer!';
+          $('state').className = j.leido ? 'wait' : 'new';
         }
       })
       .catch(function () { $('state').textContent = 'Sin conexión con VOX… reintentando.'; $('state').className = 'wait'; })
       .then(function () { timer = setTimeout(poll, 2000); });
   }
 
+  function markSeen() {
+    if (!token || !curSeq || seenSent === curSeq) return;
+    seenSent = curSeq;
+    fetch('/seen?t=' + encodeURIComponent(token) + '&s=' + curSeq, { method: 'POST' }).catch(function () { seenSent = 0; });
+  }
+
+  function upload() {
+    var f = $('file').files && $('file').files[0];
+    var msg = $('upMsg');
+    msg.className = 'ok'; msg.textContent = '';
+    if (!f) { msg.className = 'err'; msg.textContent = 'Elige primero el archivo.'; return; }
+    if (f.size > 16000) { msg.className = 'err'; msg.textContent = 'El archivo es demasiado grande.'; return; }
+    f.text().then(function (text) {
+      return fetch('/partida', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text });
+    }).then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { msg.className = 'err'; msg.textContent = j.error || 'No se ha podido subir.'; return; }
+        msg.textContent = 'Subida: «' + (j.titulo || 'sin título') + '». Pide al máster que la cargue.';
+      })
+      .catch(function () { msg.className = 'err'; msg.textContent = 'Sin conexión con VOX.'; });
+  }
+
   var hold = $('hold');
-  function reveal(on, ev) { if (ev) ev.preventDefault(); $('secret').classList.toggle('show', on); }
+  function reveal(on, ev) { if (ev) ev.preventDefault(); $('secret').classList.toggle('show', on); if (on) markSeen(); }
   hold.addEventListener('pointerdown', function (e) { reveal(true, e); });
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (n) { hold.addEventListener(n, function (e) { reveal(false, e); }); });
   hold.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   $('joinBtn').addEventListener('click', join);
   $('name').addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+  $('upBtn').addEventListener('click', upload);
 
   token = load();
   if (token) { toPlayer(''); poll(); } else { toJoin(); }

@@ -100,18 +100,34 @@ closes the conversation and re-arms local listening.
     - a tap only interrupts the master: while listening it shows «MANTÉN PARA SALIR». Holding the
       eye ~1.5 s (`APP_VOX_SESSION_ACTION_CLOSE_HOLD`) or asking the master to end the game leaves
       it.
-  - `mostrar_secreto(jugador, texto)`: delivered to that player's phone when they joined the phone
-    page; otherwise shown on the screen card (`show_secret`). The response tells the model which
-    one happened.
+    - the response carries the phone address, lobby instructions and, when a game is saved, its
+      title so the master can offer to continue it.
+  - `mostrar_secreto(jugador, texto, en_pantalla)`: to that player's phone; if the name has not
+    joined yet it waits there for them (`app_rol_web` reserves the name). `en_pantalla=true`, or
+    the page being off, shows the screen card (`show_secret`). The response tells the model which.
+  - `estado_jugadores()`: phone address, players (`movil`, `secreto_sin_leer`, `ficha`) and the
+    saved game's title.
+  - `actualizar_ficha(jugador, ficha)`: the whole character sheet shown on the phone (also kept
+    for a name that has not joined yet).
+  - `guardar_partida(titulo, juego, resumen)`: the master's summary, the sheets, the secrets and
+    the prepared roll, kept in NVS (`app_rol_web_store_game`, one game) and downloadable at
+    `/partida`.
+  - `cargar_partida(modo)`: turns role mode on, restores the players on the page (sheets; secrets
+    too with `continuar`, not with `mismos_personajes`) and the prepared roll, and returns the
+    whole document to the model (without secrets for `mismos_personajes`).
   - Dice badge (role mode only): the player rolls the prepared roll on the device. The roll is
     shown and sent to Gemini as a `clientContent` text turn (`app_gemini_live_send_text`), e.g.
     «Tirada de reserva del jugador…: 6d10, éxito con 8 o más; resultados …; 3 éxitos, 1 uno y 1
     máximo (10).»
-  - While the model streams a reply, the WebSocket client is busy and a send fails. Pending rolls
-    are therefore kept (up to 640 bytes, several rolls in one message) and sent once
-    `reply_pending` clears, retrying every 0.5 s. They are dropped after 90 s, on close, or on a
-    voice reconnect (`player roll delivered` / `player roll not delivered (…)`).
-  - Tool arguments are copied into the slot (640 bytes each) by the WebSocket task. They are parsed
-    with cJSON on the session task.
+  - Notes for the master: player rolls and phone notices («Aviso de VOX (no lo dice un jugador):
+    Ana se ha conectado al móvil.», taken from `app_rol_web_take_notices` every tick) share one
+    queue of 1 KiB. While the model streams a reply the WebSocket client is busy and a send fails,
+    so notes are sent once `reply_pending` clears, several in one message, retrying every 0.5 s.
+    They are dropped after 90 s, on close, or on a voice reconnect (`notes delivered` /
+    `notes not delivered (…)`).
+  - Up to 8 function calls can be pending at once (slots in PSRAM): the model often sends a secret
+    for every player plus a roll in one message. Arguments are copied into the slot (6 KiB each,
+    room for the saved-game summary) by the WebSocket task and parsed with cJSON on the session
+    task.
 - Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only
   when asked or for recent facts it does not know, never mentioning sources or that it searched.

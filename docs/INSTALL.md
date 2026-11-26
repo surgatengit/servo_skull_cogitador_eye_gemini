@@ -624,6 +624,22 @@ En el dispositivo, por orden:
    - «Ahora jugamos con porcentaje, tira tú»: el máster tira d100 y salen dos dados, decenas
      («40») y unidades («7»), con «RESULTADO 47».
    - Con 6 a 10 dados salen en dos filas.
+10. **Sala de espera:** al empezar, el máster os da la dirección y espera. Cada vez que alguien
+    entra desde el móvil, el máster le da la bienvenida. Empieza cuando le decís que estáis.
+11. **Entrar tarde:** deja a un jugador sin entrar. Cuando el máster reparta los secretos, el
+    suyo le espera; al entrar con su nombre le aparecen su ficha y su secreto.
+12. **Secretos sin leer:** «¿Quién no ha leído su secreto?». El máster lo sabe y avisa por su
+    nombre. Al mantener pulsado el botón, el móvil cuenta como leído.
+13. **Ficha:** cada jugador ve su ficha en el móvil. Cuando pierde vida o gana algo, la ficha se
+    actualiza y el móvil vibra.
+14. **Cambio de móvil:** entra con el mismo nombre desde otro móvil (o en otra pestaña). Lo
+    recupera todo; el móvil anterior vuelve a la pantalla de entrada y el máster recibe el aviso.
+15. **Guardar:** «Guarda la partida». En el móvil, «Partida guardada» → «Descargar la partida de
+    VOX» baja `partida_vox.json`.
+16. **Continuar:** sal de la partida, empieza otra («Vamos a jugar a rol»). El máster pregunta si
+    queréis continuar la guardada; di que sí. Resume lo ocurrido y cada jugador, al entrar con su
+    nombre, recupera ficha y secreto. Prueba también «nueva aventura con los mismos personajes».
+17. **Subir:** en el móvil, «Subir a VOX» con el archivo descargado. El máster recibe un aviso.
 
 **Primer intento (2026-11-26, firmware `da1a7c52…`):**
 - Correcto: `cambiar_voz` (Kore), el botón de voz (Sulafat, guardada tras reiniciar), la reconexión
@@ -647,14 +663,25 @@ En el dispositivo, por orden:
 llegó 2 s después, al acabar su frase (`player roll delivered`). Después se añadieron los tipos de
 tirada (paso 9).
 
+**Cuarto intento (2026-11-26, commit `1e6a29d`):**
+- Correcto: `preparar_tirada` a porcentaje (botón «D%») y a reserva 6d10; la tirada de reserva
+  (2 éxitos) llegó al máster.
+- Fallo: el máster pidió a la vez preparar la tirada y dos secretos. Solo cabían 2 peticiones, se
+  perdió un secreto y VOX esperó 30 s sin respuesta (`tool call mostrar_secreto dropped`).
+- Corrección: 8 peticiones a la vez (commit `c9b40e4`). Después se añadieron la sala de espera,
+  las fichas y las partidas guardadas (pasos 10–17).
+
 En el registro (`iris logs`), busca:
 - `dice {...}` (con `"modo":"suma"`, `"porcentaje"` o `"reserva"`);
 - `player roll prepared: …`;
 - `voice … requested by the model` y `reconnecting with voice …`;
 - `role mode on`;
-- `phone page at http://…` y `player joined: …`;
-- `secret sent to the phone of …`;
-- `player roll: …` y, justo después o al acabar la respuesta, `player roll delivered`;
+- `phone page at http://…`, `player joined: …` / `player rejoined: …` y `phone notice: …`;
+- `secret sent to the phone of …` o `secret kept for … (no phone yet)`;
+- `sheet updated on the phone of …` o `sheet kept for …`;
+- `game saved: … (N bytes)`, `game loaded (continue|same characters): …`,
+  `saved game uploaded: …`;
+- `player roll: …` y, justo después o al acabar la respuesta, `notes delivered`;
 - `eye held in role mode; leaving the game`.
 
 ## 3. Volver al firmware actual (restauración)
