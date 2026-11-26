@@ -57,6 +57,9 @@ foto con su cámara y te la describe.
 | 🖼️ | **Galería de recuerdos** | Guarda las **10 últimas fotos** en su memoria flash, aunque lo apagues. Toca el contador para verlas, ‹ › para pasar, **X** para volver y **mantén la X 1,5 s** para borrarlas todas. |
 | 🔒 | **Privacidad y seguridad** | Las fotos no salen del aparato (Gemini solo recibe la que te describe). La clave de Gemini **no está** en el código, el binario ni GitHub: se guarda en el propio dispositivo y no se puede leer desde fuera. |
 | 🔁 | **Robusto** | Reconexión automática, modelo de reserva si el principal falla, avisos claros en pantalla y modo de recuperación siempre disponible. |
+| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y VOX hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. |
+| 🤫 | **Secretos en el móvil** | En modo rol, cada jugador abre en su móvil la dirección que sale en pantalla, escribe su nombre y recibe **solo sus secretos**. Si alguien no tiene móvil, el suyo sale en pantalla hasta que la toca. |
+| 🎙️ | **Cuatro voces** | Charon y Algenib (chico), Kore y Sulafat (chica). Se cambian pidiéndoselo («ponte voz de chica»), tocando el círculo de arriba a la derecha o por USB. |
 | 🔎 | **Google Search opcional** | Puede buscar en Google datos recientes (desactivado por defecto: el plan gratuito agota la cuota). |
 | 💸 | **Coste cero para empezar** | Funciona con el **plan gratuito** de Gemini (con sus límites de uso). |
 | 🧪 | **Hecho con rigor** | Tests en PC, simulador de la interfaz, parches documentados y probados en el hardware real, y una copia mínima del BSP oficial que arregla la memoria DMA de la pantalla. |
@@ -177,6 +180,8 @@ Prueba con:
 - «¿Quién eres?»
 - «¿Qué ves?» (hace una foto con la cámara de la izquierda)
 - Toca el número de arriba a la izquierda para ver la galería de fotos.
+- «Vamos a jugar una partida de rol» (1.6.0): sigue las indicaciones del máster y abre en el móvil
+  la dirección que aparece abajo en la pantalla.
 
 ---
 
@@ -236,11 +241,12 @@ si el dispositivo va a cambiar de manos.
 
 | Componente | Responsabilidad |
 |---|---|
-| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería); también corre en el simulador |
-| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación, herramienta `capturar_imagen` y galería |
+| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, dados, secretos, botones de voz y D20); también corre en el simulador |
+| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `cambiar_voz`, `modo_rol` y `mostrar_secreto`; galería |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, imágenes, herramientas, reanudación, grounding) |
 | [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda: cámara izquierda, reset del sensor, PPA y JPEG por hardware |
 | [`app_photos`](components/app_photos/README.md) | Últimas 10 fotos en la partición `photos` |
+| [`app_rol_web`](components/app_rol_web/README.md) | Página del móvil para los secretos del modo rol (solo mientras dura) |
 | [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
 | [`app_wake`](components/app_wake/README.md) | «Hola ESP» local (ESP-SR WakeNet10 `wn10_es_holaesp`), solo en reposo |
 | [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |

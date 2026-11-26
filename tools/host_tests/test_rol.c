@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rol_players.h"
 #include "secret_text.h"
 #include "vox_rol.h"
 
@@ -142,8 +143,51 @@ static void test_secret_text(void)
     CHECK(wrapped[0] == '\0');
 }
 
+static void test_players(void)
+{
+    static rol_players_t t;
+    char key[64];
+    char list[128];
+    rol_players_clear(&t);
+    CHECK(rol_players_normalize("  Íñigo   Pérez ", key, sizeof(key)) > 0);
+    CHECK(strcmp(key, "inigo perez") == 0);
+    CHECK(rol_players_normalize("   ", key, sizeof(key)) == 0);
+
+    CHECK(rol_players_join(&t, "Ana", "aaaa") == ROL_JOIN_OK);
+    CHECK(rol_players_join(&t, "  ANA ", "bbbb") == ROL_JOIN_TAKEN);
+    CHECK(rol_players_join(&t, "Íñigo", "cccc") == ROL_JOIN_OK);
+    CHECK(rol_players_join(&t, "", "dddd") == ROL_JOIN_BAD_NAME);
+    CHECK(rol_players_join(&t, "Luis", "") == ROL_JOIN_BAD_NAME);
+    rol_players_list(&t, list, sizeof(list));
+    CHECK(strcmp(list, "Ana, Íñigo") == 0);
+
+    const rol_player_t *ana = rol_players_by_token(&t, "aaaa");
+    CHECK(ana && strcmp(ana->name, "Ana") == 0 && ana->secret[0] == '\0');
+    CHECK(rol_players_by_token(&t, "zzzz") == NULL);
+    CHECK(rol_players_by_token(&t, "") == NULL);
+
+    CHECK(rol_players_deliver(&t, "ana", "Eres el traidor."));
+    CHECK(rol_players_deliver(&t, "Inigo", "Tienes la llave."));   /* accents ignored */
+    CHECK(!rol_players_deliver(&t, "Marta", "nadie"));
+    CHECK(ana && strcmp(ana->secret, "Eres el traidor.") == 0 && ana->secret_seq == 1);
+    CHECK(rol_players_deliver(&t, "ANA", "Cambio de planes."));
+    CHECK(ana && ana->secret_seq == 2);
+
+    for (int i = 0; i < 4; ++i) {
+        char name[8];
+        char token[8];
+        snprintf(name, sizeof(name), "J%d", i);
+        snprintf(token, sizeof(token), "t%d", i);
+        CHECK(rol_players_join(&t, name, token) == ROL_JOIN_OK);
+    }
+    CHECK(rol_players_join(&t, "Extra", "eeee") == ROL_JOIN_FULL);
+    rol_players_clear(&t);
+    CHECK(rol_players_by_token(&t, "aaaa") == NULL);
+}
+
 int main(void)
 {
+    test_players();
     test_voices();
     test_dice();
     test_roll_text();

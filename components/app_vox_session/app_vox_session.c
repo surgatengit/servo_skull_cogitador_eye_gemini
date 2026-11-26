@@ -10,6 +10,7 @@
 #include "app_camera.h"
 #include "app_gemini_live.h"
 #include "app_photos.h"
+#include "app_rol_web.h"
 #include "app_secrets.h"
 #include "app_wake.h"
 #include "app_wifi.h"
@@ -89,9 +90,11 @@ static const char PERSONA[] =
     "haz de máster. Pregunta cuántos jugadores son, sus nombres y a qué juego quieren jugar; si "
     "no lo saben, propón uno corto. Son principiantes: explica en pocas frases la ambientación y "
     "las reglas básicas, cómo se tira y qué significa el resultado. Crea de palabra una ficha "
-    "breve de cada personaje con habilidades, puntos de vida y equipo. Da a cada personaje un "
-    "secreto con mostrar_secreto, pidiendo antes a los demás que no miren la pantalla; nunca "
-    "digas un secreto en voz alta y haz que los secretos choquen en algún momento. La partida "
+    "breve de cada personaje con habilidades, puntos de vida y equipo. Al empezar, pide a los "
+    "jugadores que abran en el móvil la dirección que sale en la pantalla y escriban su nombre: "
+    "así reciben allí sus secretos. Da a cada personaje un secreto con mostrar_secreto; si un "
+    "jugador no tiene móvil, el secreto sale en la pantalla y pides a los demás que no miren. "
+    "Nunca digas un secreto en voz alta y haz que los secretos choquen en algún momento. La partida "
     "dura unos diez minutos, tres o cuatro turnos, y si está muy interesante puedes alargarla "
     "dos a cuatro turnos más. Prepara un guion con un giro sorpresa y un desenlace claro, sin "
     "revelarlo. En cada turno narra de forma viva y breve, interpreta a cada personaje con una "
@@ -390,7 +393,14 @@ static void refresh_status(void)
         return;
     }
     if (s.role_mode && s.item_count == 0) {
-        s.config.ui.set_status(s.config.ui.ui, "MODO ROL");
+        char address[40];
+        char line[STATUS_CAPACITY];
+        if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
+            snprintf(line, sizeof(line), "MÓVIL: %s", address + 7); /* without "http://" */
+        } else {
+            snprintf(line, sizeof(line), "MODO ROL");
+        }
+        s.config.ui.set_status(s.config.ui.ui, line);
         return;
     }
     char text[STATUS_CAPACITY] = "";
@@ -568,6 +578,13 @@ static void set_role_mode(bool on)
     }
     s.role_mode = on;
     ESP_LOGI(TAG, "role mode %s", on ? "on" : "off");
+#if CONFIG_VOX_ROLE_PHONE_PAGE
+    if (on) {
+        (void)app_rol_web_start(); /* optional: secrets fall back to the screen card */
+    } else {
+        app_rol_web_stop();
+    }
+#endif
     if (s.config.ui.set_role_mode) {
         s.config.ui.set_role_mode(s.config.ui.ui, on);
     }
@@ -1049,24 +1066,60 @@ static void run_role(const tool_slot_t *slot, const cJSON *args)
 {
     const cJSON *on = cJSON_GetObjectItemCaseSensitive(args, "activar");
     set_role_mode(cJSON_IsTrue(on));
-    answer_tool(slot, s.role_mode
-                ? "{\"result\":\"Modo rol activado: la conversación espera más antes de "
-                  "cerrarse y los jugadores tienen un botón D20 en la pantalla.\"}"
-                : "{\"result\":\"Modo rol desactivado.\"}");
+    if (!s.role_mode) {
+        answer_tool(slot, "{\"result\":\"Modo rol desactivado.\"}");
+        return;
+    }
+    char address[40];
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "result",
+                            "Modo rol activado: la conversación espera más antes de cerrarse y "
+                            "los jugadores tienen un botón D20 en la pantalla.");
+    if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
+        cJSON_AddStringToObject(root, "pagina_movil", address);
+        cJSON_AddStringToObject(root, "instrucciones",
+                                "Pide a cada jugador que abra en su móvil, conectado a la misma "
+                                "Wi-Fi, la dirección que aparece en la parte de abajo de la "
+                                "pantalla y escriba su nombre. Los secretos les llegarán allí.");
+    }
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    answer_tool(slot, json ? json : "{\"result\":\"Modo rol activado.\"}");
+    cJSON_free(json);
 }
 
 static void run_secret(const tool_slot_t *slot, const cJSON *args)
 {
     const char *player = arg_str(args, "jugador");
     const char *text = arg_str(args, "texto");
-    if (!text || !text[0] || !s.config.ui.show_secret) {
+    if (!text || !text[0]) {
+        answer_tool(slot, "{\"error\":\"Falta el texto del secreto.\"}");
+        return;
+    }
+    if (player && app_rol_web_deliver(player, text)) {
+        ESP_LOGI(TAG, "secret sent to the phone of %s", player);
+        answer_tool(slot, "{\"result\":\"Secreto enviado al móvil del jugador; solo él lo "
+                    "ve. No lo digas en voz alta.\"}");
+        return;
+    }
+    if (!s.config.ui.show_secret) {
         answer_tool(slot, "{\"error\":\"No se puede mostrar el secreto.\"}");
         return;
     }
     s.config.ui.show_secret(s.config.ui.ui, player ? player : "", text);
-    ESP_LOGI(TAG, "secret shown for %s", player ? player : "?");
-    answer_tool(slot, "{\"result\":\"Secreto mostrado en la pantalla hasta que el jugador la "
-                "toque. No lo digas en voz alta.\"}");
+    ESP_LOGI(TAG, "secret shown on screen for %s", player ? player : "?");
+    char joined[160];
+    app_rol_web_players(joined, sizeof(joined));
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "result",
+                            "Ese jugador no tiene el móvil conectado: el secreto se muestra en "
+                            "la pantalla hasta que la toque. Pide a los demás que no miren y no "
+                            "lo digas en voz alta.");
+    cJSON_AddStringToObject(root, "jugadores_con_movil", joined);
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    answer_tool(slot, json ? json : "{\"result\":\"Secreto mostrado en la pantalla.\"}");
+    cJSON_free(json);
 }
 
 static void run_tool(int index)

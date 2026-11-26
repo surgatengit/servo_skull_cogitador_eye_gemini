@@ -591,6 +591,38 @@ y muestra «BORRANDO...» y después «FOTOS BORRADAS» durante 3 s.
 
 **Galería y almacenamiento: superados.** Reinicio por software: pendiente de la corrección.
 
+### Prueba 14 (pendiente de autorización): 1.6.0 RoleMaster
+
+Comprobado en el PC:
+- tests de voces, dados (rango y reparto en 200 000 tiradas), textos de tirada, tarjeta de secreto y
+  tabla de jugadores;
+- simulador: botones de voz y D20, dados con crítico y pifia, tarjeta «SOLO PARA ÍÑIGO»;
+- página del móvil con un servidor simulado: alta, secreto que llega borroso y se lee manteniendo
+  pulsado.
+
+En el dispositivo, por orden:
+1. **Voz por botón:** con el ojo en reposo, toca el círculo de arriba a la derecha. Cambia la letra
+   (C, A, K, S) y la línea de estado dice la voz («KORE · CHICA FIRME»). Di «Hola ESP»: habla con
+   esa voz.
+2. **Voz por voz:** «Ponte una voz de chico grave». VOX se despide, se reconecta (ámbar) y vuelve a
+   escuchar con Algenib.
+3. **Dados:** «Tira dos dados de veinte». Salen animados en pantalla y VOX dice el resultado.
+4. **Modo rol:** «Vamos a jugar una partida de rol».
+   - Aparece «D20» a la derecha y «MÓVIL: 192.168.x.x» abajo.
+   - Abre esa dirección en el móvil, en la misma Wi-Fi, y escribe tu nombre.
+5. **Secreto:** cuando el máster reparta secretos, el tuyo llega al móvil (vibra; mantén pulsado
+   para leerlo). El de un jugador sin móvil sale en la pantalla hasta tocarla.
+6. **Tirada del jugador:** toca «D20». Salen tus 2d20 y el máster los usa.
+7. Deja de hablar 2–3 minutos en modo rol: no debe cerrarse antes de unos 180 s.
+
+En el registro (`iris logs`), busca:
+- `dice {...}`;
+- `voice … requested by the model` y `reconnecting with voice …`;
+- `role mode on`;
+- `phone page at http://…` y `player joined: …`;
+- `secret sent to the phone of …`;
+- `player roll: …`.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

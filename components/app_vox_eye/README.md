@@ -47,6 +47,29 @@ app_vox_eye_set_status(eye, "SIN WI-FI");            /* any task; "" hides */
 runs the same controller; the Host adapter cycles the five states every 3 s and
 a tap toggles idle/listening. Networking and audio are not simulated.
 
+## RoleMaster controls (1.6.0)
+
+- Voice badge (top right, mirrors the photo counter): shows the voice's initial
+  (`app_vox_eye_set_voice_initial`). A tap reports `APP_VOX_EYE_ACTION_VOICE_NEXT` through
+  `on_action`.
+- Role badge «D20» (right bezel, hidden): shown in role mode (`app_vox_eye_set_role_mode`). A tap
+  reports `APP_VOX_EYE_ACTION_ROLE_ROLL`.
+- Dice panel (`app_vox_eye_show_dice`):
+  - up to 4 dice;
+  - the render task tumbles random numbers for ~0.8 s, then shows the results: maximum in gold,
+    1 in red, total, and «CRÍTICO»/«PIFIA» on a d20;
+  - it hides after ~6 s, or on a tap once the dice have settled;
+  - the caller hands the values over through a sequence counter (release/acquire on the device,
+    plain volatile in the single-threaded PC preview).
+- Secret card (`app_vox_eye_show_secret`):
+  - full screen, «SOLO PARA <NOMBRE>»;
+  - the text is mapped to the card charset and word-wrapped by `secret_text.c` (27 columns,
+    11 lines; host-tested);
+  - it stays until it is tapped.
+- The eye animation pauses under the dice panel and the secret card, as it does under the gallery.
+- PC preview: the voice badge cycles C/A/K/S and shows a secret on the fourth voice. The D20 badge
+  alternates a 2d20 critical and a 1d20 fumble.
+
 ## Photo counter and gallery (1.5.0)
 
 - **Counter:** `photo_badge` / `photo_count` on the bezel at about 10:30 (60,60 56×56), above the

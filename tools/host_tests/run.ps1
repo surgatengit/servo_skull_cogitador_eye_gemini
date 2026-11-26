@@ -11,6 +11,8 @@ if (-not $vs) { throw "Visual Studio C++ tools not found" }
 $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 $out = Join-Path ([System.IO.Path]::GetTempPath()) "vox_host_tests"
 New-Item -ItemType Directory -Force $out | Out-Null
+# Stale objects from earlier runs once produced a crashing test binary: start clean.
+Get-ChildItem $out -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 $sources = @(
     "$here\test_grounding.c",
     "$root\components\app_gemini_live\gl_grounding.c",
@@ -47,6 +49,7 @@ $rol = "`"$vcvars`" >nul && cl /nologo /utf-8 /W4 /WX " +
        "/I`"$root\components\app_vox_session`" /I`"$root\components\app_vox_eye`" " +
        "`"$here\test_rol.c`" `"$root\components\app_vox_session\vox_rol.c`" " +
        "`"$root\components\app_vox_eye\secret_text.c`" " +
+       "/I`"$root\components\app_rol_web`" `"$root\components\app_rol_web\rol_players.c`" " +
        "/Fo`"$out\\`" /Fe`"$out\test_rol.exe`""
 cmd /c $rol
 if ($LASTEXITCODE -ne 0) { throw "rol build failed" }

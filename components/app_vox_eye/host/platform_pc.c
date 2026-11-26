@@ -19,7 +19,11 @@ static struct {
     unsigned photo;          /* gallery demo position, 1..DEMO_PHOTOS */
     bool gallery;
     unsigned gallery_events;
+    unsigned voice;          /* RoleMaster demo: voice badge position */
+    unsigned rolls;
 } backend;
+
+static const char VOICE_INITIALS[] = "CAKS"; /* Charon, Algenib, Kore, Sulafat */
 
 #define DEMO_PHOTOS 3        /* the PC has no photo store: placeholder picture */
 
@@ -83,6 +87,35 @@ static void on_gallery(app_vox_gallery_action_t action, void *ctx)
     fprintf(stderr, "vox_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
 }
 
+/* RoleMaster demo (1.6.0): the voice badge cycles C/A/K/S and shows a secret
+ * card on the last voice; the D20 badge alternates a 2d20 roll with a critical
+ * and a 1d20 fumble. */
+static void on_action(app_vox_eye_action_t action, void *ctx)
+{
+    (void)ctx;
+    if (action == APP_VOX_EYE_ACTION_VOICE_NEXT) {
+        backend.voice = (backend.voice + 1) % 4;
+        (void)app_vox_eye_set_voice_initial(backend.eye, VOICE_INITIALS[backend.voice]);
+        fprintf(stderr, "vox_eye_backend: voice %c\n", VOICE_INITIALS[backend.voice]);
+        if (backend.voice == 3) {
+            (void)app_vox_eye_show_secret(backend.eye, "Íñigo",
+                                          "Eres el hijo perdido del gobernador. Si Ana descubre "
+                                          "tu sello, intentará venderte al Inquisidor… "
+                                          "¿confiarás en ella?");
+        }
+        return;
+    }
+    backend.rolls++;
+    if (backend.rolls % 2) {
+        const uint16_t two[] = { 20, 7 };
+        (void)app_vox_eye_show_dice(backend.eye, two, 2, 20);
+    } else {
+        const uint16_t one[] = { 1 };
+        (void)app_vox_eye_show_dice(backend.eye, one, 1, 20);
+    }
+    fprintf(stderr, "vox_eye_backend: roll %u\n", backend.rolls);
+}
+
 /* Tap opens/closes the demo conversation like the device session does. */
 static void on_tap(void *ctx)
 {
@@ -105,6 +138,7 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
     const app_vox_eye_config_t config = {
         .on_tap = on_tap,
         .on_gallery = on_gallery,
+        .on_action = on_action,
         .level = level,
         .seed = 0xC0617A70u,
     };
@@ -113,6 +147,8 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
         return err;
     }
     (void)app_vox_eye_set_photo_count(backend.eye, DEMO_PHOTOS);
+    (void)app_vox_eye_set_voice_initial(backend.eye, 'C');
+    (void)app_vox_eye_set_role_mode(backend.eye, true);
     backend.state = APP_VOX_EYE_IDLE;
     backend.demo_timer = esp_gsp_timer_create(ui, DEMO_STEP_MS, demo_tick, NULL);
     return backend.demo_timer ? ESP_GSP_OK : ESP_GSP_ERR_NO_MEM;

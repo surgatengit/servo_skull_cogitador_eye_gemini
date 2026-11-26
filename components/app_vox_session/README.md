@@ -71,5 +71,32 @@ closes the conversation and re-arms local listening.
   - A cancelled call gets no response.
   - The `diag` line reports `tools{calls=… stills=…}`.
   - The session task stack is 8 KiB.
+- RoleMaster (1.6.0). Function declarations are always sent; `capturar_imagen` only with the camera.
+  - `tirar_dados(cantidad, caras)`:
+    - clamped to 1–4 dice of 2–100 sides;
+    - each die comes from `esp_random()` with rejection sampling (`vox_rol.c`);
+    - the result is shown with `show_dice`;
+    - the response is JSON with the results, the total and `critico`/`pifia` (d20).
+  - `cambiar_voz(voz)`: one of Charon, Algenib, Kore or Sulafat (genders from Google Cloud
+    Chirp 3 HD).
+    - The voice is stored in NVS.
+    - When the reply has been spoken, the session reconnects with the new voice. It is a fresh
+      session, so the context is lost.
+  - Voice badge (`app_vox_session_action(VOICE_NEXT)`): cycles the four voices.
+    - With the conversation closed, the voice applies at once and the status shows «KORE · CHICA
+      FIRME».
+    - During a conversation it applies when the conversation closes («PRÓXIMA VOZ: KORE»).
+  - `modo_rol(activar)`:
+    - role badge on;
+    - idle timeout `VOX_ROLE_IDLE_TIMEOUT_S` (180 s);
+    - phone page started (`app_rol_web`), with its address on the status line;
+    - closing the conversation ends role mode.
+  - `mostrar_secreto(jugador, texto)`: delivered to that player's phone when they joined the phone
+    page; otherwise shown on the screen card (`show_secret`). The response tells the model which
+    one happened.
+  - D20 badge (role mode only): the player rolls 2d20 on the device. The roll is shown and sent to
+    Gemini as a `clientContent` text turn (`app_gemini_live_send_text`).
+  - Tool arguments are copied into the slot (640 bytes each) by the WebSocket task. They are parsed
+    with cJSON on the session task.
 - Quiet search (owner's decision): the persona tells Gemini to answer immediately and search only
   when asked or for recent facts it does not know, never mentioning sources or that it searched.

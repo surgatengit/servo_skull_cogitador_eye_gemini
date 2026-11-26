@@ -37,6 +37,15 @@
 #define DIE_COLOR_NORMAL       0x1E2A33
 #define DIE_COLOR_MAX          0xB37800 /* gold: critical on a d20 */
 #define DIE_COLOR_ONE          0xA0102A /* red: fumble on a d20 */
+/* Dice request handoff: release/acquire on the device; the PC preview (MSVC)
+ * runs GSP and the demo on one thread. */
+#if defined(__GNUC__)
+#define SEQ_LOAD(p)            __atomic_load_n((p), __ATOMIC_ACQUIRE)
+#define SEQ_BUMP(p)            ((void)__atomic_add_fetch((p), 1U, __ATOMIC_RELEASE))
+#else
+#define SEQ_LOAD(p)            (*(volatile uint32_t *)(p))
+#define SEQ_BUMP(p)            ((void)(++*(volatile uint32_t *)(p)))
+#endif
 /* Secret card text box: 332 px wide at 20 px, 11 lines of 24 px. */
 #define SECRET_COLUMNS         27
 #define SECRET_LINES           11
@@ -314,7 +323,7 @@ static void hide_dice(struct app_vox_eye *eye)
 /* Render task: start a new roll, tumble, settle on the results, hide. */
 static void step_dice(struct app_vox_eye *eye)
 {
-    const uint32_t seq = __atomic_load_n(&eye->dice_req_seq, __ATOMIC_ACQUIRE);
+    const uint32_t seq = SEQ_LOAD(&eye->dice_req_seq);
     if (seq != eye->dice_seen_seq) {
         eye->dice_seen_seq = seq;
         eye->dice_count = eye->dice_req_count;
@@ -735,7 +744,7 @@ esp_gsp_err_t app_vox_eye_show_dice(app_vox_eye_handle_t handle, const uint16_t 
     memcpy(handle->dice_req_values, values, count * sizeof(values[0]));
     handle->dice_req_count = count;
     handle->dice_req_sides = sides;
-    __atomic_add_fetch(&handle->dice_req_seq, 1U, __ATOMIC_RELEASE);
+    SEQ_BUMP(&handle->dice_req_seq);
     return ESP_GSP_OK;
 }
 

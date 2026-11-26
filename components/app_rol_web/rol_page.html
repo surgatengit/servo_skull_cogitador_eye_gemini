@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VOX · Secretos</title>
+<style>
+:root{--bg:#0b0f14;--panel:#141a21;--line:#2a333d;--text:#e8e3d6;--dim:#8d97a3;--amber:#ffb300;--violet:#d500f9;--red:#ff1744}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:17px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:480px;margin:0 auto;padding:24px 16px 40px}
+h1{font:700 22px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--amber);margin:0 0 4px}
+.sub{color:var(--dim);font-size:14px;margin:0 0 24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:14px;color:var(--dim);margin-bottom:8px}
+input{width:100%;font:inherit;color:var(--text);background:#0e1318;border:1px solid var(--line);border-radius:10px;padding:12px}
+button{width:100%;font:700 16px/1 system-ui,sans-serif;letter-spacing:.04em;border:0;border-radius:10px;padding:14px;margin-top:12px;cursor:pointer;background:var(--amber);color:#1a1200}
+button.hold{background:#2b0f33;color:#f2e8ff;border:1px solid var(--violet);padding:22px 14px;user-select:none;-webkit-user-select:none;touch-action:none}
+.err{color:var(--red);font-size:14px;margin-top:10px;min-height:1em}
+.who{font:700 13px ui-monospace,Consolas,monospace;color:var(--violet);letter-spacing:.1em}
+.secret{white-space:pre-wrap;font-size:19px;margin:14px 0 0;min-height:3em;filter:blur(9px);transition:filter .15s}
+.secret.show{filter:none}
+.wait{color:var(--dim)}
+.new{color:var(--amber);font-weight:700}
+.hidden{display:none}
+footer{color:var(--dim);font-size:12px;text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<main>
+  <h1>VOX M-01 · SECRETOS</h1>
+  <p class="sub">Modo rol. Lo que aparezca aquí es solo para ti.</p>
+
+  <section id="join" class="card hidden">
+    <label for="name">Tu nombre (el mismo que le has dicho al máster)</label>
+    <input id="name" maxlength="24" autocomplete="off" autocapitalize="words" placeholder="Por ejemplo: Ana">
+    <button id="joinBtn" type="button">Entrar en la partida</button>
+    <div id="joinErr" class="err"></div>
+  </section>
+
+  <section id="player" class="card hidden">
+    <div class="who" id="who"></div>
+    <p id="state" class="wait">Esperando a que el máster te dé un secreto…</p>
+    <button id="hold" class="hold hidden" type="button">MANTÉN PULSADO PARA LEER</button>
+    <p id="secret" class="secret"></p>
+  </section>
+
+  <footer>No compartas la pantalla. Si te sales, vuelve a abrir esta misma dirección.</footer>
+</main>
+<script>
+(function () {
+  var KEY = 'vox_rol_token';
+  var token = null, lastSeq = 0, timer = null;
+  function $(id) { return document.getElementById(id); }
+  function load() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function save(t) { try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) {} }
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+
+  function toJoin() {
+    token = null; save(null);
+    show('player', false); show('join', true);
+  }
+  function toPlayer(name) {
+    $('who').textContent = 'SOLO PARA ' + String(name || '').toUpperCase();
+    show('join', false); show('player', true);
+  }
+
+  function join() {
+    var name = $('name').value.trim();
+    $('joinErr').textContent = '';
+    if (!name) { $('joinErr').textContent = 'Escribe tu nombre.'; return; }
+    fetch('/join', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: name })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { $('joinErr').textContent = j.error || 'No se ha podido entrar.'; return; }
+        token = j.token; save(token); lastSeq = 0; toPlayer(j.nombre); poll();
+      })
+      .catch(function () { $('joinErr').textContent = 'Sin conexión con VOX. ¿Estás en la misma Wi-Fi?'; });
+  }
+
+  function poll() {
+    clearTimeout(timer);
+    if (!token) return;
+    fetch('/secret?t=' + encodeURIComponent(token), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { toJoin(); $('joinErr').textContent = 'La partida ha terminado o ha empezado otra. Vuelve a entrar.'; return; }
+        toPlayer(j.nombre);
+        if (j.secreto) {
+          $('secret').textContent = j.secreto;
+          show('hold', true);
+          if (j.seq !== lastSeq) {
+            $('state').textContent = '¡Tienes un secreto nuevo!';
+            $('state').className = 'new';
+            if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch (e) {} }
+            lastSeq = j.seq;
+          }
+        }
+      })
+      .catch(function () { $('state').textContent = 'Sin conexión con VOX… reintentando.'; $('state').className = 'wait'; })
+      .then(function () { timer = setTimeout(poll, 2000); });
+  }
+
+  var hold = $('hold');
+  function reveal(on, ev) { if (ev) ev.preventDefault(); $('secret').classList.toggle('show', on); }
+  hold.addEventListener('pointerdown', function (e) { reveal(true, e); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (n) { hold.addEventListener(n, function (e) { reveal(false, e); }); });
+  hold.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  $('joinBtn').addEventListener('click', join);
+  $('name').addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+
+  token = load();
+  if (token) { toPlayer(''); poll(); } else { toJoin(); }
+})();
+</script>
+</body>
+</html>

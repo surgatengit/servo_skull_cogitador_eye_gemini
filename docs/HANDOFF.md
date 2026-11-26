@@ -45,6 +45,21 @@ ahora; queda para revisar. Google Search está implementado pero
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
 | App anterior | ESP-Claw = Mosaico-Claw 0.8.0, Idea **100000** (restaurable desde Vibe Mode → Mis Ideas) |
 
+### En curso: 1.6.0 RoleMaster (rama `feat/rolemaster`, sin instalar)
+
+- Cuatro voces (Charon, Algenib, Kore, Sulafat):
+  - herramienta `cambiar_voz`, que reconecta con la voz nueva;
+  - botón de voz en el bisel;
+  - `provision_key.py --voice`.
+- Dados reales:
+  - `tirar_dados` con RNG por hardware y panel animado;
+  - botón D20 para que tiren los jugadores en modo rol (se envía a Gemini como texto).
+- `modo_rol`: máster de rol en la personalidad, espera de 180 s antes de cerrar.
+- `mostrar_secreto`: al móvil del jugador (página `app_rol_web` en la Wi-Fi de casa, solo en modo
+  rol) o a la tarjeta de pantalla.
+- Probado en el PC (tests, simulador, página con servidor simulado). Falta la prueba 14 en el
+  dispositivo.
+
 ## 2. Entorno
 
 - ESP-IDF en `C:\esp\esp-idf-master`, commit exacto `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`

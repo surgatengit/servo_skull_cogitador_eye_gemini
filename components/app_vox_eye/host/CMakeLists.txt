@@ -21,6 +21,6 @@ endif()
 
 add_subdirectory("${ESP_GSP_COMPONENT_DIR}/tools/sim_bridge" sim_bridge)
 gsp_add_backend(vox_eye_backend
-    SOURCES ../app_vox_eye.c platform_pc.c
+    SOURCES ../app_vox_eye.c ../secret_text.c platform_pc.c
     INCLUDE_DIRECTORIES ../include
     SCENES ../ui/main.json)
