@@ -60,7 +60,9 @@ static const char *TAG = "vox_session";
 #define GROUNDING_ROTATE_US     (3 * 1000 * 1000)
 #define STATUS_CAPACITY         48
 #define STATUS_MAX_CHARS        24      /* fits the round panel's bottom chord at 20 px bold */
-#define TOOL_SLOTS              2       /* pending function calls (WebSocket -> session) */
+/* Pending function calls (WebSocket -> session). The model may send several in one
+ * message: a secret per player plus a roll, so room for six players and more. */
+#define TOOL_SLOTS              8
 #define TOOL_ID_CAPACITY        96
 #define TOOL_NAME_CAPACITY      32
 #define TOOL_CAPTURE            "capturar_imagen"
@@ -271,7 +273,7 @@ static struct {
     int64_t item_shown_us;
     /* Function calls: the WebSocket task fills a free slot and posts EV_TOOL;
      * the session task runs it and frees the slot (busy flag, atomic). */
-    tool_slot_t tools[TOOL_SLOTS];
+    tool_slot_t *tools;     /* TOOL_SLOTS, PSRAM (about 6 KiB) */
     uint32_t tool_busy[TOOL_SLOTS];
     uint32_t stills_sent;   /* diagnostics */
     /* Gallery (session task only): photos are read from flash here, never on
@@ -1651,6 +1653,12 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     if (!s.queue) {
         return ESP_ERR_NO_MEM;
     }
+    s.tools = heap_caps_calloc(TOOL_SLOTS, sizeof(tool_slot_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s.tools) {
+        vQueueDelete(s.queue);
+        s.queue = NULL;
+        return ESP_ERR_NO_MEM;
+    }
     /* Read after the queue exists: later changes arrive as EV_WIFI events. */
     s.wifi_state = app_wifi_get_state();
 
@@ -1735,5 +1743,7 @@ fail_gl:
 fail_queue:
     vQueueDelete(s.queue);
     s.queue = NULL;
+    heap_caps_free(s.tools);
+    s.tools = NULL;
     return err;
 }
