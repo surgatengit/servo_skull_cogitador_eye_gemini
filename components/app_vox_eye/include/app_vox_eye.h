@@ -44,6 +44,7 @@ typedef void (*app_vox_gallery_cb_t)(app_vox_gallery_action_t action, void *ctx)
 typedef enum {
     APP_VOX_EYE_ACTION_VOICE_NEXT = 0, /**< voice badge (top right) tapped */
     APP_VOX_EYE_ACTION_ROLE_ROLL,      /**< "D20" badge (role mode, right) tapped */
+    APP_VOX_EYE_ACTION_CLOSE_HOLD,     /**< role mode: eye held ~1.5 s (leave the game) */
 } app_vox_eye_action_t;
 
 /** Bezel button notification. Runs on the GSP framework task: never block. */

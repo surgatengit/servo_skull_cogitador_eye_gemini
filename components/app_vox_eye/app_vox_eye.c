@@ -29,6 +29,15 @@
 #define CLOSE_Y0               0
 #define CLOSE_Y1               64
 #define DELETE_HOLD_TICKS      45       /* ~1.5 s holding the X deletes every photo */
+/* Bezel badges (voice_badge / role_badge in ui/main.json; keep in sync). */
+#define VOICE_X0               364
+#define VOICE_X1               420
+#define VOICE_Y0               60
+#define VOICE_Y1               116
+#define ROLE_X0                404
+#define ROLE_X1                460
+#define ROLE_Y0                212
+#define ROLE_Y1                268
 /* Dice panel (ui/main.json "dice"; keep in sync). */
 #define DIE_SIZE               76
 #define DIE_GAP                16
@@ -102,6 +111,11 @@ struct app_vox_eye {
     uint32_t dice_tick;
     bool dice_active;
     volatile int32_t secret_open;   /* set by any task, cleared on the render task */
+    volatile int32_t role_mode;     /* set by any task: hold the eye to leave */
+    /* Hold on the eye in role mode (render task only: interceptor + timer). */
+    bool eye_held;
+    bool eye_fired;
+    uint32_t eye_since;
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -402,6 +416,13 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
             eye->config.on_gallery(APP_VOX_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
         }
     }
+    if (eye->eye_held && !eye->eye_fired && eye->ticks - eye->eye_since >= DELETE_HOLD_TICKS) {
+        eye->eye_fired = true; /* fire while still held; the release is swallowed */
+        eye->blink_request = 1;
+        if (eye->config.on_action) {
+            eye->config.on_action(APP_VOX_EYE_ACTION_CLOSE_HOLD, eye->config.action_ctx);
+        }
+    }
     step_dice(eye);
     if (eye->gallery_open || eye->dice_active || eye->secret_open) {
         return; /* covered by an overlay: no eye repaints, less DMA traffic */
@@ -528,6 +549,31 @@ static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, vo
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
+    /* Role mode: a press held on the eye (not on a bezel badge or an overlay)
+     * leaves the game; a short tap still interrupts. */
+    const bool on_badge = (x >= VOICE_X0 && x < VOICE_X1 && y >= VOICE_Y0 && y < VOICE_Y1) ||
+                          (x >= ROLE_X0 && x < ROLE_X1 && y >= ROLE_Y0 && y < ROLE_Y1);
+    const bool eye_free = eye->role_mode && !eye->gallery_open && !eye->dice_active &&
+                          !eye->secret_open && !on_badge;
+    if (pressed) {
+        if (!eye->eye_held && eye_free) {
+            eye->eye_held = true;
+            eye->eye_fired = false;
+            eye->eye_since = eye->ticks;
+        } else if (eye->eye_held && !eye_free && !eye->eye_fired) {
+            eye->eye_held = false;
+        }
+    } else if (eye->eye_held) {
+        const bool fired = eye->eye_fired;
+        eye->eye_held = false;
+        eye->eye_fired = false;
+        if (fired) {
+            return true; /* the hold already acted: no tap on release */
+        }
+    }
+    if (pressed && eye->eye_fired) {
+        return true;
+    }
     const bool on_x = x >= CLOSE_X0 && x < CLOSE_X1 && y >= CLOSE_Y0 && y < CLOSE_Y1;
     if (pressed) {
         if (!eye->x_held && eye->gallery_open && on_x) {
@@ -731,6 +777,7 @@ esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enable
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
+    handle->role_mode = enabled ? 1 : 0;
     return (esp_gsp_err_t)gsp_vox_role_badge_set_visible(handle->ui, enabled);
 }
 

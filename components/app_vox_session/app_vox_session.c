@@ -700,6 +700,12 @@ static void on_tap(void)
     case ST_LISTENING:
     case ST_PROCESSING:
     default:
+        if (s.role_mode) {
+            /* A game must not end by accident: holding the eye (or asking the
+             * master to end the game) leaves it. */
+            show_notice("MANTÉN PARA SALIR");
+            break;
+        }
         close_conversation();
         break;
     }
@@ -1074,7 +1080,9 @@ static void run_role(const tool_slot_t *slot, const cJSON *args)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "result",
                             "Modo rol activado: la conversación espera más antes de cerrarse y "
-                            "los jugadores tienen un botón D20 en la pantalla.");
+                            "los jugadores tienen un botón D20 en la pantalla. Un toque solo te "
+                            "interrumpe; para salir de la partida se mantiene pulsada la pantalla "
+                            "o te lo piden.");
     if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
         cJSON_AddStringToObject(root, "pagina_movil", address);
         cJSON_AddStringToObject(root, "instrucciones",
@@ -1285,6 +1293,13 @@ static void on_action(app_vox_session_action_t action)
         show_notice(text);
         ESP_LOGI(TAG, "voice %s (%s)%s", next->name, next->label,
                  open ? " from the next conversation" : "");
+        return;
+    }
+    if (action == APP_VOX_SESSION_ACTION_CLOSE_HOLD) {
+        if (s.state != ST_CLOSED && s.state != ST_ERROR) {
+            ESP_LOGI(TAG, "eye held in role mode; leaving the game");
+            close_conversation();
+        }
         return;
     }
     if (action == APP_VOX_SESSION_ACTION_ROLE_ROLL && s.role_mode) {

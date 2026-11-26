@@ -67,6 +67,8 @@ a tap toggles idle/listening. Networking and audio are not simulated.
     11 lines; host-tested);
   - it stays until it is tapped.
 - The eye animation pauses under the dice panel and the secret card, as it does under the gallery.
+- In role mode (device only, input interceptor), a press held ~1.5 s on the eye, outside the badges
+  and overlays, reports `APP_VOX_EYE_ACTION_CLOSE_HOLD`, and its release is swallowed.
 - PC preview: the voice badge cycles C/A/K/S and shows a secret on the fourth voice. The D20 badge
   alternates a 2d20 critical and a 1d20 fumble.
 

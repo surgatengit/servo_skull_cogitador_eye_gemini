@@ -51,6 +51,7 @@ typedef enum {
 typedef enum {
     APP_VOX_SESSION_ACTION_VOICE_NEXT = 0, /**< voice badge: next voice */
     APP_VOX_SESSION_ACTION_ROLE_ROLL,      /**< D20 badge (role mode): player roll 2d20 */
+    APP_VOX_SESSION_ACTION_CLOSE_HOLD,     /**< role mode: eye held, leave the game */
 } app_vox_session_action_t;
 
 typedef struct {

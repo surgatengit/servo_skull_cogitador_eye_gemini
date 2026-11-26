@@ -90,7 +90,10 @@ closes the conversation and re-arms local listening.
     - role badge on;
     - idle timeout `VOX_ROLE_IDLE_TIMEOUT_S` (180 s);
     - phone page started (`app_rol_web`), with its address on the status line;
-    - closing the conversation ends role mode.
+    - closing the conversation ends role mode;
+    - a tap only interrupts the master: while listening it shows «MANTÉN PARA SALIR». Holding the
+      eye ~1.5 s (`APP_VOX_SESSION_ACTION_CLOSE_HOLD`) or asking the master to end the game leaves
+      it.
   - `mostrar_secreto(jugador, texto)`: delivered to that player's phone when they joined the phone
     page; otherwise shown on the screen card (`show_secret`). The response tells the model which
     one happened.

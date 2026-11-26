@@ -614,6 +614,16 @@ En el dispositivo, por orden:
    para leerlo). El de un jugador sin móvil sale en la pantalla hasta tocarla.
 6. **Tirada del jugador:** toca «D20». Salen tus 2d20 y el máster los usa.
 7. Deja de hablar 2–3 minutos en modo rol: no debe cerrarse antes de unos 180 s.
+8. En modo rol, un toque mientras escucha no cierra (pone «MANTÉN PARA SALIR»). Mantén el dedo
+   1,5 s sobre el ojo: sale de la partida.
+
+**Primer intento (2026-11-26, firmware `da1a7c52…`):**
+- Correcto: `cambiar_voz` (Kore), el botón de voz (Sulafat, guardada tras reiniciar), la reconexión
+  con la voz nueva y los dados 2d20 y 3d100.
+- `modo_rol` arrancó la página en `http://192.168.1.37`.
+- A los 15 s, dos toques seguidos (interrumpir y luego, sin querer, cerrar) terminaron la partida.
+- Corrección: en modo rol un toque ya no cierra; se sale manteniendo pulsado o pidiéndoselo al
+  máster.
 
 En el registro (`iris logs`), busca:
 - `dice {...}`;
