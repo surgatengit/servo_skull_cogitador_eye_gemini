@@ -74,7 +74,7 @@ Un toque en el ojo solo interrumpe al máster. Para salir de la partida, **mant�
 > **RoleMaster está en beta.** Ya se ha probado en el dispositivo: voces, dados en los tres sistemas,
 > secretos en el móvil y la salida manteniendo pulsado. La sala de espera, las fichas y las partidas
 > guardadas están probadas en el simulador y pendientes de la primera partida real con jugadores. El
-> firmware compilado de la [Guía A](#️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-vox) sigue
+> firmware compilado de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-vox) sigue
 > siendo la versión estable 1.5.0; para probar RoleMaster hoy, compílalo desde el código
 > ([Para desarrolladores](#️-para-desarrolladores)).
 
