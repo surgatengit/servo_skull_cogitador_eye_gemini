@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Check that the VOX fork of esp-mosaico-bsp differs from the submodule only by the
-documented change (third_party/esp-mosaico-bsp/VOX_FORK.md). Exit 0 when it does.
+"""Check that the Cogitador fork of esp-mosaico-bsp differs from the submodule only by the
+documented change (third_party/esp-mosaico-bsp/COGITADOR_FORK.md). Exit 0 when it does.
 
 Usage (from the project root): python tools/check_bsp_fork.py
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[1]
 FORK = PROJECT / "third_party" / "esp-mosaico-bsp"
 UPSTREAM = PROJECT.parents[1] / "submodule" / "esp-mosaico-bsp" / "components" / "esp-mosaico-bsp"
-FORK_ONLY = {"VOX_FORK.md"}
+FORK_ONLY = {"COGITADOR_FORK.md"}
 PATCHED = "onboard/display.c"
 EXPECTED_LINE = "io_config.trans_queue_depth = 2;"
 
@@ -26,7 +26,7 @@ def files(root: Path) -> set[str]:
 # Unmodified copies that must resolve `../esp-mosaico-bsp` to the fork above.
 # Their unit-test folders are not copied. Files listed in UPSTREAM_FIXES are taken
 # verbatim from a later official esp-mosaico-bsp commit instead of the submodule
-# checkout (see third_party/esp-mosaico-bsp/VOX_FORK.md).
+# checkout (see third_party/esp-mosaico-bsp/COGITADOR_FORK.md).
 VERBATIM = ("mosaico_module_camera", "mosaico_module_mgr")
 SKIPPED_DIRS = ("test/",)
 UPSTREAM_FIXES = {

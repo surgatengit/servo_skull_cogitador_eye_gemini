@@ -1,4 +1,4 @@
-# VOX M-01 1.2.0 — Google Search nativo en Gemini Live
+# Cogitador M-01 1.2.0 — Google Search nativo en Gemini Live
 
 Estado: **implementado y compilado en la rama `feat/google-search` (2026-11-25); pendiente de
 validar en el dispositivo** (prueba 10 de [INSTALL.md](INSTALL.md)). La versión estable sigue siendo
@@ -21,10 +21,10 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
 > **ESTADO (2026-11-25): búsqueda DESACTIVADA por defecto.**
 >
 > - En la prueba 10, el servidor cerró con código 1011 todos los `setup` que declaraban
->   `googleSearch`, con los dos modelos, y VOX no podía conectar.
+>   `googleSearch`, con los dos modelos, y Cogitador no podía conectar.
 > - Causa: según `tools/test_live_setup.py`, la **cuota del plan gratuito está excedida** en los
 >   dos modelos.
-> - Decisión del propietario: búsqueda **opcional, desactivada por defecto** (`VOX_GOOGLE_SEARCH=n`).
+> - Decisión del propietario: búsqueda **opcional, desactivada por defecto** (`COGITADOR_GOOGLE_SEARCH=n`).
 >   Para usarla hay que recompilar con `=y` y tener cuota disponible (detalles en INSTALL.md,
 >   prueba 10).
 >
@@ -32,7 +32,7 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
 > de inmediato con lo que sabe y solo busca cuando el operador se lo pide («busca…») o cuando
 > desconoce un dato reciente (por ejemplo, la última película de Nolan). No cita fuentes ni de
 > viva voz ni en pantalla. La línea de estado con sugerencias y fuentes queda desactivada
-> (Kconfig `VOX_SHOW_SEARCH_SOURCES=n`). El código se conserva por si se quiere activar. Las
+> (Kconfig `COGITADOR_SHOW_SEARCH_SOURCES=n`). El código se conserva por si se quiere activar. Las
 > secciones 1 y 4 describen esa opción; el riesgo de cumplimiento de la sección 4 aumenta al no
 > mostrarse nada.
 
@@ -45,15 +45,15 @@ Fuentes consultadas el 2026-11-25. Las páginas de `ai.google.dev/gemini-api/doc
   alternativo. La documentación marca Google Search como **compatible en los dos**.
 - La personalidad añade la regla de búsqueda discreta: responder de inmediato y buscar solo si se
   le pide o si desconoce un dato reciente, sin mencionar fuentes. Una primera versión decía
-  «busca ante hechos actuales y cita la fuente», y el propietario notó VOX más lento.
-- Opcional (`VOX_SHOW_SEARCH_SOURCES`, **desactivado**): la línea de estado del ojo mostraría primero
+  «busca ante hechos actuales y cita la fuente», y el propietario notó al Cogitador más lento.
+- Opcional (`COGITADOR_SHOW_SEARCH_SOURCES`, **desactivado**): la línea de estado del ojo mostraría primero
   las **sugerencias de búsqueda** («GOOGLE: …») y después las **fuentes** («FUENTE 1/3: AEMET.ES»),
   rotando cada 3 s.
 - Mientras Gemini busca o razona, el reposo de 15 s queda **en suspenso** y el ojo se mantiene ámbar.
 - La palabra de despertar, el toque (abrir, interrumpir, cerrar), el semidúplex del audio, la
   ganancia, el volumen y el vigilante de modelo mudo funcionan igual que en 1.1.0.
 
-Se puede desactivar sin tocar el código con Kconfig `VOX_GOOGLE_SEARCH=n`.
+Se puede desactivar sin tocar el código con Kconfig `COGITADOR_GOOGLE_SEARCH=n`.
 
 ## 2. Mensaje `setup`
 
@@ -64,7 +64,7 @@ Se puede desactivar sin tocar el código con Kconfig `VOX_GOOGLE_SEARCH=n`.
 {"setup":{
   "model":"models/gemini-3.1-flash-live-preview",
   "generationConfig":{"responseModalities":["AUDIO"],"speechConfig":{"…":"…"}},
-  "systemInstruction":{"parts":[{"text":"Eres VOX M-01…"}]},
+  "systemInstruction":{"parts":[{"text":"Eres Cogitador M-01…"}]},
   "tools":[{"googleSearch":{}}],
   "inputAudioTranscription":{},"outputAudioTranscription":{},
   "realtimeInputConfig":{"automaticActivityDetection":{"disabled":false}},
@@ -78,19 +78,19 @@ camelCase sigue la convención JSON de los protos, igual que el resto de campos 
 aceptación del servidor se confirma en la prueba 10** con el log `connected; setup sent (…, google search)`
 seguido de `session ready`. Si el servidor rechazara el campo, la sesión no llegaría a
 `setupComplete` y el cliente pasaría al modelo alternativo. En ese caso, recompila con
-`VOX_GOOGLE_SEARCH=n`.
+`COGITADOR_GOOGLE_SEARCH=n`.
 
 No se envía `thinkingConfig` (sección 6).
 
 ## 3. Mensajes del servidor que ahora se gestionan
 
-| Mensaje / campo | Qué hace VOX 1.2.0 |
+| Mensaje / campo | Qué hace Cogitador 1.2.0 |
 |---|---|
 | `serverContent.modelTurn.parts[].inlineData` | Audio, como antes |
 | Partes sin audio: `text`, `thought: true`, `executableCode`, `codeExecutionResult` | No se reproducen. Cuentan como actividad del modelo (`APP_GL_EVT_MODEL_ACTIVITY`) y se registran solo por tipo, a nivel DEBUG y sin contenido. La documentación avisa de que el modelo puede escribir y ejecutar código para buscar |
 | `serverContent.groundingMetadata` | `webSearchQueries` (sugerencias) y `groundingChunks[].web.title`/`domain` (fuentes), sin duplicados y acumulados durante la respuesta. `searchEntryPoint.renderedContent` (HTML/CSS) no se puede pintar, así que solo se mide su tamaño. Las `uri` son redirecciones `vertexaisearch…` y no se usan |
 | `turnComplete` + `interactionStatus` | `IN_PROGRESS` significa que acaba de terminar una frase de relleno y el modelo sigue trabajando, así que el turno sigue abierto. `IDLE` o sin estado cierra el turno |
-| `toolCall` / `toolCallCancellation` | No se esperan, porque VOX no declara funciones y la búsqueda es del servidor. Si llegan, se registran y no se responden |
+| `toolCall` / `toolCallCancellation` | No se esperan, porque Cogitador no declara funciones y la búsqueda es del servidor. Si llegan, se registran y no se responden |
 | `usageMetadata` | Se guarda la última y se escribe una línea por turno: `turn usage: prompt=… response=… tool=… thoughts=… total=…`. `tool` son los tokens de los resultados de búsqueda inyectados |
 
 Diagnóstico: la línea `diag` añade `other=` (partes sin audio), `search{q=… grounded=…}` y
@@ -117,13 +117,13 @@ foro oficial de desarrolladores, ambas sin respuesta de Google
 [bot de texto](https://discuss.ai.google.dev/t/compliance-help-gemini-grounding-search-suggestions-in-text-only-irc-bot/80732)).
 El ESP32-S31 no puede pintar el HTML/CSS de `renderedContent` en una pantalla redonda de 466×466.
 
-Lo que hace VOX, como aproximación prudente:
+Lo que hace Cogitador, como aproximación prudente:
 
 1. **Muestra las sugerencias de búsqueda** (`webSearchQueries`) en la línea de estado con el prefijo
    «GOOGLE:», mientras suena la respuesta y antes de las fuentes. El texto se pasa a mayúsculas y se
    limpia para la fuente del ojo (máx. 24 caracteres, «...» si no cabe).
 2. **Muestra las fuentes** (dominios) numeradas en la pantalla.
-3. **No modifica la respuesta.** El audio de Gemini se reproduce tal cual; VOX solo puede
+3. **No modifica la respuesta.** El audio de Gemini se reproduce tal cual; Cogitador solo puede
    interrumpirlo con un toque.
 4. **No guarda nada.** Ni sugerencias, ni fuentes, ni respuestas se escriben en flash. Se borran con la
    siguiente pregunta o al cerrar, y en los logs solo aparecen a nivel DEBUG.
@@ -147,8 +147,8 @@ adicional, lo que este proyecto evita).
 | Audio de salida | 12,00 $ por 1 M de tokens (≈ 0,018 $/min) |
 | Texto de entrada / salida | 0,75 $ / 4,50 $ por 1 M de tokens. Los resultados de búsqueda inyectados (`toolUsePromptTokenCount`) cuentan como entrada |
 | Nivel gratuito | Sin coste, pero Google **usa los datos para mejorar sus productos**. En el nivel de pago no |
-| Sesión | La conexión dura unos 10 min (`goAway` y reanudación, ya gestionados). El audio sin compresión se limita a 15 min (VOX activa `slidingWindow`). Contexto de 128 k |
-| Sesiones simultáneas (API de desarrolladores) | No publicado: la página de límites remite a AI Studio, que pide iniciar sesión. VOX solo abre una |
+| Sesión | La conexión dura unos 10 min (`goAway` y reanudación, ya gestionados). El audio sin compresión se limita a 15 min (Cogitador activa `slidingWindow`). Contexto de 128 k |
+| Sesiones simultáneas (API de desarrolladores) | No publicado: la página de límites remite a AI Studio, que pide iniciar sesión. Cogitador solo abre una |
 
 Ejemplo orientativo: 10 preguntas al día con una búsqueda cada una son unas 300 consultas al mes,
 dentro del cupo gratuito. Por encima de 5 000 consultas al mes, cada búsqueda cuesta ≈ 0,014 $,
@@ -157,7 +157,7 @@ y la línea `turn usage` de los logs.
 
 ## 6. Pensamiento (`thinkingLevel`): comprobado, sin cambios
 
-| Modelo | Opciones | Por defecto | VOX 1.2.0 |
+| Modelo | Opciones | Por defecto | Cogitador 1.2.0 |
 |---|---|---|---|
 | `gemini-3.1-flash-live-preview` | `generationConfig.thinkingConfig.thinkingLevel`: `minimal`, `low`, `medium`, `high` (en JSON, en mayúsculas en los ejemplos: `"LOW"`). Sin `thinkingBudget`. `includeThoughts` no está confirmado en Live | `minimal` (prioriza latencia) | No envía `thinkingConfig`, así que usa `minimal` |
 | `gemini-3.8-live` | Razonamiento integrado. **`thinkingLevel` no se admite**: hay que omitir `thinkingConfig` | — | No lo envía |
@@ -185,7 +185,7 @@ Ahora la sesión lleva un estado de **respuesta pendiente** (`reply_pending`):
   al cerrar.
 - Mientras está activa, **el reposo no corre**. Si la reproducción se vacía más de 2 s con el turno
   abierto, el ojo pasa de verde a **ámbar** (PROCESSING) en lugar de a rojo.
-- Límite de seguridad: si no llega ninguna salida del modelo en **`VOX_RESPONSE_TIMEOUT_S` (30 s por
+- Límite de seguridad: si no llega ninguna salida del modelo en **`COGITADOR_RESPONSE_TIMEOUT_S` (30 s por
   defecto)**, se abandona la espera (`no model output for 30 s; reply abandoned`), se vuelve a
   escuchar y a partir de ahí corren los 15 s de reposo.
 
@@ -197,7 +197,7 @@ cierre con un toque no cambian.
 - **Sin reservas nuevas en RAM interna en tiempo de ejecución.** Los árboles cJSON (ya en PSRAM), las
   listas de grounding (2 × 384 B), los elementos de estado (768 B) y los mensajes grandes (búfer RX de
   256 KiB) están en PSRAM.
-- Estático (`esp_idf_size`): `.bss` interno de `app_vox_session` **200 B** (unos 44 B más) y de
+- Estático (`esp_idf_size`): `.bss` interno de `app_cogitador_session` **200 B** (unos 44 B más) y de
   `app_gemini_live` 1 B. El código va en PSRAM/flash. DIRAM total: 176 576 B usados (35 %).
 - Al arrancar: un mutex de FreeRTOS (≈ 80 B) y unos 40 B más en la estructura del cliente, ambos en
   RAM interna y antes de crear la pantalla. No fragmentan en ejecución.
@@ -208,7 +208,7 @@ cierre con un toque no cambian.
 
 ## 9. Pruebas
 
-- **PC:** `tools/host_tests/run.ps1` (MSVC) compila `gl_grounding.c`, `vox_status_text.c` y cJSON
+- **PC:** `tools/host_tests/run.ps1` (MSVC) compila `gl_grounding.c`, `cogitador_status_text.c` y cJSON
   con stubs, y comprueba lo siguiente. Resultado: `all grounding host tests passed`.
   - Análisis de `groundingMetadata`: duplicados, títulos y `domain`, entradas largas cortadas en
     límite UTF-8, búfer pequeño, metadatos vacíos.

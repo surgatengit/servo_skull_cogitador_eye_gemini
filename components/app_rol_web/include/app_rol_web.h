@@ -57,7 +57,7 @@ size_t app_rol_web_take_notices(char *out, size_t cap);
 /** Saved game from the current players plus meta and summary (cJSON_free it). */
 char *app_rol_web_build_game(const rol_game_meta_t *meta, const char *summary);
 
-/** Keep `json` (a valid saved game) as the saved game on VOX (NVS). */
+/** Keep `json` (a valid saved game) as the saved game on Cogitador (NVS). */
 esp_err_t app_rol_web_store_game(const char *json);
 
 /** The saved game (heap string, free() it), or NULL when there is none. */

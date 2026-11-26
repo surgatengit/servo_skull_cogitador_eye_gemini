@@ -1,6 +1,6 @@
 # app_audio
 
-ES8311 audio for VOX M-01 on the BSP's shared 48 kHz / 16-bit / stereo I2S bus.
+ES8311 audio for Cogitador M-01 on the BSP's shared 48 kHz / 16-bit / stereo I2S bus.
 Depends on `esp-mosaico-bsp` (codec devices), FreeRTOS and esp_timer.
 
 ```
@@ -11,7 +11,7 @@ SPK  ring 24 kHz (8 s, PSRAM) → 47-tap polyphase FIR ×2 (11 kHz) → 48 kHz �
 ## Contract
 
 - `app_audio_start(&cfg)`: singleton, once. Opens both codec devices and starts
-  `vox_mic` (prio 18) and `vox_play` (prio 19) on core 1.
+  `cog_mic` (prio 18) and `cog_play` (prio 19) on core 1.
 - `on_mic(pcm, 640, ctx)` runs on the capture task every 40 ms while enabled
   (`app_audio_set_mic_enabled`). Keep it short; `pcm` is valid only during the call.
 - `app_audio_play(pcm24k, n, timeout_ms)`: single producer. Blocks while the ring
@@ -21,7 +21,7 @@ SPK  ring 24 kHz (8 s, PSRAM) → 47-tap polyphase FIR ×2 (11 kHz) → 48 kHz �
   lock-free and callable from any task.
 - Cross-task state uses GCC `__atomic` builtins; the ring is single-producer /
   single-consumer. Buffers are instance-owned; no large stack arrays.
-- Defaults: mic gain 24 dB (30 dB saturated in hardware tests), volume 70 (Kconfig `VOX_MIC_GAIN_DB`, `VOX_SPEAKER_VOLUME`).
+- Defaults: mic gain 24 dB (30 dB saturated in hardware tests), volume 70 (Kconfig `COGITADOR_MIC_GAIN_DB`, `COGITADOR_SPEAKER_VOLUME`).
 
 ## Limits
 

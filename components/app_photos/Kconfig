@@ -1,6 +1,6 @@
-menu "VOX M-01 photo store"
+menu "Cogitador M-01 photo store"
 
-    config VOX_PHOTOS_SLOTS
+    config COGITADOR_PHOTOS_SLOTS
         int "Stills kept in the photos partition (oldest replaced)"
         range 1 10
         default 10

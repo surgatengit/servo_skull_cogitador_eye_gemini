@@ -13,7 +13,9 @@
 static const char *TAG = "app_secrets";
 
 /* Application-owned default "nvs" partition; never Vibe Mode's sysmeta/shared. */
-#define SECRETS_NAMESPACE   "vox_secret"
+#define SECRETS_NAMESPACE   "cog_secret"
+/* Namespace used up to 1.6; its entries move to SECRETS_NAMESPACE once (1.7). */
+#define LEGACY_NAMESPACE    "vox_secret"
 #define KEY_API             "api_key"
 #define KEY_MODEL           "model"
 #define KEY_VOICE           "voice"
@@ -268,8 +270,51 @@ static esp_err_t rpc_handler(const esp_iris_rpc_request_t *request, uint8_t *res
     }
 }
 
+/* Copy one string key from the legacy namespace unless the new one already has it. */
+static void migrate_key(nvs_handle_t from, nvs_handle_t to, const char *key)
+{
+    size_t len = 0;
+    if (nvs_get_str(to, key, NULL, &len) == ESP_OK) {
+        return;
+    }
+    char value[APP_SECRETS_API_KEY_CAPACITY];
+    len = sizeof(value);
+    if (nvs_get_str(from, key, value, &len) == ESP_OK) {
+        (void)nvs_set_str(to, key, value);
+    }
+    mbedtls_platform_zeroize(value, sizeof(value));
+}
+
+/* One-time move of the 1.6 namespace; a missing legacy namespace is the normal case. */
+static void migrate_legacy_namespace(void)
+{
+    nvs_handle_t from;
+    if (nvs_open(LEGACY_NAMESPACE, NVS_READONLY, &from) != ESP_OK) {
+        return;
+    }
+    nvs_close(from);
+    nvs_handle_t to;
+    if (nvs_open(LEGACY_NAMESPACE, NVS_READWRITE, &from) != ESP_OK) {
+        return;
+    }
+    esp_err_t err = nvs_open(SECRETS_NAMESPACE, NVS_READWRITE, &to);
+    if (err == ESP_OK) {
+        migrate_key(from, to, KEY_API);
+        migrate_key(from, to, KEY_MODEL);
+        migrate_key(from, to, KEY_VOICE);
+        err = nvs_commit(to);
+        nvs_close(to);
+    }
+    if (err == ESP_OK && nvs_erase_all(from) == ESP_OK) {
+        err = nvs_commit(from);
+    }
+    nvs_close(from);
+    ESP_LOGI(TAG, "legacy secrets namespace migrated (%s)", esp_err_to_name(err));
+}
+
 esp_err_t app_secrets_init(app_secrets_changed_cb_t on_changed, void *ctx)
 {
+    migrate_legacy_namespace();
     s_notify.on_changed = on_changed;
     s_notify.ctx = ctx;
     static const uint16_t methods[] = {

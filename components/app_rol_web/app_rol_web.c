@@ -21,7 +21,9 @@ static const char *TAG = "app_rol_web";
 #define JOIN_BODY_MAX     96
 #define SERVER_STACK      6144
 #define NOTICES_CAP       320
-#define GAME_NAMESPACE    "vox_game"
+#define GAME_NAMESPACE    "cog_game"
+/* Namespace used up to 1.6; its saved game moves to GAME_NAMESPACE once (1.7). */
+#define LEGACY_GAME_NAMESPACE "vox_game"
 #define GAME_KEY          "partida"
 
 extern const char rol_page_start[] asm("_binary_rol_page_html_start");
@@ -211,11 +213,11 @@ static esp_err_t game_get(httpd_req_t *req)
     char *json = app_rol_web_load_game();
     if (!json) {
         httpd_resp_set_status(req, "404 Not Found");
-        return send_error(req, "No hay ninguna partida guardada en VOX.");
+        return send_error(req, "No hay ninguna partida guardada en Co.");
     }
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"partida_vox.json\"");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"partida_cogitador.json\"");
     const esp_err_t err = httpd_resp_sendstr(req, json);
     free(json);
     return err;
@@ -224,11 +226,11 @@ static esp_err_t game_get(httpd_req_t *req)
 static esp_err_t game_post(httpd_req_t *req)
 {
     if (req->content_len == 0 || req->content_len >= ROL_GAME_MAX_BYTES) {
-        return send_error(req, "El archivo no es una partida de VOX o es demasiado grande.");
+        return send_error(req, "El archivo no es una partida de Co o es demasiado grande.");
     }
     char *body = heap_caps_malloc(ROL_GAME_MAX_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!body) {
-        return send_error(req, "VOX no tiene memoria libre ahora mismo.");
+        return send_error(req, "Co no tiene memoria libre ahora mismo.");
     }
     rol_game_meta_t meta;
     const bool ok = recv_body(req, body, ROL_GAME_MAX_BYTES) &&
@@ -236,7 +238,7 @@ static esp_err_t game_post(httpd_req_t *req)
                     app_rol_web_store_game(body) == ESP_OK;
     heap_caps_free(body);
     if (!ok) {
-        return send_error(req, "El archivo no es una partida de VOX o es demasiado grande.");
+        return send_error(req, "El archivo no es una partida de Co o es demasiado grande.");
     }
     ESP_LOGI(TAG, "saved game uploaded: %s", meta.title);
     char notice[160];
@@ -251,8 +253,11 @@ static esp_err_t game_post(httpd_req_t *req)
     return send_json(req, root);
 }
 
+static void migrate_legacy_game(void);
+
 esp_err_t app_rol_web_start(void)
 {
+    migrate_legacy_game();
     if (s.server) {
         return ESP_OK;
     }
@@ -450,8 +455,56 @@ char *app_rol_web_build_game(const rol_game_meta_t *meta, const char *summary)
     return json;
 }
 
+/* One-time move of the 1.6 saved game, on the session task: from app_rol_web_start()
+ * before the server exists, or from an earlier store/load call. Later calls (including
+ * the server's GET /partida) only read the flag. */
+static void migrate_legacy_game(void)
+{
+    static bool done;
+    if (done) {
+        return;
+    }
+    done = true;
+    nvs_handle_t from;
+    if (nvs_open(LEGACY_GAME_NAMESPACE, NVS_READONLY, &from) != ESP_OK) {
+        return;
+    }
+    nvs_close(from);
+    if (nvs_open(LEGACY_GAME_NAMESPACE, NVS_READWRITE, &from) != ESP_OK) {
+        return;
+    }
+    esp_err_t err = ESP_OK;
+    size_t len = 0;
+    if (nvs_get_blob(from, GAME_KEY, NULL, &len) == ESP_OK && len > 1 &&
+            len <= ROL_GAME_MAX_BYTES) {
+        char *json = heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        nvs_handle_t to;
+        err = json ? nvs_get_blob(from, GAME_KEY, json, &len) : ESP_ERR_NO_MEM;
+        if (err == ESP_OK) {
+            err = nvs_open(GAME_NAMESPACE, NVS_READWRITE, &to);
+            if (err == ESP_OK) {
+                size_t have = 0;
+                if (nvs_get_blob(to, GAME_KEY, NULL, &have) != ESP_OK) {
+                    err = nvs_set_blob(to, GAME_KEY, json, len);
+                }
+                if (err == ESP_OK) {
+                    err = nvs_commit(to);
+                }
+                nvs_close(to);
+            }
+        }
+        free(json);
+    }
+    if (err == ESP_OK && nvs_erase_all(from) == ESP_OK) {
+        err = nvs_commit(from);
+    }
+    nvs_close(from);
+    ESP_LOGI(TAG, "legacy saved game migrated (%s)", esp_err_to_name(err));
+}
+
 esp_err_t app_rol_web_store_game(const char *json)
 {
+    migrate_legacy_game();
     if (!json || !rol_game_valid(json, strlen(json))) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -479,6 +532,7 @@ esp_err_t app_rol_web_store_game(const char *json)
 
 char *app_rol_web_load_game(void)
 {
+    migrate_legacy_game();
     nvs_handle_t handle;
     if (nvs_open(GAME_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) {
         return NULL;

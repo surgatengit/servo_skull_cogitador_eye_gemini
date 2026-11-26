@@ -1,6 +1,6 @@
 # app_wifi
 
-Wi-Fi station for VOX M-01. Reads the Vibe Mode shared credentials through
+Wi-Fi station for Cogitador M-01. Reads the Vibe Mode shared credentials through
 `app_config_load_wifi()`, applies them with `WIFI_STORAGE_RAM` (no second
 persistent copy) and keeps the link up with exponential backoff (1 s → 30 s
 with jitter). Power save is disabled for low-latency audio streaming.

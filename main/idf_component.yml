@@ -2,8 +2,8 @@ dependencies:
   idf: ">=6.2"
   esp-mosaico-bsp:
     version: "*"
-    # VOX fork of the BSP at submodule commit 5f88b91 with one change; see
-    # third_party/esp-mosaico-bsp/VOX_FORK.md and tools/check_bsp_fork.py.
+    # Cogitador fork of the BSP at submodule commit 5f88b91 with one change; see
+    # third_party/esp-mosaico-bsp/COGITADOR_FORK.md and tools/check_bsp_fork.py.
     override_path: "../third_party/esp-mosaico-bsp"
   # Verbatim BSP camera component (fase 2), resolving esp-mosaico-bsp to the fork.
   # It patches ESP-IDF's DVP driver at configure time (owner's decision, HANDOFF §5).

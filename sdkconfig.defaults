@@ -58,7 +58,7 @@ CONFIG_TINYUSB_CDC_COUNT=2
 
 # REQUIRED for the camera (test 12): GPIO33/34 are camera D2/flash and the USB
 # Serial/JTAG pads. With USJ enabled the SC101IOT streams but no frame completes
-# (VIDIOC_DQBUF timeout). VOX never uses USJ (console on UART, ESP-Iris on
+# (VIDIOC_DQBUF timeout). Cogitador never uses USJ (console on UART, ESP-Iris on
 # USB-OTG HS); the BSP camera examples disable it too.
 # CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set
 

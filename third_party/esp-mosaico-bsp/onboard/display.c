@@ -261,7 +261,7 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config, esp_lcd_panel_hand
 
     esp_lcd_panel_io_spi_config_t io_config = CO5300_PANEL_IO_QSPI_CONFIG(BSP_LCD_CS, NULL, NULL);
     io_config.flags.psram_dma_direct = false;
-    /* VOX M-01 fork (see VOX_FORK.md): queue at most 2 color transfers. Each queued
+    /* Cogitador M-01 fork (see COGITADOR_FORK.md): queue at most 2 color transfers. Each queued
      * transfer holds its own internal DMA bounce buffer (8 lines, 7680 B) because
      * psram_dma_direct is false; the default depth of 10 fragments the internal DMA
      * heap and freezes the panel when the largest block drops below one transfer.

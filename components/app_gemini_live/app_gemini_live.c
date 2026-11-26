@@ -602,7 +602,7 @@ esp_err_t app_gemini_live_connect(app_gemini_live_handle_t gl, const char *api_k
         .enable_close_reconnect = true,   /* resume after goAway / server close */
         .ping_interval_sec = 20,
         .pingpong_timeout_sec = 60,
-        .user_agent = "vox-m01/1.0",
+        .user_agent = "cogitador-m01/1.0",
     };
     esp_websocket_client_handle_t client = esp_websocket_client_init(&cfg);
     /* The client keeps its own copy of the URI; erase ours immediately. */

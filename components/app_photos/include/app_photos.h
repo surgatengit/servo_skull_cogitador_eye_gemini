@@ -13,7 +13,7 @@ extern "C" {
 /**
  * Persistent ring of the latest JPEG stills in the "photos" flash partition
  * (contracts: ../README.md). Single owner: call every function from one task
- * with an internal-RAM stack (the VOX session task); flash erase/write must not
+ * with an internal-RAM stack (the Cogitador session task); flash erase/write must not
  * run on a task whose stack lives in PSRAM.
  */
 

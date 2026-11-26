@@ -238,9 +238,9 @@ esp_err_t app_audio_start(const app_audio_config_t *config)
         free_buffers();
         return err;
     }
-    if (xTaskCreatePinnedToCore(playback_task, "vox_play", AUDIO_TASK_STACK, NULL,
+    if (xTaskCreatePinnedToCore(playback_task, "cog_play", AUDIO_TASK_STACK, NULL,
                                 PLAYBACK_TASK_PRIO, NULL, AUDIO_TASK_CORE) != pdPASS ||
-            xTaskCreatePinnedToCore(capture_task, "vox_mic", AUDIO_TASK_STACK, NULL,
+            xTaskCreatePinnedToCore(capture_task, "cog_mic", AUDIO_TASK_STACK, NULL,
                                     CAPTURE_TASK_PRIO, NULL, AUDIO_TASK_CORE) != pdPASS) {
         /* A started playback task keeps running on silence; buffers stay owned. */
         ESP_LOGE(TAG, "audio task creation failed");

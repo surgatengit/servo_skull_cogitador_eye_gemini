@@ -47,7 +47,7 @@ char *rol_game_build(const rol_game_meta_t *meta, const char *summary,
         cJSON_Delete(list);
         return NULL;
     }
-    cJSON_AddNumberToObject(root, "vox_partida", ROL_GAME_VERSION);
+    cJSON_AddNumberToObject(root, ROL_GAME_VERSION_KEY, ROL_GAME_VERSION);
     cJSON_AddStringToObject(root, "titulo", meta->title);
     cJSON_AddStringToObject(root, "juego", meta->game);
     /* The summary is the master's own text; keep it within the document budget. */
@@ -97,7 +97,11 @@ static cJSON *parse_checked(const char *json, size_t len)
         return NULL;
     }
     cJSON *root = cJSON_ParseWithLength(json, len);
-    const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "vox_partida");
+    const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, ROL_GAME_VERSION_KEY);
+    if (!version) {
+        /* Files saved or downloaded up to 1.6 carry the old key. */
+        version = cJSON_GetObjectItemCaseSensitive(root, ROL_GAME_LEGACY_VERSION_KEY);
+    }
     const cJSON *players = cJSON_GetObjectItemCaseSensitive(root, "jugadores");
     if (!cJSON_IsObject(root) || !cJSON_IsNumber(version) ||
             (int)version->valuedouble != ROL_GAME_VERSION ||

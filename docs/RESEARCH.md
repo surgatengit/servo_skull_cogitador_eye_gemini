@@ -1,7 +1,7 @@
-# VOX M-01 — Investigación de proyectos de referencia (2026-11-25)
+# Cogitador M-01 — Investigación de proyectos de referencia (2026-11-25)
 
 Estudio de cuatro repositorios públicos y de la documentación oficial del kit ESP-Mosaico para
-decidir cómo evolucionar VOX M-01. **Solo investigación:**
+decidir cómo evolucionar Cogitador M-01. **Solo investigación:**
 - no se ha copiado código;
 - no se ha modificado la versión estable (`main` = `v1.2.0`, instalada en el dispositivo);
 - no se ha tocado ningún submódulo.
@@ -91,9 +91,9 @@ Recomendación: la opción 2 en una rama de prueba y la 1 en paralelo. Medir `la
   en JPEG de calidad 65 (máximo 48 KB) como **`realtimeInput.video`** (`image/jpeg`, base64).
   Limita la frecuencia y no envía mientras hay audio.
 
-**Propuesta para VOX:**
+**Propuesta para Cogitador:**
 
-- Frase de activación: «VOX, ¿qué ves?». Puede ser una función propia `capturar_imagen` declarada en el
+- Frase de activación: «Co, ¿qué ves?». Puede ser una función propia `capturar_imagen` declarada en el
   `setup` (sección 6) o una orden local.
 - Pasos: abrir la cámara, un fotograma, cerrarla, reducir a 320×240, JPEG por hardware con un máximo
   de unos 10–16 KB y enviarlo por `realtimeInput.video` con el TX en PSRAM.
@@ -104,7 +104,7 @@ Recomendación: la opción 2 en una rama de prueba y la 1 en paralelo. Medir `la
 **Riesgos:**
 
 1. **USB: resuelto en la fase 0.** El driver del BSP desactiva el pad de USB Serial/JTAG
-   (GPIO33 = D2 de la cámara) entre `mosaico_camera_new()` y `mosaico_camera_del()`, pero **VOX no usa
+   (GPIO33 = D2 de la cámara) entre `mosaico_camera_new()` y `mosaico_camera_del()`, pero **Cogitador no usa
    ese USB**:
    - `iris` funciona por el USB-OTG con TinyUSB: `ESP_IRIS_TRANSPORT_USB` con 2 CDC; COM7 control y
      COM6 datos, `VID_303A&PID_4002`;
@@ -137,7 +137,7 @@ Coste de CPU despreciable (miles de operaciones por fotograma); el autor no lo m
 detecta y reconoce caras con ESP-DL. Es más caro, necesita modelos en flash y su autor lo considera
 experimental.
 
-**Encaje en VOX:** nuestro iris ya se mueve dentro de la escena GSP (posición x/y con límites). El
+**Encaje en Cogitador:** nuestro iris ya se mueve dentro de la escena GSP (posición x/y con límites). El
 centroide (x, y) se puede traducir a la posición del iris con suavizado. No hay servo, solo ojo.
 
 **Obstáculo importante: la cámara tendría que quedarse abierta.** Eso implica:
@@ -188,12 +188,12 @@ cuestión del USB resuelta.
 
 ## 6. Herramientas: búsqueda y funciones personalizadas
 
-- **Google Search:** ya está implementado en VOX 1.2.0 (opcional y apagado) y bloqueado por la cuota
+- **Google Search:** ya está implementado en Cogitador 1.2.0 (opcional y apagado) y bloqueado por la cuota
   del plan gratuito (GOOGLE_SEARCH.md e INSTALL.md, prueba 10).
   - Ninguno de los proyectos usa grounding en Gemini.
   - openai usa la búsqueda alojada por OpenAI.
 - **Funciones propias** (`functionDeclarations` en `setup.tools`, `toolCall` y `toolResponse`). Ideas de
-  jamiryo y openai para VOX:
+  jamiryo y openai para Cogitador:
   - `cambiar_emocion` (color e iris del ojo; NON_BLOCKING);
   - `capturar_imagen` (sección 3);
   - `leer_sensores` (batería, carga, temperatura, IMU, magnetómetros, como `read_device_sensors` de
@@ -209,7 +209,7 @@ cuestión del USB resuelta.
   - Diferencias por modelo: `gemini-3.1-flash-live-preview` solo admite llamadas **síncronas**;
     `gemini-3.8-live` es **asíncrono** por defecto (hay que marcar `behavior: BLOCKING`).
 - **Lección de M5Gemini:** reintenta cualquier cierre 1011 cada 2 s, lo que con la cuota agotada sería
-  un bucle. VOX ya se detiene tras 5 fallos y ahora registra el motivo. Se puede afinar: si el motivo
+  un bucle. Cogitador ya se detiene tras 5 fallos y ahora registra el motivo. Se puede afinar: si el motivo
   menciona cuota, mostrar «CUOTA AGOTADA» sin reintentar.
 
 ## 7. Detección de alimentación externa y base magnética
@@ -229,12 +229,12 @@ cuestión del USB resuelta.
 - xiaozhi tiene un GPIO de carga y una calibración de ADC para el S31 (los valores brutos van invertidos
   y no hay calibración por hardware), útil si se mide una tensión.
 
-**Propuesta para VOX, sin hardware nuevo:** usar el BQ27220 que ya tiene el BSP (`bsp_battery_read()`).
+**Propuesta para Cogitador, sin hardware nuevo:** usar el BQ27220 que ya tiene el BSP (`bsp_battery_read()`).
 Con alimentación externa, `current_ma` / `average_current_ma` es positiva (carga) o casi nula con la
 batería llena, y `status_flags` indica descarga o carga.
 
 - Si `average_current_ma > umbral` o la batería no está descargando → «con alimentación».
-- Usos en VOX: pulso tenue en reposo mientras carga, permitir el seguimiento de la sección 4 solo con
+- Usos en Cogitador: pulso tenue en reposo mientras carga, permitir el seguimiento de la sección 4 solo con
   alimentación, y avisar con batería baja.
 - **Hay que validarlo en el hardware:** con la batería llena la corriente puede ser casi 0, así que
   conviene combinarlo con la tensión.
@@ -250,7 +250,7 @@ Detalles en ROADMAP.md §3.
 
 ## 8. PSRAM y optimización de memoria
 
-| Técnica | Dónde | Estado en VOX | Propuesta |
+| Técnica | Dónde | Estado en Cogitador | Propuesta |
 |---|---|---|---|
 | `SPIRAM_MALLOC_ALWAYSINTERNAL=4096` + `RESERVE_INTERNAL=65536` | openai (mismos valores); Hero S31 usa `RESERVE_INTERNAL=98304` | Ya activo (4096 / 65536) | Probar 98304 midiendo `largest=` |
 | `MBEDTLS_EXTERNAL_MEM_ALLOC` | openai, jamiryo, Hero | TLS ya en PSRAM | — |
@@ -289,7 +289,7 @@ Añadido a petición del propietario (1.5.0, `feat/gallery`, prueba 13 superada)
 |---|---|
 | USB de `iris` | **USB-OTG con TinyUSB**, no USB Serial/JTAG. Windows ve `VID_303A&PID_4002` compuesto (serie `1C2904D11390`) con COM7 (MI_00, control) y COM6 (MI_02, datos). `sdkconfig`: `ESP_IRIS_TRANSPORT_USB=y`, `TINYUSB_CDC_COUNT=2`, consola en UART0, sin consola secundaria en USB Serial/JTAG. **La cámara no corta la instalación ni los logs**: el riesgo principal de las fases 2 y 6 desaparece (salvo comprobarlo con la cámara activa) |
 | Versión del módulo de cámara | **V1.4 = SC101IOT** (1 MP, 1280×720 UYVY por defecto, enfoque manual). El módulo viene encapsulado, pero indica «rotate clockwise to focus far», y solo el V1.4 tiene enfoque manual. La primera compilación de la fase 2 lo confirmará por SCCB |
-| Batería y alimentación (BQ27220) | **No se puede leer sin escribir en el dispositivo**: VOX no inicializa el indicador e `iris device-status` no informa de batería. Hace falta una compilación de diagnóstico que escriba `bsp_battery_read()` en la línea `diag`, con instalación autorizada. Se propone como primer paso de la fase 4 |
+| Batería y alimentación (BQ27220) | **No se puede leer sin escribir en el dispositivo**: Cogitador no inicializa el indicador e `iris device-status` no informa de batería. Hace falta una compilación de diagnóstico que escriba `bsp_battery_read()` en la línea `diag`, con instalación autorizada. Se propone como primer paso de la fase 4 |
 
 ## 10. No verificado
 

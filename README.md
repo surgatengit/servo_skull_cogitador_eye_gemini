@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/img/vox-banner.svg" alt="VOX M-01: servocráneo con Gemini Live para ESP-Mosaico" width="100%">
+  <img src="docs/img/cogitador-banner.svg" alt="Cogitador M-01: servocráneo con Gemini Live para ESP-Mosaico" width="100%">
 </p>
 
 <p align="center">
@@ -18,26 +18,26 @@
 
 ---
 
-## 🆕 Novedad: VOX RoleMaster 1.6, tu mesa de rol tiene un máster nuevo
+## 🆕 Novedad: Cogitador RoleMaster 1.6, tu mesa de rol tiene un máster nuevo
 
 <p align="center">
-  <img src="docs/img/rolemaster-banner.svg" alt="VOX RoleMaster 1.6: el máster de rol que vive dentro de un ESP32" width="100%">
+  <img src="docs/img/rolemaster-banner.svg" alt="Cogitador RoleMaster 1.6: el máster de rol que vive dentro de un ESP32" width="100%">
 </p>
 
 <p align="center">
   <b>Reúne a tus amigos, saca los móviles y di «Hola ESP, vamos a jugar a rol».</b><br>
-  VOX se convierte en un <b>máster de rol de verdad</b>: inventa la aventura, pone voz a cada personaje,
+  Cogitador se convierte en un <b>máster de rol de verdad</b>: inventa la aventura, pone voz a cada personaje,
   tira dados reales, reparte secretos que solo ve quien debe verlos y guarda la partida para la próxima
   noche.
 </p>
 
 <p align="center">
-  <img src="docs/img/dados-critico.png" alt="Tirada 2d20 con crítico en la pantalla de VOX" width="200">
+  <img src="docs/img/dados-critico.png" alt="Tirada 2d20 con crítico en la pantalla de Cogitador" width="200">
   <img src="docs/img/dados-porcentaje.png" alt="Tirada porcentual: decenas 40 y unidades 7, resultado 47" width="200">
   <img src="docs/img/dados-reserva.png" alt="Reserva de 6d10 con 3 éxitos resaltados en dorado" width="200">
   <img src="docs/img/dados-reserva10.png" alt="Reserva de 10d10 en dos filas con 4 éxitos" width="200">
 </p>
-<p align="center"><sub>Suma con crítico, porcentaje, reserva de 6 dados y reserva de 10 dados: los tres sistemas de dados del juego de rol, en la pantalla redonda de VOX (capturas del simulador oficial).</sub></p>
+<p align="center"><sub>Suma con crítico, porcentaje, reserva de 6 dados y reserva de 10 dados: los tres sistemas de dados del juego de rol, en la pantalla redonda de Cogitador (capturas del simulador oficial).</sub></p>
 
 ### 🎭 Un máster que no se cansa nunca
 
@@ -50,19 +50,19 @@
 | 📜 | **Ficha de personaje viva** | Tu ficha (atributos, vida, equipo) siempre a mano en el móvil. Cuando te hieren o encuentras algo, el máster la actualiza y **el móvil vibra**. |
 | 🚪 | **Sala de espera** | El máster os da la dirección y espera. Cada vez que alguien entra, le da la bienvenida. ¿Alguien llega tarde o se le acaba la batería? Entra con su nombre y **recupera su ficha y sus secretos**. |
 | 👀 | **Nadie se queda atrás** | El máster sabe **quién no ha leído su secreto** y le avisa por su nombre antes del momento clave. |
-| 💾 | **Guarda y continúa** | «Guarda la partida»: resumen de la historia, fichas, secretos y tipo de dados quedan **en VOX**. Otro día eliges **continuar**, o empezar **una aventura nueva con los mismos personajes**. |
+| 💾 | **Guarda y continúa** | «Guarda la partida»: resumen de la historia, fichas, secretos y tipo de dados quedan **en Cogitador**. Otro día eliges **continuar**, o empezar **una aventura nueva con los mismos personajes**. |
 | 📂 | **Tus partidas, en un archivo** | Desde el móvil **descargas** la partida como archivo y **subes** otra cuando quieras: guarda todas las campañas que quieras. |
 
 <p align="center">
   <img src="docs/img/movil-ficha-secreto.jpg" alt="La página del móvil: ficha de personaje y secreto borroso" width="260">
   &nbsp;&nbsp;&nbsp;
-  <img src="docs/img/secreto-pantalla.png" alt="Tarjeta de secreto en la pantalla de VOX para un jugador sin móvil" width="300">
+  <img src="docs/img/secreto-pantalla.png" alt="Tarjeta de secreto en la pantalla de Cogitador para un jugador sin móvil" width="300">
 </p>
-<p align="center"><sub>A la izquierda, lo que ve Ana en su móvil: su ficha y un secreto que solo se lee manteniendo pulsado. A la derecha, el plan B para quien no tiene móvil: el secreto sale en la pantalla de VOX hasta que la toca.</sub></p>
+<p align="center"><sub>A la izquierda, lo que ve Ana en su móvil: su ficha y un secreto que solo se lee manteniendo pulsado. A la derecha, el plan B para quien no tiene móvil: el secreto sale en la pantalla de Cogitador hasta que la toca.</sub></p>
 
 ### 🕹️ Así se juega
 
-1. **«Hola ESP, vamos a jugar a rol».** VOX pregunta cuántos sois y a qué queréis jugar (o te propone una aventura corta).
+1. **«Hola ESP, vamos a jugar a rol».** Cogitador pregunta cuántos sois y a qué queréis jugar (o te propone una aventura corta).
 2. **Sacad los móviles.** Abrid la dirección que sale en la pantalla (`MÓVIL: 192.168.…`), escribid vuestro nombre y esperad a los demás.
 3. **«Ya estamos».** El máster explica las reglas en dos frases, crea vuestros personajes y os manda la ficha y un secreto a cada uno.
 4. **Jugad.** Contad qué hacéis; cuando algo es arriesgado, el máster tira o te prepara la tirada para que **toques el botón de dados**.
@@ -74,31 +74,31 @@ Un toque en el ojo solo interrumpe al máster. Para salir de la partida, **mant�
 > **RoleMaster está en beta.** Ya se ha probado en el dispositivo: voces, dados en los tres sistemas,
 > secretos en el móvil y la salida manteniendo pulsado. La sala de espera, las fichas y las partidas
 > guardadas están probadas en el simulador y pendientes de la primera partida real con jugadores. El
-> firmware compilado de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-vox) sigue
+> firmware compilado de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-cogitador) sigue
 > siendo la versión estable 1.5.0; para probar RoleMaster hoy, compílalo desde el código
 > ([Para desarrolladores](#️-para-desarrolladores)).
 
 ---
 
-## ✨ Qué es VOX M-01
+## ✨ Qué es Cogitador M-01
 
-VOX M-01 convierte la placa **ESP-Mosaico** en un **servocráneo conversacional**: la pantalla redonda
+El Cogitador M-01 (para los amigos, **Co**) convierte la placa **ESP-Mosaico** en un **servocráneo conversacional**: la pantalla redonda
 se transforma en un ojo mecánico a pantalla completa, y detrás hay **Gemini Live**, la IA de voz en
 tiempo real de Google. Le dices **«Hola ESP»** y conversas con él como con una persona: le preguntas,
 te contesta con voz natural, le interrumpes con un toque y, si le preguntas **«¿qué ves?»**, hace una
 foto con su cámara y te la describe.
 
 <p align="center">
-  <img src="docs/img/ojo-simulador.png" alt="El ojo de VOX en reposo, con el contador de fotos" width="300">
+  <img src="docs/img/ojo-simulador.png" alt="El ojo de Cogitador en reposo, con el contador de fotos" width="300">
   &nbsp;&nbsp;
-  <img src="docs/img/galeria-simulador.png" alt="La galería de fotos de VOX" width="300">
+  <img src="docs/img/galeria-simulador.png" alt="La galería de fotos de Cogitador" width="300">
 </p>
 <p align="center"><sub>El ojo en reposo (arriba a la izquierda, el número de fotos guardadas) y la galería. Capturas del simulador oficial, con la misma interfaz que el dispositivo.</sub></p>
 
 ### El ojo habla con colores
 
 <p align="center">
-  <img src="docs/img/vox-states.svg" alt="Estados del ojo: reposo cian, escucha rojo, piensa ámbar, habla verde, aviso violeta" width="640">
+  <img src="docs/img/cogitador-states.svg" alt="Estados del ojo: reposo cian, escucha rojo, piensa ámbar, habla verde, aviso violeta" width="640">
 </p>
 
 | Color | Qué significa |
@@ -120,7 +120,7 @@ foto con su cámara y te la describe.
 | 🖼️ | **Galería de recuerdos** | Guarda las **10 últimas fotos** en su memoria flash, aunque lo apagues. Toca el contador para verlas, ‹ › para pasar, **X** para volver y **mantén la X 1,5 s** para borrarlas todas. |
 | 🔒 | **Privacidad y seguridad** | Las fotos no salen del aparato (Gemini solo recibe la que te describe). La clave de Gemini **no está** en el código, el binario ni GitHub: se guarda en el propio dispositivo y no se puede leer desde fuera. |
 | 🔁 | **Robusto** | Reconexión automática, modelo de reserva si el principal falla, avisos claros en pantalla y modo de recuperación siempre disponible. |
-| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y VOX hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. Sirve para tres tipos de juego: dados que se **suman** (2d20, 3d6), **porcentaje** (d100 con dos d10) y **reserva** (hasta 10 dados contando éxitos). Cada jugador entra desde su **móvil** y ve allí su **ficha** y sus **secretos**; la partida se **guarda** en VOX para continuarla otro día, y se puede descargar o subir como archivo. |
+| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y Cogitador hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. Sirve para tres tipos de juego: dados que se **suman** (2d20, 3d6), **porcentaje** (d100 con dos d10) y **reserva** (hasta 10 dados contando éxitos). Cada jugador entra desde su **móvil** y ve allí su **ficha** y sus **secretos**; la partida se **guarda** en Cogitador para continuarla otro día, y se puede descargar o subir como archivo. |
 | 🤫 | **Secretos en el móvil** | En modo rol, cada jugador abre en su móvil la dirección que sale en pantalla, escribe su nombre y recibe **solo sus secretos**. Si alguien no tiene móvil, el suyo sale en pantalla hasta que la toca. |
 | 🎙️ | **Cuatro voces** | Charon y Algenib (chico), Kore y Sulafat (chica). Se cambian pidiéndoselo («ponte voz de chica»), tocando el círculo de arriba a la derecha o por USB. |
 | 🔎 | **Google Search opcional** | Puede buscar en Google datos recientes (desactivado por defecto: el plan gratuito agota la cuota). |
@@ -134,7 +134,7 @@ foto con su cámara y te la describe.
 
 ---
 
-## 🅰️ Guía A: tengo un ESP-Mosaico nuevo y quiero instalar VOX
+## 🅰️ Guía A: tengo un ESP-Mosaico nuevo y quiero instalar Cogitador
 
 Para quien tiene el ESP-Mosaico tal como viene de fábrica (con ESP-Claw) y actualizado.
 No hace falta saber programar: solo copiar y pegar unas órdenes. Tiempo: unos 20 minutos.
@@ -199,7 +199,7 @@ git clone https://github.com/surgatengit/cogitador_gemini.git projects/servocran
 En la pantalla del ESP-Mosaico, entra en **Mis Ideas** y comprueba que aparece **ESP-Claw**
 (código **100000**). Lo necesitarás si algún día quieres volver a dejarlo de fábrica (Guía B).
 
-### Paso 5. Instala VOX
+### Paso 5. Instala Cogitador
 
 1. Conecta el ESP-Mosaico al ordenador con el cable USB-C y enciéndelo.
 2. En PowerShell, dentro de `esp-mosaico-vibe`, ejecuta:
@@ -218,7 +218,7 @@ python mosaico.py iris system-update --bundle projects/servocraneo_gemini_direct
 
 ### Paso 6. Wi-Fi
 
-VOX usa el Wi-Fi que ya tenga guardado el ESP-Mosaico (el mismo que usaba ESP-Claw). Si el ojo se
+Cogitador usa el Wi-Fi que ya tenga guardado el ESP-Mosaico (el mismo que usaba ESP-Claw). Si el ojo se
 pone **violeta** con «SIN WI-FI», configura la red desde **Vibe Mode** en la pantalla del dispositivo
 (mantén pulsado el botón **AI** mientras lo enciendes para entrar).
 
@@ -250,12 +250,12 @@ Prueba con:
 
 ## 🅱️ Guía B: quiero volver a dejarlo de fábrica (ESP-Claw)
 
-Para quien tiene VOX instalado y quiere dejar el ESP-Mosaico como venía, con el último firmware
+Para quien tiene Cogitador instalado y quiere dejar el ESP-Mosaico como venía, con el último firmware
 oficial. Tus Ideas descargadas, el Wi-Fi y Vibe Mode se conservan.
 
 ### Paso 1. Borra tu clave de Gemini del dispositivo
 
-Con VOX en marcha y conectado por USB, en PowerShell dentro de `esp-mosaico-vibe`:
+Con Cogitador en marcha y conectado por USB, en PowerShell dentro de `esp-mosaico-vibe`:
 
 ```powershell
 python projects/servocraneo_gemini_direct/tools/provision_key.py --clear
@@ -278,7 +278,7 @@ cuando veas el menú de Vibe Mode.
 
 ### Paso 4 (recomendado). Revoca la clave
 
-Entra en <https://aistudio.google.com/apikey> y borra la clave que creaste para VOX. Es lo más seguro
+Entra en <https://aistudio.google.com/apikey> y borra la clave que creaste para Cogitador. Es lo más seguro
 si el dispositivo va a cambiar de manos.
 
 > [!IMPORTANT]
@@ -304,8 +304,8 @@ si el dispositivo va a cambiar de manos.
 
 | Componente | Responsabilidad |
 |---|---|
-| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
-| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
+| [`app_cogitador_eye`](components/app_cogitador_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
+| [`app_cogitador_session`](components/app_cogitador_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, imágenes, herramientas, reanudación, grounding) |
 | [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda: cámara izquierda, reset del sensor, PPA y JPEG por hardware |
 | [`app_photos`](components/app_photos/README.md) | Últimas 10 fotos en la partición `photos` |
@@ -323,7 +323,7 @@ Este repositorio va en `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (u
 `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe` para `esp32s31`.
 
 Copias mínimas en `third_party/` (Apache-2.0), comprobadas con `python tools/check_bsp_fork.py`:
-el BSP con un cambio para la memoria DMA de la pantalla (`VOX_FORK.md`) y `mosaico_module_camera`
+el BSP con un cambio para la memoria DMA de la pantalla (`COGITADOR_FORK.md`) y `mosaico_module_camera`
 con el arreglo oficial de PWDN `b60f5d8`. Los submódulos no se modifican.
 
 ### Compilar, simular e instalar (desde la raíz del espacio de trabajo)

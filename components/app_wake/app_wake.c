@@ -175,7 +175,7 @@ esp_err_t app_wake_init(app_wake_cb_t on_wake, void *ctx)
     s_wake.stream = xStreamBufferCreateStatic(WAKE_BUFFER_BYTES, 1, s_wake.stream_storage,
                                               &s_wake.stream_struct);
     if (!s_wake.stream ||
-            xTaskCreatePinnedToCore(wake_task, "vox_wake", WAKE_TASK_STACK, NULL, WAKE_TASK_PRIO,
+            xTaskCreatePinnedToCore(wake_task, "cog_wake", WAKE_TASK_STACK, NULL, WAKE_TASK_PRIO,
                                     NULL, WAKE_TASK_CORE) != pdPASS) {
         heap_caps_free(s_wake.stream_storage);
         s_wake.stream_storage = NULL;

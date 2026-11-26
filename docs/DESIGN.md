@@ -1,4 +1,4 @@
-# VOX M-01 GEMINI DIRECT — diseño del cliente Gemini Live nativo
+# Cogitador M-01 GEMINI DIRECT — diseño del cliente Gemini Live nativo
 
 Estado: **v1.1 (2026-11-24)**. Decisiones técnicas aprobadas por el propietario; versión 1.1.0
 validada en el hardware. Para retomar el desarrollo, empieza por [HANDOFF.md](HANDOFF.md).
@@ -19,7 +19,7 @@ intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Liv
 | Duración | Sin límite artificial (no hay grabación de 8 s); sesión continua con reanudación |
 | Idioma | Español de España (`es-ES`) |
 | Voz | `Charon` |
-| Personalidad | VOX M-01, servocráneo del Adeptus Mechanicus: solemne, ceremonial, con referencias ocasionales al Omnissiah. Útil y directo con cualquier pregunta legítima, incluidas las matemáticas sencillas |
+| Personalidad | Cogitador M-01, servocráneo del Adeptus Mechanicus: solemne, ceremonial, con referencias ocasionales al Omnissiah. Útil y directo con cualquier pregunta legítima, incluidas las matemáticas sencillas |
 
 ### 1.2 Clave de API
 
@@ -40,10 +40,10 @@ intermedios: el ESP-Mosaico abre directamente un WebSocket seguro con Gemini Liv
   | Reposo | Cian `#00E5FF` | Conversación cerrada o en espera |
   | Escuchando | Rojo `#FF1A1A` | Micrófono abierto y enviando audio |
   | Procesando | Ámbar `#FFB000` | Turno enviado; esperando la respuesta del modelo |
-  | Hablando | Verde `#20FF60` | Reproduciendo la voz de VOX |
+  | Hablando | Verde `#20FF60` | Reproduciendo la voz de Cogitador |
   | Error | Violeta `#B040FF` | Sin Wi-Fi, sin clave, error de red o de sesión |
 
-- **Un toque en la pantalla abre o cierra la conversación.** Mientras VOX habla, un toque la
+- **Un toque en la pantalla abre o cierra la conversación.** Mientras Cogitador habla, un toque la
   interrumpe y vuelve a escuchar (sección 3.4).
 - Una línea de estado discreta en la parte inferior solo para errores accionables
   (por ejemplo «SIN WI-FI» o «SIN CLAVE»).
@@ -81,11 +81,11 @@ main (composición; app_main solo inicializa y conecta)
  ├─ app_wifi          estación Wi-Fi, reintentos con backoff, eventos de estado
  ├─ app_audio         I2S/ES8311: captura 48k→16k mono, reproducción 24k→48k estéreo
  ├─ app_gemini_live   WSS + protocolo Live: setup, envío, reensamblado, parseo y reanudación
- ├─ app_vox_session   máquina de estados: une audio ↔ Gemini ↔ ojo y gestiona los toques
- └─ app_vox_eye       UI GSP del ojo mecánico (portable al simulador; sustituye a app_hello)
+ ├─ app_cogitador_session   máquina de estados: une audio ↔ Gemini ↔ ojo y gestiona los toques
+ └─ app_cogitador_eye       UI GSP del ojo mecánico (portable al simulador; sustituye a app_hello)
 ```
 
-Las dependencias van en una sola dirección. `app_vox_eye` no conoce la red: recibe estados
+Las dependencias van en una sola dirección. `app_cogitador_eye` no conoce la red: recibe estados
 y emite toques. Cada componente guarda su estado en un contexto privado y expone `include/` mínimos.
 
 ### 3.1 `app_wifi`
@@ -109,8 +109,8 @@ y emite toques. Cada componente guarda su estado en un contexto privado y expone
 - `goAway` o cierre → reconexión con el último *handle* de reanudación y backoff.
 - El modelo alternativo se usa automáticamente si el principal falla durante el `setup`
   y se puede fijar por RPC.
-- **Vigilante de modelo mudo** (en `app_vox_session`): si en una conexión salen al menos
-  `VOX_SILENT_MODEL_VOICED_FRAMES` tramas con voz (100 = 4 s; pico ≥ `VOX_VOICED_PEAK_THRESHOLD`,
+- **Vigilante de modelo mudo** (en `app_cogitador_session`): si en una conexión salen al menos
+  `COGITADOR_SILENT_MODEL_VOICED_FRAMES` tramas con voz (100 = 4 s; pico ≥ `COGITADOR_VOICED_PEAK_THRESHOLD`,
   ≈ −30 dBFS) y no llega ninguna transcripción ni audio, la sesión reconecta **una vez por arranque**
   con el otro modelo (`app_gemini_live_swap_model`).
 
@@ -125,7 +125,7 @@ SPK  ring 24k (PSRAM, ~4 s) → interpolación ×2 con FIR → 48k → estéreo 
 - Tareas de captura y reproducción en el núcleo 1; la red en el núcleo 0.
 - `flush_playback()` vacía el ring al instante (interrupción); el nivel de salida mueve la pupila.
 
-### 3.4 `app_vox_session` — estados y toques
+### 3.4 `app_cogitador_session` — estados y toques
 
 ```
 CERRADA ──toque──▶ CONECTANDO ──setupComplete──▶ ESCUCHANDO ──(audio del modelo)──▶ HABLANDO
@@ -144,7 +144,7 @@ ESCUCHANDO ──actividad detectada/turno enviado──▶ PROCESANDO (ámbar) 
 - Para cerrar la sesión hay que tocar en ESCUCHANDO, PROCESANDO o ERROR. En HABLANDO,
   el toque solo interrumpe; un segundo toque cierra.
 
-### 3.5 `app_vox_eye`
+### 3.5 `app_cogitador_eye`
 
 - Escena GSP 480×480: carcasa metálica, anillo luminoso de estado, cuenca oscura, grupo del iris
   (anillo de color, anillo interior, pupila y brillo) con `x/y` dinámicos acotados, párpados
@@ -156,7 +156,7 @@ ESCUCHANDO ──actividad detectada/turno enviado──▶ PROCESANDO (ámbar) 
 
 ## 4. Clave de API: almacenamiento y protecciones
 
-**Almacén:** partición `nvs` propia de la aplicación (0x200000), espacio de nombres `vox_secret`,
+**Almacén:** partición `nvs` propia de la aplicación (0x200000), espacio de nombres `cog_secret` (hasta 1.6, `vox_secret`; se migra solo al arrancar),
 claves `api_key` (≤ 128 B) y `model` (opcional). Es distinta de `sysmeta/shared` de Vibe Mode.
 
 **Provisión privada tras la instalación:** RPC binaria de ESP-Iris registrada por `app_secrets`
@@ -204,7 +204,7 @@ Instalación, datos conservados, restauración y auditoría de la clave: [INSTAL
 
 1. ✅ Entorno, compilación y simulador.
 2. ✅ Wi-Fi, secretos y RPC de provisión, cliente Gemini Live, audio y ojo (compilado y en el simulador).
-3. ✅ Primera prueba física (2026-11-24): VOX conversa con Gemini Live directamente por Wi-Fi.
+3. ✅ Primera prueba física (2026-11-24): Cogitador conversa con Gemini Live directamente por Wi-Fi.
    Se corrigieron la RAM interna de la pantalla y el modelo; detalles en [INSTALL.md](INSTALL.md).
 4. Ajustes: ganancia del micrófono de 30 a 24 dB (saturaba), vigilante de modelo mudo,
    y después latencia, VAD, pruebas de larga duración y reanudación.
@@ -246,7 +246,7 @@ porque chocaba con el audio entrante.
 
 «Inactividad» significa que no llega ninguna transcripción del usuario ni audio del modelo,
 no hay ningún toque y no hay reproducción en curso. Cada uno de esos eventos, y también la voz detectada localmente, reinicia el plazo de 15 s.
-El plazo no corre mientras VOX habla.
+El plazo no corre mientras Cogitador habla.
 
 ### 7.2 Compatibilidad verificada (2026-11-24)
 
@@ -259,7 +259,7 @@ El plazo no corre mientras VOX habla.
 | Tamaño del modelo | Dos variantes cuantizadas a 8 bits (p1 375 KB, p2 418 KB); el empaquetador incluye **417,76 KB** | Salida de `movemodel` en la compilación de prueba |
 | RAM y CPU en S31 | WakeNet10 cuantizado, 3 canales: **16 KB de RAM interna, 523 KB de PSRAM, 6,4 ms por trama de 32 ms, 19,9 % de un núcleo**. Con 1 canal se espera menos; no hay cifra publicada | Benchmark oficial de ESP-SR para esp32s31 |
 | Entrada | PCM 16 kHz, mono, 16 bit (trama de 32 ms = 512 muestras). Ya la producimos: `app_audio` entrega 16 kHz mono en tramas de 640 | Documentación de WakeNet |
-| Tamaño de la app | El ejemplo completo (WakeNet + MultiNet + TTS) ocupa 1,25 MB; el aumento estimado para VOX solo con WakeNet es de +0,3–0,6 MB (por medir). `main_app` tiene margen de sobra | Compilación de prueba |
+| Tamaño de la app | El ejemplo completo (WakeNet + MultiNet + TTS) ocupa 1,25 MB; el aumento estimado para Cogitador solo con WakeNet es de +0,3–0,6 MB (por medir). `main_app` tiene margen de sobra | Compilación de prueba |
 
 ### 7.3 Almacenamiento: cambio de particiones necesario
 
@@ -290,19 +290,19 @@ que este proyecto no usa. Plan:
 - Nuevo componente `app_wake` (WakeNet10 sin AFE: un solo micrófono, sin referencia AEC).
   Reagrupa tramas de 640 a 512 muestras en un ring propio y detecta en su tarea, en el núcleo 1
   con prioridad inferior a la de audio. La tarea de captura nunca se bloquea.
-- `app_vox_session`: en CERRADA, el micrófono va **solo** a `app_wake`. Con una detección se llama
+- `app_cogitador_session`: en CERRADA, el micrófono va **solo** a `app_wake`. Con una detección se llama
   a `open_conversation()` (las mismas comprobaciones de Wi-Fi y clave). WakeNet queda en pausa mientras
   la conversación está abierta, para evitar disparos con el altavoz y ahorrar CPU.
 - Pre-roll: se guardan los ~2 s posteriores a «Hola ESP» y se envían a Gemini al recibir
   `setupComplete`, para no perder la pregunta mientras conecta.
-- Temporizador de inactividad de 15 s en la sesión (Kconfig `VOX_IDLE_TIMEOUT_S`), con un evento
-  de cierre limpio. Kconfig `VOX_WAKE_WORD` para activarlo o desactivarlo.
+- Temporizador de inactividad de 15 s en la sesión (Kconfig `COGITADOR_IDLE_TIMEOUT_S`), con un evento
+  de cierre limpio. Kconfig `COGITADOR_WAKE_WORD` para activarlo o desactivarlo.
 
 ### 7.5 Riesgos y validación pendiente
 
 - Soporte preliminar de ESP32-S31 en ESP-SR: validar la tasa de aciertos y de falsos disparos en el
   hardware (por ejemplo, 20 activaciones a 1 y 3 m y 1 h de ruido doméstico).
-- PSRAM: VOX ya reserva ≈ 832 KB (RX WebSocket 256 KB, PCM 192 KB, ring 384 KB) más la UI.
+- PSRAM: Cogitador ya reserva ≈ 832 KB (RX WebSocket 256 KB, PCM 192 KB, ring 384 KB) más la UI.
   Medir con `iris memory` en la primera prueba física antes de sumar unos 0,5 MB para WakeNet.
 - CPU: unos 20 % de un núcleo en el peor caso publicado. Solo funciona en reposo,
   así que no compite con la conversación.

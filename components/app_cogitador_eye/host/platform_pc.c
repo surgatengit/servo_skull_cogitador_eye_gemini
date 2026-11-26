@@ -5,17 +5,17 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "app_vox_eye.h"
+#include "app_cogitador_eye.h"
 #include "gsp_sim_bridge.h"
-#include "vox_rol.h"
+#include "cogitador_rol.h"
 
 #define DEMO_STEP_MS 3000
 
 /* The bridge ABI has no caller context; keep the owned handles here. */
 static struct {
-    app_vox_eye_handle_t eye;
+    app_cogitador_eye_handle_t eye;
     void *demo_timer;
-    app_vox_eye_state_t state;
+    app_cogitador_eye_state_t state;
     unsigned level_tick;
     unsigned transitions;
     unsigned photo;          /* gallery demo position, 1..DEMO_PHOTOS */
@@ -29,26 +29,26 @@ static const char VOICE_INITIALS[] = "CAKS"; /* Charon, Algenib, Kore, Sulafat *
 
 #define DEMO_PHOTOS 3        /* the PC has no photo store: placeholder picture */
 
-static const char *const STATUS[APP_VOX_EYE_STATE_COUNT] = {
-    [APP_VOX_EYE_IDLE] = "",
-    [APP_VOX_EYE_LISTENING] = "",
-    [APP_VOX_EYE_PROCESSING] = "",
-    [APP_VOX_EYE_SPEAKING] = "",
-    [APP_VOX_EYE_ERROR] = "SIN WI-FI",
+static const char *const STATUS[APP_COGITADOR_EYE_STATE_COUNT] = {
+    [APP_COGITADOR_EYE_IDLE] = "",
+    [APP_COGITADOR_EYE_LISTENING] = "",
+    [APP_COGITADOR_EYE_PROCESSING] = "",
+    [APP_COGITADOR_EYE_SPEAKING] = "",
+    [APP_COGITADOR_EYE_ERROR] = "SIN WI-FI",
 };
 
-static void show(app_vox_eye_state_t state)
+static void show(app_cogitador_eye_state_t state)
 {
     backend.state = state;
     backend.transitions++;
-    app_vox_eye_set_state(backend.eye, state);
-    (void)app_vox_eye_set_status(backend.eye, STATUS[state]);
-    fprintf(stderr, "vox_eye_backend: state=%d\n", (int)state);
+    app_cogitador_eye_set_state(backend.eye, state);
+    (void)app_cogitador_eye_set_status(backend.eye, STATUS[state]);
+    fprintf(stderr, "cogitador_eye_backend: state=%d\n", (int)state);
 }
 
 static void advance(void)
 {
-    show((app_vox_eye_state_t)((backend.state + 1) % APP_VOX_EYE_STATE_COUNT));
+    show((app_cogitador_eye_state_t)((backend.state + 1) % APP_COGITADOR_EYE_STATE_COUNT));
 }
 
 static void demo_tick(esp_gsp_handle_t ui, void *ctx)
@@ -61,63 +61,63 @@ static void demo_tick(esp_gsp_handle_t ui, void *ctx)
 }
 
 /* Gallery flow with the scene's placeholder picture (no JPEG on the PC). */
-static void on_gallery(app_vox_gallery_action_t action, void *ctx)
+static void on_gallery(app_cogitador_gallery_action_t action, void *ctx)
 {
     (void)ctx;
     backend.gallery_events++;
     switch (action) {
-    case APP_VOX_GALLERY_OPEN:
+    case APP_COGITADOR_GALLERY_OPEN:
         backend.photo = DEMO_PHOTOS;
         backend.gallery = true;
         break;
-    case APP_VOX_GALLERY_PREV:
+    case APP_COGITADOR_GALLERY_PREV:
         backend.photo = backend.photo <= 1 ? DEMO_PHOTOS : backend.photo - 1;
         break;
-    case APP_VOX_GALLERY_NEXT:
+    case APP_COGITADOR_GALLERY_NEXT:
         backend.photo = backend.photo >= DEMO_PHOTOS ? 1 : backend.photo + 1;
         break;
-    case APP_VOX_GALLERY_CLOSE:
+    case APP_COGITADOR_GALLERY_CLOSE:
         backend.gallery = false;
-        (void)app_vox_eye_hide_gallery(backend.eye);
-        fprintf(stderr, "vox_eye_backend: gallery closed (events=%u)\n", backend.gallery_events);
+        (void)app_cogitador_eye_hide_gallery(backend.eye);
+        fprintf(stderr, "cogitador_eye_backend: gallery closed (events=%u)\n", backend.gallery_events);
         return;
-    case APP_VOX_GALLERY_TOUCH:
+    case APP_COGITADOR_GALLERY_TOUCH:
     default:
         return;
     }
-    (void)app_vox_eye_show_photo(backend.eye, NULL, 0, backend.photo, DEMO_PHOTOS);
-    fprintf(stderr, "vox_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
+    (void)app_cogitador_eye_show_photo(backend.eye, NULL, 0, backend.photo, DEMO_PHOTOS);
+    fprintf(stderr, "cogitador_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
 }
 
 /* Show a fixed roll through the same view code the device uses. */
-static void demo_roll(vox_rol_spec_t spec, const uint16_t *values)
+static void demo_roll(cogitador_rol_spec_t spec, const uint16_t *values)
 {
-    vox_rol_view_t view;
-    vox_rol_view(&spec, values, &view);
-    app_vox_eye_roll_t roll = { .count = view.count, .tumble = view.tumble };
+    cogitador_rol_view_t view;
+    cogitador_rol_view(&spec, values, &view);
+    app_cogitador_eye_roll_t roll = { .count = view.count, .tumble = view.tumble };
     memcpy(roll.faces, view.faces, sizeof(roll.faces));
     memcpy(roll.marks, view.marks, sizeof(roll.marks));
     memcpy(roll.title, view.title, sizeof(roll.title));
     memcpy(roll.result, view.result, sizeof(roll.result));
-    (void)app_vox_eye_show_roll(backend.eye, &roll);
+    (void)app_cogitador_eye_show_roll(backend.eye, &roll);
     char badge[8];
-    if (vox_rol_badge(&spec, badge, sizeof(badge)) > 0) {
-        (void)app_vox_eye_set_role_badge(backend.eye, badge);
+    if (cogitador_rol_badge(&spec, badge, sizeof(badge)) > 0) {
+        (void)app_cogitador_eye_set_role_badge(backend.eye, badge);
     }
 }
 
 /* RoleMaster demo (1.6.0): the voice badge cycles C/A/K/S and shows a secret
  * card on the last voice; the dice badge cycles a 2d20 critical, a 1d20
  * fumble, a percentile roll, a 6d10 pool and a 10d10 pool. */
-static void on_action(app_vox_eye_action_t action, void *ctx)
+static void on_action(app_cogitador_eye_action_t action, void *ctx)
 {
     (void)ctx;
-    if (action == APP_VOX_EYE_ACTION_VOICE_NEXT) {
+    if (action == APP_COGITADOR_EYE_ACTION_VOICE_NEXT) {
         backend.voice = (backend.voice + 1) % 4;
-        (void)app_vox_eye_set_voice_initial(backend.eye, VOICE_INITIALS[backend.voice]);
-        fprintf(stderr, "vox_eye_backend: voice %c\n", VOICE_INITIALS[backend.voice]);
+        (void)app_cogitador_eye_set_voice_initial(backend.eye, VOICE_INITIALS[backend.voice]);
+        fprintf(stderr, "cogitador_eye_backend: voice %c\n", VOICE_INITIALS[backend.voice]);
         if (backend.voice == 3) {
-            (void)app_vox_eye_show_secret(backend.eye, "Íñigo",
+            (void)app_cogitador_eye_show_secret(backend.eye, "Íñigo",
                                           "Eres el hijo perdido del gobernador. Si Ana descubre "
                                           "tu sello, intentará venderte al Inquisidor… "
                                           "¿confiarás en ella?");
@@ -130,20 +130,20 @@ static void on_action(app_vox_eye_action_t action, void *ctx)
     static const uint16_t pool6[] = { 9, 3, 10, 8, 1, 5 };
     static const uint16_t pool10[] = { 10, 2, 8, 6, 1, 9, 4, 8, 3, 7 };
     switch (backend.rolls++ % 5) {
-    case 0: demo_roll(vox_rol_spec_default(), crit); break;
-    case 1: demo_roll(vox_rol_spec_make(VOX_ROL_SUM, 1, 20, 0), fumble); break;
-    case 2: demo_roll(vox_rol_spec_make(VOX_ROL_PERCENT, 2, 10, 0), percent); break;
-    case 3: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 8), pool6); break;
-    default: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 10, 10, 8), pool10); break;
+    case 0: demo_roll(cogitador_rol_spec_default(), crit); break;
+    case 1: demo_roll(cogitador_rol_spec_make(COGITADOR_ROL_SUM, 1, 20, 0), fumble); break;
+    case 2: demo_roll(cogitador_rol_spec_make(COGITADOR_ROL_PERCENT, 2, 10, 0), percent); break;
+    case 3: demo_roll(cogitador_rol_spec_make(COGITADOR_ROL_POOL, 6, 10, 8), pool6); break;
+    default: demo_roll(cogitador_rol_spec_make(COGITADOR_ROL_POOL, 10, 10, 8), pool10); break;
     }
-    fprintf(stderr, "vox_eye_backend: roll %u\n", backend.rolls);
+    fprintf(stderr, "cogitador_eye_backend: roll %u\n", backend.rolls);
 }
 
 /* Tap opens/closes the demo conversation like the device session does. */
 static void on_tap(void *ctx)
 {
     (void)ctx;
-    show(backend.state == APP_VOX_EYE_IDLE ? APP_VOX_EYE_LISTENING : APP_VOX_EYE_IDLE);
+    show(backend.state == APP_COGITADOR_EYE_IDLE ? APP_COGITADOR_EYE_LISTENING : APP_COGITADOR_EYE_IDLE);
 }
 
 /* Synthetic speech envelope for the speaking pupil pulse. */
@@ -158,21 +158,21 @@ static uint8_t level(void *ctx)
 
 esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
 {
-    const app_vox_eye_config_t config = {
+    const app_cogitador_eye_config_t config = {
         .on_tap = on_tap,
         .on_gallery = on_gallery,
         .on_action = on_action,
         .level = level,
         .seed = 0xC0617A70u,
     };
-    esp_gsp_err_t err = app_vox_eye_create(ui, &config, &backend.eye);
+    esp_gsp_err_t err = app_cogitador_eye_create(ui, &config, &backend.eye);
     if (err != ESP_GSP_OK) {
         return err;
     }
-    (void)app_vox_eye_set_photo_count(backend.eye, DEMO_PHOTOS);
-    (void)app_vox_eye_set_voice_initial(backend.eye, 'C');
-    (void)app_vox_eye_set_role_mode(backend.eye, true);
-    backend.state = APP_VOX_EYE_IDLE;
+    (void)app_cogitador_eye_set_photo_count(backend.eye, DEMO_PHOTOS);
+    (void)app_cogitador_eye_set_voice_initial(backend.eye, 'C');
+    (void)app_cogitador_eye_set_role_mode(backend.eye, true);
+    backend.state = APP_COGITADOR_EYE_IDLE;
     backend.demo_timer = esp_gsp_timer_create(ui, DEMO_STEP_MS, demo_tick, NULL);
     return backend.demo_timer ? ESP_GSP_OK : ESP_GSP_ERR_NO_MEM;
 }
@@ -183,16 +183,16 @@ void gsp_bridge_app_deinit(esp_gsp_handle_t ui)
         (void)esp_gsp_timer_delete(ui, backend.demo_timer);
         backend.demo_timer = NULL;
     }
-    app_vox_eye_snapshot_t snapshot;
-    if (app_vox_eye_read(backend.eye, &snapshot) == ESP_GSP_OK) {
+    app_cogitador_eye_snapshot_t snapshot;
+    if (app_cogitador_eye_read(backend.eye, &snapshot) == ESP_GSP_OK) {
         fprintf(stderr,
-                "vox_eye_backend: frames=%u blinks=%u taps=%u state=%d transitions=%u last_error=%d\n",
+                "cogitador_eye_backend: frames=%u blinks=%u taps=%u state=%d transitions=%u last_error=%d\n",
                 (unsigned)snapshot.frames, (unsigned)snapshot.blinks, (unsigned)snapshot.taps,
                 (int)snapshot.state, backend.transitions, (int)snapshot.last_error);
     }
     /* The bridge calls deinit after poll exits; no callbacks can use the state. */
-    const esp_gsp_err_t err = app_vox_eye_destroy(&backend.eye);
+    const esp_gsp_err_t err = app_cogitador_eye_destroy(&backend.eye);
     if (err != ESP_GSP_OK) {
-        fprintf(stderr, "vox_eye_backend: cleanup failed (%d)\n", err);
+        fprintf(stderr, "cogitador_eye_backend: cleanup failed (%d)\n", err);
     }
 }

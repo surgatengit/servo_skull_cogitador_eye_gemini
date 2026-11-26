@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Provision the Gemini API key (or model) into VOX M-01 over ESP-Iris RPC.
+"""Provision the Gemini API key (or model) into Cogitador M-01 over ESP-Iris RPC.
 
 The key is read from, in order: the GEMINI_API_KEY environment variable, a local
 `.env` file next to this project (ignored by Git), or a hidden interactive prompt.

@@ -15,10 +15,11 @@ static const char *TAG = "app_photos";
 
 #define PHOTOS_SUBTYPE      0x41
 #define PHOTOS_LABEL        "photos"
-#define SLOT_COUNT          CONFIG_VOX_PHOTOS_SLOTS
+#define SLOT_COUNT          CONFIG_COGITADOR_PHOTOS_SLOTS
 #define SLOT_SIZE           (48 * 1024)          /* 12 flash sectors */
 #define HEADER_SIZE         32
-#define PHOTO_MAGIC         0x50584F56u          /* "VOXP" little endian */
+#define PHOTO_MAGIC         0x50474F43u          /* "COGP" little endian */
+#define PHOTO_MAGIC_LEGACY  0x50584F56u          /* photos taken up to 1.6 */
 #define PHOTO_VERSION       1u
 
 _Static_assert(SLOT_COUNT <= PHOTOS_RING_MAX_SLOTS, "too many photo slots");
@@ -45,7 +46,8 @@ static struct {
 
 static bool header_ok(const photo_header_t *h)
 {
-    return h->magic == PHOTO_MAGIC && h->version == PHOTO_VERSION && h->size > 0 &&
+    return (h->magic == PHOTO_MAGIC || h->magic == PHOTO_MAGIC_LEGACY) &&
+           h->version == PHOTO_VERSION && h->size > 0 &&
            h->size <= SLOT_SIZE - HEADER_SIZE;
 }
 
