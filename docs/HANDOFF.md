@@ -45,6 +45,32 @@ ahora; queda para revisar. Google Search está implementado pero
 | Clave de API | Provisionada en la NVS propia del dispositivo (`vox_secret`); no está en el repo |
 | App anterior | ESP-Claw = Mosaico-Claw 0.8.0, Idea **100000** (restaurable desde Vibe Mode → Mis Ideas) |
 
+### En curso: 1.6.0 RoleMaster (rama `feat/rolemaster`)
+
+- Cuatro voces (Charon, Algenib, Kore, Sulafat):
+  - herramienta `cambiar_voz`, que reconecta con la voz nueva;
+  - botón de voz en el bisel;
+  - `provision_key.py --voice`.
+- Dados reales:
+  - `tirar_dados` con RNG por hardware y panel animado de hasta 10 dados;
+  - tres modos: `suma`, `porcentaje` (d100 con dos d10) y `reserva` (éxitos con `exito_con`);
+  - botón de dados para que tiren los jugadores en modo rol: tira lo que prepara el máster con
+    `preparar_tirada` (2d20 al empezar) y su etiqueta lo dice («2D20», «D%», «6D10»). Se envía a
+    Gemini como texto; si el modelo está hablando, al terminar su respuesta.
+- `modo_rol`: máster de rol en la personalidad, espera de 180 s antes de cerrar.
+- `mostrar_secreto`: al móvil del jugador (página `app_rol_web` en la Wi-Fi de casa, solo en modo
+  rol) o a la tarjeta de pantalla.
+- Probado en el PC (tests, simulador, página con servidor simulado).
+- Prueba 14 en el dispositivo (commit `1f7153b`): todo correcto salvo las tiradas del D20 hechas
+  mientras VOX hablaba, que no llegaban a Gemini. Corregido en `06dfd94` y comprobado en el
+  dispositivo.
+- Modos de tirada: probados en el dispositivo (reserva y preparar porcentaje). Fallo de 2
+  peticiones a la vez corregido con 8 (`c9b40e4`).
+- Sala de espera, fichas en el móvil, secretos para quien entra tarde, aviso de secretos sin
+  leer, cambio de móvil, guardar/cargar partida (NVS `vox_game`) y descargar/subir el archivo:
+  probados en el PC (tests y página con servidor simulado); falta la prueba 14, pasos 10–17, en
+  el dispositivo.
+
 ## 2. Entorno
 
 - ESP-IDF en `C:\esp\esp-idf-master`, commit exacto `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe`

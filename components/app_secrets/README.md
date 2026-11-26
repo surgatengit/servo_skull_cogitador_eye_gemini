@@ -12,6 +12,10 @@ Mode's shared information. Depends on ESP-Iris (RPC), NVS and Mbed TLS zeroizati
 | 2 clear_api_key | — | `ok` / `error` |
 | 3 status | — | `{"api_key":true|false,"model":"…"}` |
 | 4 set_model | `gemini-3.8-live`, `gemini-3.1-flash-live-preview`, or empty | `ok` / `error` |
+| 5 set_voice (1.6.0) | one of the 30 Gemini prebuilt voices (exact name), or empty | `ok` / `error` |
+
+`status` also reports `"voice":"…"` since 1.6.0. The session stores the voice itself when it is
+changed by voice or with the bezel badge (`app_secrets_store_voice`).
 
 There is deliberately **no** method that returns the key. Use
 `tools/provision_key.py` over USB.

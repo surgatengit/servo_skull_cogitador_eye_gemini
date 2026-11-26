@@ -13,7 +13,70 @@
   <img alt="IA" src="https://img.shields.io/badge/IA-Gemini%20Live-00e676?style=flat-square">
   <img alt="palabra" src="https://img.shields.io/badge/«Hola%20ESP»-local%20y%20offline-ff1744?style=flat-square">
   <img alt="licencia" src="https://img.shields.io/badge/licencia-Apache--2.0-d500f9?style=flat-square">
+  <img alt="novedad" src="https://img.shields.io/badge/🆕%20RoleMaster-1.6%20beta-ffb300?style=flat-square">
 </p>
+
+---
+
+## 🆕 Novedad: VOX RoleMaster 1.6, tu mesa de rol tiene un máster nuevo
+
+<p align="center">
+  <img src="docs/img/rolemaster-banner.svg" alt="VOX RoleMaster 1.6: el máster de rol que vive dentro de un ESP32" width="100%">
+</p>
+
+<p align="center">
+  <b>Reúne a tus amigos, saca los móviles y di «Hola ESP, vamos a jugar a rol».</b><br>
+  VOX se convierte en un <b>máster de rol de verdad</b>: inventa la aventura, pone voz a cada personaje,
+  tira dados reales, reparte secretos que solo ve quien debe verlos y guarda la partida para la próxima
+  noche.
+</p>
+
+<p align="center">
+  <img src="docs/img/dados-critico.png" alt="Tirada 2d20 con crítico en la pantalla de VOX" width="200">
+  <img src="docs/img/dados-porcentaje.png" alt="Tirada porcentual: decenas 40 y unidades 7, resultado 47" width="200">
+  <img src="docs/img/dados-reserva.png" alt="Reserva de 6d10 con 3 éxitos resaltados en dorado" width="200">
+  <img src="docs/img/dados-reserva10.png" alt="Reserva de 10d10 en dos filas con 4 éxitos" width="200">
+</p>
+<p align="center"><sub>Suma con crítico, porcentaje, reserva de 6 dados y reserva de 10 dados: los tres sistemas de dados del juego de rol, en la pantalla redonda de VOX (capturas del simulador oficial).</sub></p>
+
+### 🎭 Un máster que no se cansa nunca
+
+| | Qué hace | Por qué mola |
+|---|---|---|
+| 🎙️ | **Narra e interpreta** | Describe la escena con voz natural y cambia de tono, ritmo y actitud para el villano, el posadero o el monstruo de la cripta. Elige entre **cuatro voces**. |
+| 🎲 | **Dados reales, sin trampas** | Salen del **generador aleatorio por hardware** del chip, animados en pantalla: **crítico en dorado, pifia en rojo**. Tres sistemas: **suma** (2d20, 3d6…), **porcentaje** (d100 con decenas y unidades) y **reserva** (hasta **10 dados**, contando éxitos). |
+| 👆 | **Tira tú mismo** | El máster prepara tu tirada según tu habilidad y el botón de la pantalla lo dice («2D20», «D%», «6D10»). Tocas, ruedan los dados y el máster lo recibe al instante, aunque esté hablando. |
+| 📱 | **Tu móvil, tu secreto** | Cada jugador abre una dirección en su móvil, escribe su nombre y recibe **solo lo suyo**. El secreto sale borroso y solo se lee **manteniendo pulsado**. Sin app y sin cuentas: funciona en la Wi‑Fi de casa. |
+| 📜 | **Ficha de personaje viva** | Tu ficha (atributos, vida, equipo) siempre a mano en el móvil. Cuando te hieren o encuentras algo, el máster la actualiza y **el móvil vibra**. |
+| 🚪 | **Sala de espera** | El máster os da la dirección y espera. Cada vez que alguien entra, le da la bienvenida. ¿Alguien llega tarde o se le acaba la batería? Entra con su nombre y **recupera su ficha y sus secretos**. |
+| 👀 | **Nadie se queda atrás** | El máster sabe **quién no ha leído su secreto** y le avisa por su nombre antes del momento clave. |
+| 💾 | **Guarda y continúa** | «Guarda la partida»: resumen de la historia, fichas, secretos y tipo de dados quedan **en VOX**. Otro día eliges **continuar**, o empezar **una aventura nueva con los mismos personajes**. |
+| 📂 | **Tus partidas, en un archivo** | Desde el móvil **descargas** la partida como archivo y **subes** otra cuando quieras: guarda todas las campañas que quieras. |
+
+<p align="center">
+  <img src="docs/img/movil-ficha-secreto.jpg" alt="La página del móvil: ficha de personaje y secreto borroso" width="260">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/img/secreto-pantalla.png" alt="Tarjeta de secreto en la pantalla de VOX para un jugador sin móvil" width="300">
+</p>
+<p align="center"><sub>A la izquierda, lo que ve Ana en su móvil: su ficha y un secreto que solo se lee manteniendo pulsado. A la derecha, el plan B para quien no tiene móvil: el secreto sale en la pantalla de VOX hasta que la toca.</sub></p>
+
+### 🕹️ Así se juega
+
+1. **«Hola ESP, vamos a jugar a rol».** VOX pregunta cuántos sois y a qué queréis jugar (o te propone una aventura corta).
+2. **Sacad los móviles.** Abrid la dirección que sale en la pantalla (`MÓVIL: 192.168.…`), escribid vuestro nombre y esperad a los demás.
+3. **«Ya estamos».** El máster explica las reglas en dos frases, crea vuestros personajes y os manda la ficha y un secreto a cada uno.
+4. **Jugad.** Contad qué hacéis; cuando algo es arriesgado, el máster tira o te prepara la tirada para que **toques el botón de dados**.
+5. **«Guarda la partida».** Y la próxima vez: «vamos a jugar a rol» → «continuar».
+
+Un toque en el ojo solo interrumpe al máster. Para salir de la partida, **mantén el dedo 1,5 s** sobre el ojo o pídeselo.
+
+> [!IMPORTANT]
+> **RoleMaster está en beta.** Ya se ha probado en el dispositivo: voces, dados en los tres sistemas,
+> secretos en el móvil y la salida manteniendo pulsado. La sala de espera, las fichas y las partidas
+> guardadas están probadas en el simulador y pendientes de la primera partida real con jugadores. El
+> firmware compilado de la [Guía A](#️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-vox) sigue
+> siendo la versión estable 1.5.0; para probar RoleMaster hoy, compílalo desde el código
+> ([Para desarrolladores](#️-para-desarrolladores)).
 
 ---
 
@@ -57,6 +120,9 @@ foto con su cámara y te la describe.
 | 🖼️ | **Galería de recuerdos** | Guarda las **10 últimas fotos** en su memoria flash, aunque lo apagues. Toca el contador para verlas, ‹ › para pasar, **X** para volver y **mantén la X 1,5 s** para borrarlas todas. |
 | 🔒 | **Privacidad y seguridad** | Las fotos no salen del aparato (Gemini solo recibe la que te describe). La clave de Gemini **no está** en el código, el binario ni GitHub: se guarda en el propio dispositivo y no se puede leer desde fuera. |
 | 🔁 | **Robusto** | Reconexión automática, modelo de reserva si el principal falla, avisos claros en pantalla y modo de recuperación siempre disponible. |
+| 🎲 | **Modo rol (RoleMaster, 1.6.0)** | Di «vamos a jugar a rol» y VOX hace de **máster**: explica las reglas, crea los personajes, interpreta a cada uno con su propia voz y pide tiradas. Los dados son **reales** (generador aleatorio del chip) y salen animados en pantalla, con crítico y pifia. Sirve para tres tipos de juego: dados que se **suman** (2d20, 3d6), **porcentaje** (d100 con dos d10) y **reserva** (hasta 10 dados contando éxitos). Cada jugador entra desde su **móvil** y ve allí su **ficha** y sus **secretos**; la partida se **guarda** en VOX para continuarla otro día, y se puede descargar o subir como archivo. |
+| 🤫 | **Secretos en el móvil** | En modo rol, cada jugador abre en su móvil la dirección que sale en pantalla, escribe su nombre y recibe **solo sus secretos**. Si alguien no tiene móvil, el suyo sale en pantalla hasta que la toca. |
+| 🎙️ | **Cuatro voces** | Charon y Algenib (chico), Kore y Sulafat (chica). Se cambian pidiéndoselo («ponte voz de chica»), tocando el círculo de arriba a la derecha o por USB. |
 | 🔎 | **Google Search opcional** | Puede buscar en Google datos recientes (desactivado por defecto: el plan gratuito agota la cuota). |
 | 💸 | **Coste cero para empezar** | Funciona con el **plan gratuito** de Gemini (con sus límites de uso). |
 | 🧪 | **Hecho con rigor** | Tests en PC, simulador de la interfaz, parches documentados y probados en el hardware real, y una copia mínima del BSP oficial que arregla la memoria DMA de la pantalla. |
@@ -177,6 +243,8 @@ Prueba con:
 - «¿Quién eres?»
 - «¿Qué ves?» (hace una foto con la cámara de la izquierda)
 - Toca el número de arriba a la izquierda para ver la galería de fotos.
+- «Vamos a jugar una partida de rol» (1.6.0): sigue las indicaciones del máster y abre en el móvil
+  la dirección que aparece abajo en la pantalla.
 
 ---
 
@@ -236,11 +304,12 @@ si el dispositivo va a cambiar de manos.
 
 | Componente | Responsabilidad |
 |---|---|
-| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería); también corre en el simulador |
-| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación, herramienta `capturar_imagen` y galería |
+| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
+| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, imágenes, herramientas, reanudación, grounding) |
 | [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda: cámara izquierda, reset del sensor, PPA y JPEG por hardware |
 | [`app_photos`](components/app_photos/README.md) | Últimas 10 fotos en la partición `photos` |
+| [`app_rol_web`](components/app_rol_web/README.md) | Página del móvil para los secretos del modo rol (solo mientras dura) |
 | [`app_audio`](components/app_audio/README.md) | ES8311: captura 48k→16k y reproducción 24k→48k |
 | [`app_wake`](components/app_wake/README.md) | «Hola ESP» local (ESP-SR WakeNet10 `wn10_es_holaesp`), solo en reposo |
 | [`app_wifi`](components/app_wifi/README.md) | Estación Wi-Fi con las credenciales de Vibe Mode |

@@ -88,6 +88,15 @@ esp_err_t app_gemini_live_send_image(app_gemini_live_handle_t handle, const uint
 esp_err_t app_gemini_live_send_tool_response(app_gemini_live_handle_t handle, const char *tool_id,
                                              const char *tool_name, const char *response_json);
 
+/** Send one complete user text turn (clientContent, turnComplete). The model
+ * answers it like spoken input. ESP_ERR_INVALID_STATE before setupComplete.
+ * Any task except the event callback. */
+esp_err_t app_gemini_live_send_text(app_gemini_live_handle_t handle, const char *utf8);
+
+/** Prebuilt voice for later connections (copied). Call while disconnected:
+ * ESP_ERR_INVALID_STATE otherwise. Session task only. */
+esp_err_t app_gemini_live_set_voice(app_gemini_live_handle_t handle, const char *voice);
+
 /** Signal a paused microphone (automatic VAD). Any task. */
 esp_err_t app_gemini_live_send_audio_stream_end(app_gemini_live_handle_t handle);
 

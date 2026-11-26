@@ -16,12 +16,21 @@ static const char *TAG = "app_secrets";
 #define SECRETS_NAMESPACE   "vox_secret"
 #define KEY_API             "api_key"
 #define KEY_MODEL           "model"
+#define KEY_VOICE           "voice"
 #define API_KEY_MIN_LEN     30
 #define API_KEY_MAX_LEN     (APP_SECRETS_API_KEY_CAPACITY - 1)
 
 static const char *const ALLOWED_MODELS[] = {
     "gemini-3.8-live",
     "gemini-3.1-flash-live-preview",
+};
+
+/* Gemini Live prebuilt voices (aistudio.google.com/docs/speech-generation, 2026-11). */
+static const char *const ALLOWED_VOICES[] = {
+    "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe",
+    "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib",
+    "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima",
+    "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
 };
 
 /* Written once in app_secrets_init() before RPC registration; read-only afterwards. */
@@ -53,6 +62,19 @@ bool app_secrets_model_is_valid(const char *model, size_t len)
     }
     for (size_t i = 0; i < sizeof(ALLOWED_MODELS) / sizeof(ALLOWED_MODELS[0]); ++i) {
         if (strlen(ALLOWED_MODELS[i]) == len && memcmp(ALLOWED_MODELS[i], model, len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool app_secrets_voice_is_valid(const char *voice, size_t len)
+{
+    if (!voice) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(ALLOWED_VOICES) / sizeof(ALLOWED_VOICES[0]); ++i) {
+        if (strlen(ALLOWED_VOICES[i]) == len && memcmp(ALLOWED_VOICES[i], voice, len) == 0) {
             return true;
         }
     }
@@ -128,6 +150,27 @@ esp_err_t app_secrets_load_model(char *out, size_t capacity)
     return err;
 }
 
+esp_err_t app_secrets_load_voice(char *out, size_t capacity)
+{
+    esp_err_t err = load_string(KEY_VOICE, out, capacity);
+    if (err == ESP_OK && !app_secrets_voice_is_valid(out, strlen(out))) {
+        memset(out, 0, capacity);
+        err = ESP_ERR_NVS_NOT_FOUND;
+    }
+    return err;
+}
+
+esp_err_t app_secrets_store_voice(const char *voice)
+{
+    if (!voice || !voice[0]) {
+        return store_string(KEY_VOICE, NULL);
+    }
+    if (!app_secrets_voice_is_valid(voice, strlen(voice))) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    return store_string(KEY_VOICE, voice);
+}
+
 static void notify_changed(void)
 {
     if (s_notify.on_changed) {
@@ -194,12 +237,30 @@ static esp_err_t rpc_handler(const esp_iris_rpc_request_t *request, uint8_t *res
         notify_changed();
         return reply(response, response_capacity, response_size, "ok");
     }
+    case APP_SECRETS_RPC_SET_VOICE: {
+        const size_t len = request->payload_size;
+        char voice[APP_SECRETS_VOICE_CAPACITY] = {0};
+        esp_err_t err = ESP_ERR_INVALID_ARG;
+        if (len < sizeof(voice)) {
+            memcpy(voice, request->payload, len);
+            err = app_secrets_store_voice(voice);
+        }
+        if (err != ESP_OK) {
+            return reply(response, response_capacity, response_size, "error");
+        }
+        ESP_LOGI(TAG, "Voice %s", len ? voice : "cleared");
+        notify_changed();
+        return reply(response, response_capacity, response_size, "ok");
+    }
     case APP_SECRETS_RPC_STATUS: {
         char model[APP_SECRETS_MODEL_CAPACITY];
+        char voice[APP_SECRETS_VOICE_CAPACITY];
         const bool has_model = app_secrets_load_model(model, sizeof(model)) == ESP_OK;
-        char text[128];
-        snprintf(text, sizeof(text), "{\"api_key\":%s,\"model\":\"%s\"}",
-                 app_secrets_has_api_key() ? "true" : "false", has_model ? model : "");
+        const bool has_voice = app_secrets_load_voice(voice, sizeof(voice)) == ESP_OK;
+        char text[160];
+        snprintf(text, sizeof(text), "{\"api_key\":%s,\"model\":\"%s\",\"voice\":\"%s\"}",
+                 app_secrets_has_api_key() ? "true" : "false", has_model ? model : "",
+                 has_voice ? voice : "");
         return reply(response, response_capacity, response_size, text);
     }
     default:
@@ -213,7 +274,7 @@ esp_err_t app_secrets_init(app_secrets_changed_cb_t on_changed, void *ctx)
     s_notify.ctx = ctx;
     static const uint16_t methods[] = {
         APP_SECRETS_RPC_SET_API_KEY, APP_SECRETS_RPC_CLEAR_API_KEY,
-        APP_SECRETS_RPC_STATUS, APP_SECRETS_RPC_SET_MODEL,
+        APP_SECRETS_RPC_STATUS, APP_SECRETS_RPC_SET_MODEL, APP_SECRETS_RPC_SET_VOICE,
     };
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
         const esp_err_t err = esp_iris_rpc_register(APP_SECRETS_RPC_SERVICE, methods[i],

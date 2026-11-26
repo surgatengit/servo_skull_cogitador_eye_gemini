@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "bundle_gsp.h"
+#include "secret_text.h"
 
 /* Scene geometry (authored in ui/main.json; keep in sync). */
 #define EYE_TICK_MS            33
@@ -28,6 +29,40 @@
 #define CLOSE_Y0               0
 #define CLOSE_Y1               64
 #define DELETE_HOLD_TICKS      45       /* ~1.5 s holding the X deletes every photo */
+/* Bezel badges (voice_badge / role_badge in ui/main.json; keep in sync). */
+#define VOICE_X0               364
+#define VOICE_X1               420
+#define VOICE_Y0               60
+#define VOICE_Y1               116
+#define ROLE_X0                404
+#define ROLE_X1                460
+#define ROLE_Y0                212
+#define ROLE_Y1                268
+/* Dice panel (ui/main.json "dice"; keep in sync): up to 5 per row. */
+#define DIE_SIZE               64
+#define DIE_GAP                12
+#define DIE_ROW_MAX            5
+#define DIE_ROW_Y_SINGLE       196
+#define DIE_ROW_Y_TOP          162
+#define DIE_ROW_Y_BOTTOM       236
+#define DICE_ROLL_TICKS        24       /* ~0.8 s of tumbling numbers */
+#define DICE_SHOW_TICKS        180      /* ~6 s with the result */
+#define DIE_COLOR_NORMAL       0x1E2A33
+#define DIE_COLOR_GOOD         0xB37800 /* gold: maximum or success */
+#define DIE_COLOR_BAD          0xA0102A /* red: a 1 */
+/* Dice request handoff: release/acquire on the device; the PC preview (MSVC)
+ * runs GSP and the demo on one thread. */
+#if defined(__GNUC__)
+#define SEQ_LOAD(p)            __atomic_load_n((p), __ATOMIC_ACQUIRE)
+#define SEQ_BUMP(p)            ((void)__atomic_add_fetch((p), 1U, __ATOMIC_RELEASE))
+#else
+#define SEQ_LOAD(p)            (*(volatile uint32_t *)(p))
+#define SEQ_BUMP(p)            ((void)(++*(volatile uint32_t *)(p)))
+#endif
+/* Secret card text box: 332 px wide at 20 px, 11 lines of 24 px. */
+#define SECRET_COLUMNS         27
+#define SECRET_LINES           11
+#define SECRET_CAPACITY        480
 
 /* Blink phases in ticks (~66 ms close, ~33 ms hold, ~100 ms open). */
 #define BLINK_CLOSE_TICKS      2
@@ -67,6 +102,20 @@ struct app_vox_eye {
     bool x_held;
     bool x_fired;
     uint32_t x_since;
+    /* Dice: the producer fills dice_req_* and then bumps dice_req_seq (release);
+     * the render task copies them when it sees a new sequence (acquire). */
+    app_vox_eye_roll_t dice_req;
+    uint32_t dice_req_seq;
+    uint32_t dice_seen_seq;         /* render task only from here on */
+    app_vox_eye_roll_t dice;
+    uint32_t dice_tick;
+    bool dice_active;
+    volatile int32_t secret_open;   /* set by any task, cleared on the render task */
+    volatile int32_t role_mode;     /* set by any task: hold the eye to leave */
+    /* Hold on the eye in role mode (render task only: interceptor + timer). */
+    bool eye_held;
+    bool eye_fired;
+    uint32_t eye_since;
     app_vox_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
@@ -237,6 +286,118 @@ static void step_blink(struct app_vox_eye *eye)
     eye->double_blink = eye->double_blink || (rng_next(eye) % 5U) == 0U;
 }
 
+/* The generated setters are per object (die0..die9): dispatch on the index. */
+#define DIE_CALL(i, suffix, ...)                                                            \
+    do {                                                                                    \
+        switch (i) {                                                                        \
+        case 0: remember(eye, (esp_gsp_err_t)gsp_vox_die0##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 1: remember(eye, (esp_gsp_err_t)gsp_vox_die1##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 2: remember(eye, (esp_gsp_err_t)gsp_vox_die2##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 3: remember(eye, (esp_gsp_err_t)gsp_vox_die3##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 4: remember(eye, (esp_gsp_err_t)gsp_vox_die4##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 5: remember(eye, (esp_gsp_err_t)gsp_vox_die5##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 6: remember(eye, (esp_gsp_err_t)gsp_vox_die6##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 7: remember(eye, (esp_gsp_err_t)gsp_vox_die7##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 8: remember(eye, (esp_gsp_err_t)gsp_vox_die8##suffix(eye->ui, __VA_ARGS__)); break; \
+        default: remember(eye, (esp_gsp_err_t)gsp_vox_die9##suffix(eye->ui, __VA_ARGS__)); break; \
+        }                                                                                   \
+    } while (0)
+
+static void set_die_visible(struct app_vox_eye *eye, unsigned i, bool visible)
+{
+    DIE_CALL(i, _set_visible, visible);
+}
+
+static void set_die_position(struct app_vox_eye *eye, unsigned i, int32_t x, int32_t y)
+{
+    DIE_CALL(i, _slot_set_position, x, y);
+}
+
+static void set_die_color(struct app_vox_eye *eye, unsigned i, uint32_t rgb)
+{
+    DIE_CALL(i, _face_set_color_rgb888, rgb);
+}
+
+static void set_die_text(struct app_vox_eye *eye, unsigned i, const char *text)
+{
+    DIE_CALL(i, _value_set_text, text);
+}
+
+static void set_die_number(struct app_vox_eye *eye, unsigned i, unsigned value)
+{
+    char text[12];
+    snprintf(text, sizeof(text), "%u", value);
+    set_die_text(eye, i, text);
+}
+
+/* Up to DIE_ROW_MAX dice in one centred row; more in two (the top one gets the odd die). */
+static void place_dice(struct app_vox_eye *eye, unsigned count)
+{
+    const unsigned top = count <= DIE_ROW_MAX ? count : (count + 1U) / 2U;
+    for (unsigned i = 0; i < count; ++i) {
+        const bool first_row = i < top;
+        const unsigned in_row = first_row ? top : count - top;
+        const unsigned col = first_row ? i : i - top;
+        const int32_t width = (int32_t)in_row * DIE_SIZE + ((int32_t)in_row - 1) * DIE_GAP;
+        const int32_t x = 240 - width / 2 + (int32_t)col * (DIE_SIZE + DIE_GAP);
+        const int32_t y = count <= DIE_ROW_MAX ? DIE_ROW_Y_SINGLE
+                          : (first_row ? DIE_ROW_Y_TOP : DIE_ROW_Y_BOTTOM);
+        set_die_position(eye, i, x, y);
+    }
+}
+
+static void hide_dice(struct app_vox_eye *eye)
+{
+    eye->dice_active = false;
+    remember(eye, gsp_vox_dice_set_visible(eye->ui, false));
+}
+
+/* Render task: start a new roll, tumble, settle on the results, hide. */
+static void step_dice(struct app_vox_eye *eye)
+{
+    const uint32_t seq = SEQ_LOAD(&eye->dice_req_seq);
+    if (seq != eye->dice_seen_seq) {
+        eye->dice_seen_seq = seq;
+        eye->dice = eye->dice_req;
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_title_set_text(eye->ui, eye->dice.title));
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, " "));
+        place_dice(eye, eye->dice.count);
+        for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+            const bool used = i < eye->dice.count;
+            if (used) {
+                set_die_color(eye, i, DIE_COLOR_NORMAL);
+            }
+            set_die_visible(eye, i, used);
+        }
+        eye->dice_tick = 0;
+        eye->dice_active = true;
+        remember(eye, gsp_vox_dice_set_visible(eye->ui, true));
+    }
+    if (!eye->dice_active) {
+        return;
+    }
+    eye->dice_tick++;
+    if (eye->dice_tick < DICE_ROLL_TICKS) {
+        if ((eye->dice_tick & 1U) == 0U) {
+            for (unsigned i = 0; i < eye->dice.count; ++i) {
+                set_die_number(eye, i, rng_range(eye, 1, eye->dice.tumble));
+            }
+        }
+    } else if (eye->dice_tick == DICE_ROLL_TICKS) {
+        for (unsigned i = 0; i < eye->dice.count; ++i) {
+            const uint8_t mark = eye->dice.marks[i];
+            set_die_text(eye, i, eye->dice.faces[i][0] ? eye->dice.faces[i] : "?");
+            set_die_color(eye, i, mark == APP_VOX_EYE_DIE_GOOD ? DIE_COLOR_GOOD
+                                  : (mark == APP_VOX_EYE_DIE_BAD ? DIE_COLOR_BAD
+                                                                 : DIE_COLOR_NORMAL));
+        }
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(
+                          eye->ui, eye->dice.result[0] ? eye->dice.result : " "));
+    } else if (eye->dice_tick > DICE_ROLL_TICKS + DICE_SHOW_TICKS) {
+        hide_dice(eye);
+    }
+}
+
 static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
@@ -248,8 +409,16 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
             eye->config.on_gallery(APP_VOX_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
         }
     }
-    if (eye->gallery_open) {
-        return; /* hidden under the gallery: no repaints, no DMA traffic */
+    if (eye->eye_held && !eye->eye_fired && eye->ticks - eye->eye_since >= DELETE_HOLD_TICKS) {
+        eye->eye_fired = true; /* fire while still held; the release is swallowed */
+        eye->blink_request = 1;
+        if (eye->config.on_action) {
+            eye->config.on_action(APP_VOX_EYE_ACTION_CLOSE_HOLD, eye->config.action_ctx);
+        }
+    }
+    step_dice(eye);
+    if (eye->gallery_open || eye->dice_active || eye->secret_open) {
+        return; /* covered by an overlay: no eye repaints, less DMA traffic */
     }
     eye->stats.frames++;
 
@@ -373,6 +542,31 @@ static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, vo
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
+    /* Role mode: a press held on the eye (not on a bezel badge or an overlay)
+     * leaves the game; a short tap still interrupts. */
+    const bool on_badge = (x >= VOICE_X0 && x < VOICE_X1 && y >= VOICE_Y0 && y < VOICE_Y1) ||
+                          (x >= ROLE_X0 && x < ROLE_X1 && y >= ROLE_Y0 && y < ROLE_Y1);
+    const bool eye_free = eye->role_mode && !eye->gallery_open && !eye->dice_active &&
+                          !eye->secret_open && !on_badge;
+    if (pressed) {
+        if (!eye->eye_held && eye_free) {
+            eye->eye_held = true;
+            eye->eye_fired = false;
+            eye->eye_since = eye->ticks;
+        } else if (eye->eye_held && !eye_free && !eye->eye_fired) {
+            eye->eye_held = false;
+        }
+    } else if (eye->eye_held) {
+        const bool fired = eye->eye_fired;
+        eye->eye_held = false;
+        eye->eye_fired = false;
+        if (fired) {
+            return true; /* the hold already acted: no tap on release */
+        }
+    }
+    if (pressed && eye->eye_fired) {
+        return true;
+    }
     const bool on_x = x >= CLOSE_X0 && x < CLOSE_X1 && y >= CLOSE_Y0 && y < CLOSE_Y1;
     if (pressed) {
         if (!eye->x_held && eye->gallery_open && on_x) {
@@ -391,14 +585,43 @@ static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, vo
 }
 #endif
 
+/* Overlays and bezel buttons (1.6.0). Returns true when the event was consumed. */
+static bool rol_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
+{
+    if (gsp_vox_event_is_dice_close(event)) {
+        if (eye->dice_tick >= DICE_ROLL_TICKS) {
+            hide_dice(eye); /* keep it while tumbling */
+        }
+        return true;
+    }
+    if (gsp_vox_event_is_secret_close(event)) {
+        remember(eye, gsp_vox_secret_set_visible(eye->ui, false));
+        eye->secret_open = 0;
+        return true;
+    }
+    app_vox_eye_action_t action;
+    if (gsp_vox_event_is_voice_next(event)) {
+        action = APP_VOX_EYE_ACTION_VOICE_NEXT;
+    } else if (gsp_vox_event_is_role_roll(event)) {
+        action = APP_VOX_EYE_ACTION_ROLE_ROLL;
+    } else {
+        return false;
+    }
+    if (!eye->gallery_open && eye->config.on_action) {
+        eye->config.on_action(action, eye->config.action_ctx);
+    }
+    return true;
+}
+
 static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ctx)
 {
     (void)ui;
     struct app_vox_eye *eye = ctx;
-    if (gallery_event(eye, event)) {
+    if (gallery_event(eye, event) || rol_event(eye, event)) {
         return;
     }
-    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open) {
+    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open || eye->dice_active ||
+            eye->secret_open) {
         return;
     }
     eye->stats.taps++;
@@ -528,6 +751,74 @@ esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle)
     const esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, false);
     handle->gallery_open = 0;
     return err;
+}
+
+esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char initial)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    if (initial >= 'a' && initial <= 'z') {
+        initial = (char)(initial - 32);
+    }
+    const char text[2] = { (initial >= 'A' && initial <= 'Z') ? initial : 'V', '\0' };
+    return (esp_gsp_err_t)gsp_vox_voice_badge_text_set_text(handle->ui, text);
+}
+
+esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enabled)
+{
+    if (!handle) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    handle->role_mode = enabled ? 1 : 0;
+    return (esp_gsp_err_t)gsp_vox_role_badge_set_visible(handle->ui, enabled);
+}
+
+esp_gsp_err_t app_vox_eye_set_role_badge(app_vox_eye_handle_t handle, const char *text)
+{
+    if (!handle || !text || !text[0]) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    return (esp_gsp_err_t)gsp_vox_role_badge_text_set_text(handle->ui, text);
+}
+
+esp_gsp_err_t app_vox_eye_show_roll(app_vox_eye_handle_t handle, const app_vox_eye_roll_t *roll)
+{
+    if (!handle || !roll || roll->count == 0 || roll->count > APP_VOX_EYE_MAX_DICE ||
+            roll->tumble < 2 || roll->tumble > 100) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    handle->dice_req = *roll;
+    /* Terminate the copied strings whatever the caller sent. */
+    for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+        handle->dice_req.faces[i][sizeof(handle->dice_req.faces[i]) - 1] = '\0';
+    }
+    handle->dice_req.title[sizeof(handle->dice_req.title) - 1] = '\0';
+    handle->dice_req.result[sizeof(handle->dice_req.result) - 1] = '\0';
+    SEQ_BUMP(&handle->dice_req_seq);
+    return ESP_GSP_OK;
+}
+
+esp_gsp_err_t app_vox_eye_show_secret(app_vox_eye_handle_t handle, const char *player,
+                                      const char *text)
+{
+    if (!handle || !text) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    char clean[SECRET_CAPACITY];
+    char wrapped[SECRET_CAPACITY];
+    char name[40];
+    char title[64];
+    secret_text_sanitize(player, name, sizeof(name), true);
+    snprintf(title, sizeof(title), "SOLO PARA %s", name[0] ? name : "TI");
+    secret_text_sanitize(text, clean, sizeof(clean), false);
+    secret_text_wrap(clean, SECRET_COLUMNS, SECRET_LINES, wrapped, sizeof(wrapped));
+    esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_secret_title_set_text(handle->ui, title);
+    const esp_gsp_err_t body = (esp_gsp_err_t)gsp_vox_secret_text_set_text(
+        handle->ui, wrapped[0] ? wrapped : " ");
+    handle->secret_open = 1;
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_secret_set_visible(handle->ui, true);
+    return err != ESP_GSP_OK ? err : (body != ESP_GSP_OK ? body : vis);
 }
 
 esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot_t *out_snapshot)

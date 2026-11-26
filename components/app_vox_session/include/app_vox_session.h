@@ -19,6 +19,18 @@ typedef enum {
     APP_VOX_VIEW_ERROR,        /**< violet: actionable error (see status text) */
 } app_vox_view_t;
 
+#define APP_VOX_SESSION_MAX_DICE 10
+
+/** A roll for the dice panel (texts uppercase, card charset). */
+typedef struct {
+    unsigned count;                             /**< 1..APP_VOX_SESSION_MAX_DICE */
+    char faces[APP_VOX_SESSION_MAX_DICE][4];    /**< final text per die */
+    uint8_t marks[APP_VOX_SESSION_MAX_DICE];    /**< 0 normal, 1 gold (max/success), 2 red (1) */
+    unsigned tumble;                            /**< random 1..tumble while rolling */
+    char title[32];                             /**< "TIRADA 2D20", "RESERVA 6D10 · 8+" */
+    char result[40];                            /**< "TOTAL 29", "RESULTADO 47", "3 ÉXITOS" */
+} app_vox_session_roll_t;
+
 /** UI sink supplied by the composition root. Called from the session task. */
 typedef struct {
     void (*set_view)(void *ui, app_vox_view_t view);
@@ -29,6 +41,12 @@ typedef struct {
     void (*show_photo)(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
                        unsigned count);
     void (*hide_gallery)(void *ui);
+    /* Optional RoleMaster controls (1.6.0). */
+    void (*set_voice_initial)(void *ui, char initial);
+    void (*set_role_mode)(void *ui, bool enabled);
+    void (*set_role_badge)(void *ui, const char *text);  /**< "2D20", "D%", "6D10" */
+    void (*show_roll)(void *ui, const app_vox_session_roll_t *roll);
+    void (*show_secret)(void *ui, const char *player, const char *text);
     void *ui;
 } app_vox_session_ui_t;
 
@@ -41,6 +59,13 @@ typedef enum {
     APP_VOX_SESSION_GALLERY_TOUCH,
     APP_VOX_SESSION_GALLERY_DELETE_ALL,
 } app_vox_session_gallery_t;
+
+/** Bezel buttons from the UI (same values as app_vox_eye_action_t). */
+typedef enum {
+    APP_VOX_SESSION_ACTION_VOICE_NEXT = 0, /**< voice badge: next voice */
+    APP_VOX_SESSION_ACTION_ROLE_ROLL,      /**< dice badge (role mode): the prepared player roll */
+    APP_VOX_SESSION_ACTION_CLOSE_HOLD,     /**< role mode: eye held, leave the game */
+} app_vox_session_action_t;
 
 typedef struct {
     app_vox_session_ui_t ui;
@@ -59,10 +84,13 @@ void app_vox_session_tap(void);
 /** Photo counter / gallery control. Non-blocking; safe from the GSP framework task. */
 void app_vox_session_gallery(app_vox_session_gallery_t action);
 
+/** Bezel button. Non-blocking; safe from the GSP framework task. */
+void app_vox_session_action(app_vox_session_action_t action);
+
 /** Wi-Fi state notification (app_wifi_state_t value). Non-blocking. */
 void app_vox_session_wifi_changed(int app_wifi_state);
 
-/** Secrets (API key/model) changed via provisioning RPC. Non-blocking. */
+/** Secrets (API key/model/voice) changed via provisioning RPC. Non-blocking. */
 void app_vox_session_secrets_changed(void);
 
 /** Output loudness for the eye (0..100), lock-free. */

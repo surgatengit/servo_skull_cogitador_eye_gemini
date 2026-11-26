@@ -591,6 +591,99 @@ y muestra «BORRANDO...» y después «FOTOS BORRADAS» durante 3 s.
 
 **Galería y almacenamiento: superados.** Reinicio por software: pendiente de la corrección.
 
+### Prueba 14 (pendiente de autorización): 1.6.0 RoleMaster
+
+Comprobado en el PC:
+- tests de voces, dados (rango y reparto en 200 000 tiradas), textos de tirada, tarjeta de secreto y
+  tabla de jugadores;
+- simulador: botones de voz y de dados, dados con crítico y pifia, tirada porcentual, reservas de
+  6d10 y 10d10 (dos filas), tarjeta «SOLO PARA ÍÑIGO»;
+- página del móvil con un servidor simulado: alta, secreto que llega borroso y se lee manteniendo
+  pulsado.
+
+En el dispositivo, por orden:
+1. **Voz por botón:** con el ojo en reposo, toca el círculo de arriba a la derecha. Cambia la letra
+   (C, A, K, S) y la línea de estado dice la voz («KORE · CHICA FIRME»). Di «Hola ESP»: habla con
+   esa voz.
+2. **Voz por voz:** «Ponte una voz de chico grave». VOX se despide, se reconecta (ámbar) y vuelve a
+   escuchar con Algenib.
+3. **Dados:** «Tira dos dados de veinte». Salen animados en pantalla y VOX dice el resultado.
+4. **Modo rol:** «Vamos a jugar una partida de rol».
+   - Aparece «2D20» a la derecha y «MÓVIL: 192.168.x.x» abajo.
+   - Abre esa dirección en el móvil, en la misma Wi-Fi, y escribe tu nombre.
+5. **Secreto:** cuando el máster reparta secretos, el tuyo llega al móvil (vibra; mantén pulsado
+   para leerlo). El de un jugador sin móvil sale en la pantalla hasta tocarla.
+6. **Tirada del jugador:** toca «2D20», también mientras el máster habla. Salen tus 2d20 y el
+   máster los usa: si estaba hablando, la tirada le llega en cuanto termina su frase.
+7. Deja de hablar 2–3 minutos en modo rol: no debe cerrarse antes de unos 180 s.
+8. En modo rol, un toque mientras escucha no cierra (pone «MANTÉN PARA SALIR»). Mantén el dedo
+   1,5 s sobre el ojo: sale de la partida.
+9. **Tipos de tirada** (en una partida):
+   - «Quiero tirar con mi habilidad de 6 en reserva de d10»: el botón pasa a «6D10». Al tocarlo
+     salen 6 dados; los de 8 o más en dorado, los 1 en rojo, y abajo «N ÉXITOS».
+   - «Ahora jugamos con porcentaje, tira tú»: el máster tira d100 y salen dos dados, decenas
+     («40») y unidades («7»), con «RESULTADO 47».
+   - Con 6 a 10 dados salen en dos filas.
+10. **Sala de espera:** al empezar, el máster os da la dirección y espera. Cada vez que alguien
+    entra desde el móvil, el máster le da la bienvenida. Empieza cuando le decís que estáis.
+11. **Entrar tarde:** deja a un jugador sin entrar. Cuando el máster reparta los secretos, el
+    suyo le espera; al entrar con su nombre le aparecen su ficha y su secreto.
+12. **Secretos sin leer:** «¿Quién no ha leído su secreto?». El máster lo sabe y avisa por su
+    nombre. Al mantener pulsado el botón, el móvil cuenta como leído.
+13. **Ficha:** cada jugador ve su ficha en el móvil. Cuando pierde vida o gana algo, la ficha se
+    actualiza y el móvil vibra.
+14. **Cambio de móvil:** entra con el mismo nombre desde otro móvil (o en otra pestaña). Lo
+    recupera todo; el móvil anterior vuelve a la pantalla de entrada y el máster recibe el aviso.
+15. **Guardar:** «Guarda la partida». En el móvil, «Partida guardada» → «Descargar la partida de
+    VOX» baja `partida_vox.json`.
+16. **Continuar:** sal de la partida, empieza otra («Vamos a jugar a rol»). El máster pregunta si
+    queréis continuar la guardada; di que sí. Resume lo ocurrido y cada jugador, al entrar con su
+    nombre, recupera ficha y secreto. Prueba también «nueva aventura con los mismos personajes».
+17. **Subir:** en el móvil, «Subir a VOX» con el archivo descargado. El máster recibe un aviso.
+
+**Primer intento (2026-11-26, firmware `da1a7c52…`):**
+- Correcto: `cambiar_voz` (Kore), el botón de voz (Sulafat, guardada tras reiniciar), la reconexión
+  con la voz nueva y los dados 2d20 y 3d100.
+- `modo_rol` arrancó la página en `http://192.168.1.37`.
+- A los 15 s, dos toques seguidos (interrumpir y luego, sin querer, cerrar) terminaron la partida.
+- Corrección: en modo rol un toque ya no cierra; se sale manteniendo pulsado o pidiéndoselo al
+  máster.
+
+**Segundo intento (2026-11-26, commit `1f7153b`):**
+- Correcto: el alta desde el móvil, el secreto en el móvil, los dados del D20 en pantalla, que un
+  toque no cierre la partida, la salida manteniendo pulsado y el cambio de voz.
+- Fallo: las dos tiradas del D20 se hicieron mientras VOX hablaba y no llegaron a Gemini
+  (`Could not lock ws-client`, `clientContent text ESP_FAIL`). Mientras llega el audio de la
+  respuesta, el cliente WebSocket está ocupado.
+- Corrección: la tirada se guarda y se envía al terminar la respuesta (`turnComplete`). Se
+  reintenta cada 0,5 s, se agrupan varias tiradas en un solo mensaje y se descartan a los 90 s o
+  al cerrar la conversación.
+
+**Tercer intento (2026-11-26, commit `06dfd94`):** una tirada hecha mientras el máster hablaba le
+llegó 2 s después, al acabar su frase (`player roll delivered`). Después se añadieron los tipos de
+tirada (paso 9).
+
+**Cuarto intento (2026-11-26, commit `1e6a29d`):**
+- Correcto: `preparar_tirada` a porcentaje (botón «D%») y a reserva 6d10; la tirada de reserva
+  (2 éxitos) llegó al máster.
+- Fallo: el máster pidió a la vez preparar la tirada y dos secretos. Solo cabían 2 peticiones, se
+  perdió un secreto y VOX esperó 30 s sin respuesta (`tool call mostrar_secreto dropped`).
+- Corrección: 8 peticiones a la vez (commit `c9b40e4`). Después se añadieron la sala de espera,
+  las fichas y las partidas guardadas (pasos 10–17).
+
+En el registro (`iris logs`), busca:
+- `dice {...}` (con `"modo":"suma"`, `"porcentaje"` o `"reserva"`);
+- `player roll prepared: …`;
+- `voice … requested by the model` y `reconnecting with voice …`;
+- `role mode on`;
+- `phone page at http://…`, `player joined: …` / `player rejoined: …` y `phone notice: …`;
+- `secret sent to the phone of …` o `secret kept for … (no phone yet)`;
+- `sheet updated on the phone of …` o `sheet kept for …`;
+- `game saved: … (N bytes)`, `game loaded (continue|same characters): …`,
+  `saved game uploaded: …`;
+- `player roll: …` y, justo después o al acabar la respuesta, `notes delivered`;
+- `eye held in role mode; leaving the game`.
+
 ## 3. Volver al firmware actual (restauración)
 
 **Antes de instalar VOX** (en Vibe Mode, en la pantalla del dispositivo):

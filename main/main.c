@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /* VOX M-01 GEMINI DIRECT composition root: initialization, wiring and startup
  * order only. Behavior lives in the app_* components. */
+#include <string.h>
+
 #include "app_display.h"
 #include "app_secrets.h"
 #include "app_vox_eye.h"
@@ -62,6 +64,48 @@ static void ui_show_photo(void *ui, const uint8_t *jpeg, size_t size, unsigned p
 static void ui_hide_gallery(void *ui)
 {
     (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
+}
+
+static void ui_set_voice_initial(void *ui, char initial)
+{
+    (void)app_vox_eye_set_voice_initial((app_vox_eye_handle_t)ui, initial);
+}
+
+static void ui_set_role_mode(void *ui, bool enabled)
+{
+    (void)app_vox_eye_set_role_mode((app_vox_eye_handle_t)ui, enabled);
+}
+
+static void ui_set_role_badge(void *ui, const char *text)
+{
+    (void)app_vox_eye_set_role_badge((app_vox_eye_handle_t)ui, text);
+}
+
+_Static_assert(APP_VOX_SESSION_MAX_DICE == APP_VOX_EYE_MAX_DICE, "dice panel size");
+
+static void ui_show_roll(void *ui, const app_vox_session_roll_t *roll)
+{
+    app_vox_eye_roll_t view = {
+        .count = roll->count,
+        .tumble = roll->tumble,
+    };
+    memcpy(view.faces, roll->faces, sizeof(view.faces));
+    memcpy(view.marks, roll->marks, sizeof(view.marks));
+    memcpy(view.title, roll->title, sizeof(view.title));
+    memcpy(view.result, roll->result, sizeof(view.result));
+    (void)app_vox_eye_show_roll((app_vox_eye_handle_t)ui, &view);
+}
+
+static void ui_show_secret(void *ui, const char *player, const char *text)
+{
+    (void)app_vox_eye_show_secret((app_vox_eye_handle_t)ui, player, text);
+}
+
+/* GSP framework task: only enqueue. The enums share their values. */
+static void eye_action(app_vox_eye_action_t action, void *ctx)
+{
+    (void)ctx;
+    app_vox_session_action((app_vox_session_action_t)action);
 }
 
 /* GSP framework task: only enqueue. The enums share their values. */
@@ -131,6 +175,7 @@ static esp_err_t start_eye(void)
     const app_vox_eye_config_t eye = {
         .on_tap = eye_tapped,
         .on_gallery = eye_gallery,
+        .on_action = eye_action,
         .level = eye_level,
         .seed = esp_random() | 1U,
     };
@@ -168,6 +213,11 @@ void app_main(void)
             .set_photo_count = eye_ready ? ui_set_photo_count : NULL,
             .show_photo = eye_ready ? ui_show_photo : NULL,
             .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
+            .set_voice_initial = eye_ready ? ui_set_voice_initial : NULL,
+            .set_role_mode = eye_ready ? ui_set_role_mode : NULL,
+            .set_role_badge = eye_ready ? ui_set_role_badge : NULL,
+            .show_roll = eye_ready ? ui_show_roll : NULL,
+            .show_secret = eye_ready ? ui_show_secret : NULL,
             .ui = application.eye,
         },
     };

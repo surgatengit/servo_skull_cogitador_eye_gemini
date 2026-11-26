@@ -21,6 +21,8 @@ Examples (from the project directory, inside esp-mosaico-vibe/projects/):
     python tools/provision_key.py --model gemini-3.1-flash-live-preview
     python tools/provision_key.py --model "" # back to the firmware default
     python tools/provision_key.py --clear    # erase the key from the device
+    python tools/provision_key.py --voice Kore  # voice for the next conversations
+    python tools/provision_key.py --voice ""    # back to the firmware default voice
 
 Use USB (the default ESP-Iris transport) for provisioning.
 """
@@ -37,7 +39,12 @@ import sys
 from pathlib import Path
 
 SERVICE = 0x5658
-SET_API_KEY, CLEAR_API_KEY, STATUS, SET_MODEL = 1, 2, 3, 4
+SET_API_KEY, CLEAR_API_KEY, STATUS, SET_MODEL, SET_VOICE = 1, 2, 3, 4, 5
+# Gemini Live prebuilt voices (same list as the firmware, app_secrets.c).
+VOICES = ("Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe",
+          "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib",
+          "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima",
+          "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat")
 MODELS = ("gemini-3.8-live", "gemini-3.1-flash-live-preview")
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9._-]{30,128}$")
 
@@ -106,6 +113,7 @@ def main() -> int:
     group.add_argument("--status", action="store_true", help="show whether a key is stored")
     group.add_argument("--clear", action="store_true", help="erase the stored key")
     group.add_argument("--model", metavar="NAME", help=f"set model override ({', '.join(MODELS)} or '')")
+    group.add_argument("--voice", metavar="NAME", help="set the voice (one of the 30 Gemini voices, or '')")
     args = parser.parse_args()
 
     if args.status:
@@ -116,6 +124,10 @@ def main() -> int:
         if args.model and args.model not in MODELS:
             parser.error(f"modelo no permitido: {args.model}")
         return rpc(SET_MODEL, args.model.encode("ascii"))
+    if args.voice is not None:
+        if args.voice and args.voice not in VOICES:
+            parser.error(f"voz no válida: {args.voice}. Opciones: {', '.join(VOICES)}")
+        return rpc(SET_VOICE, args.voice.encode("ascii"))
 
     key, source = resolve_key()
     if not KEY_PATTERN.match(key):

@@ -4,8 +4,10 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include "app_vox_eye.h"
 #include "gsp_sim_bridge.h"
+#include "vox_rol.h"
 
 #define DEMO_STEP_MS 3000
 
@@ -19,7 +21,11 @@ static struct {
     unsigned photo;          /* gallery demo position, 1..DEMO_PHOTOS */
     bool gallery;
     unsigned gallery_events;
+    unsigned voice;          /* RoleMaster demo: voice badge position */
+    unsigned rolls;
 } backend;
+
+static const char VOICE_INITIALS[] = "CAKS"; /* Charon, Algenib, Kore, Sulafat */
 
 #define DEMO_PHOTOS 3        /* the PC has no photo store: placeholder picture */
 
@@ -83,6 +89,56 @@ static void on_gallery(app_vox_gallery_action_t action, void *ctx)
     fprintf(stderr, "vox_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
 }
 
+/* Show a fixed roll through the same view code the device uses. */
+static void demo_roll(vox_rol_spec_t spec, const uint16_t *values)
+{
+    vox_rol_view_t view;
+    vox_rol_view(&spec, values, &view);
+    app_vox_eye_roll_t roll = { .count = view.count, .tumble = view.tumble };
+    memcpy(roll.faces, view.faces, sizeof(roll.faces));
+    memcpy(roll.marks, view.marks, sizeof(roll.marks));
+    memcpy(roll.title, view.title, sizeof(roll.title));
+    memcpy(roll.result, view.result, sizeof(roll.result));
+    (void)app_vox_eye_show_roll(backend.eye, &roll);
+    char badge[8];
+    if (vox_rol_badge(&spec, badge, sizeof(badge)) > 0) {
+        (void)app_vox_eye_set_role_badge(backend.eye, badge);
+    }
+}
+
+/* RoleMaster demo (1.6.0): the voice badge cycles C/A/K/S and shows a secret
+ * card on the last voice; the dice badge cycles a 2d20 critical, a 1d20
+ * fumble, a percentile roll, a 6d10 pool and a 10d10 pool. */
+static void on_action(app_vox_eye_action_t action, void *ctx)
+{
+    (void)ctx;
+    if (action == APP_VOX_EYE_ACTION_VOICE_NEXT) {
+        backend.voice = (backend.voice + 1) % 4;
+        (void)app_vox_eye_set_voice_initial(backend.eye, VOICE_INITIALS[backend.voice]);
+        fprintf(stderr, "vox_eye_backend: voice %c\n", VOICE_INITIALS[backend.voice]);
+        if (backend.voice == 3) {
+            (void)app_vox_eye_show_secret(backend.eye, "Íñigo",
+                                          "Eres el hijo perdido del gobernador. Si Ana descubre "
+                                          "tu sello, intentará venderte al Inquisidor… "
+                                          "¿confiarás en ella?");
+        }
+        return;
+    }
+    static const uint16_t crit[] = { 20, 7 };
+    static const uint16_t fumble[] = { 1 };
+    static const uint16_t percent[] = { 4, 7 };
+    static const uint16_t pool6[] = { 9, 3, 10, 8, 1, 5 };
+    static const uint16_t pool10[] = { 10, 2, 8, 6, 1, 9, 4, 8, 3, 7 };
+    switch (backend.rolls++ % 5) {
+    case 0: demo_roll(vox_rol_spec_default(), crit); break;
+    case 1: demo_roll(vox_rol_spec_make(VOX_ROL_SUM, 1, 20, 0), fumble); break;
+    case 2: demo_roll(vox_rol_spec_make(VOX_ROL_PERCENT, 2, 10, 0), percent); break;
+    case 3: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 8), pool6); break;
+    default: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 10, 10, 8), pool10); break;
+    }
+    fprintf(stderr, "vox_eye_backend: roll %u\n", backend.rolls);
+}
+
 /* Tap opens/closes the demo conversation like the device session does. */
 static void on_tap(void *ctx)
 {
@@ -105,6 +161,7 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
     const app_vox_eye_config_t config = {
         .on_tap = on_tap,
         .on_gallery = on_gallery,
+        .on_action = on_action,
         .level = level,
         .seed = 0xC0617A70u,
     };
@@ -113,6 +170,8 @@ esp_gsp_err_t gsp_bridge_app_init(esp_gsp_handle_t ui)
         return err;
     }
     (void)app_vox_eye_set_photo_count(backend.eye, DEMO_PHOTOS);
+    (void)app_vox_eye_set_voice_initial(backend.eye, 'C');
+    (void)app_vox_eye_set_role_mode(backend.eye, true);
     backend.state = APP_VOX_EYE_IDLE;
     backend.demo_timer = esp_gsp_timer_create(ui, DEMO_STEP_MS, demo_tick, NULL);
     return backend.demo_timer ? ESP_GSP_OK : ESP_GSP_ERR_NO_MEM;
