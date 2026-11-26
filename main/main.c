@@ -5,8 +5,8 @@
 
 #include "app_display.h"
 #include "app_secrets.h"
-#include "app_vox_eye.h"
-#include "app_vox_session.h"
+#include "app_cogitador_eye.h"
+#include "app_cogitador_session.h"
 #include "app_wifi.h"
 #include "esp_iris.h"
 #include "esp_log.h"
@@ -19,73 +19,73 @@
 #include "nvs_flash.h"
 #include "ui_bundle.h"
 
-static const char *TAG = "vox_m01";
+static const char *TAG = "cogitador";
 
 /* The composition root retains owned handles, never component internals. */
 static struct {
     esp_gsp_handle_t ui;
-    app_vox_eye_handle_t eye;
+    app_cogitador_eye_handle_t eye;
 } application;
 
-static const app_vox_eye_state_t EYE_FOR_VIEW[] = {
-    [APP_VOX_VIEW_IDLE] = APP_VOX_EYE_IDLE,
-    [APP_VOX_VIEW_LISTENING] = APP_VOX_EYE_LISTENING,
-    [APP_VOX_VIEW_PROCESSING] = APP_VOX_EYE_PROCESSING,
-    [APP_VOX_VIEW_SPEAKING] = APP_VOX_EYE_SPEAKING,
-    [APP_VOX_VIEW_ERROR] = APP_VOX_EYE_ERROR,
+static const app_cogitador_eye_state_t EYE_FOR_VIEW[] = {
+    [APP_COGITADOR_VIEW_IDLE] = APP_COGITADOR_EYE_IDLE,
+    [APP_COGITADOR_VIEW_LISTENING] = APP_COGITADOR_EYE_LISTENING,
+    [APP_COGITADOR_VIEW_PROCESSING] = APP_COGITADOR_EYE_PROCESSING,
+    [APP_COGITADOR_VIEW_SPEAKING] = APP_COGITADOR_EYE_SPEAKING,
+    [APP_COGITADOR_VIEW_ERROR] = APP_COGITADOR_EYE_ERROR,
 };
 
-static void ui_set_view(void *ui, app_vox_view_t view)
+static void ui_set_view(void *ui, app_cogitador_view_t view)
 {
-    app_vox_eye_set_state((app_vox_eye_handle_t)ui, EYE_FOR_VIEW[view]);
+    app_cogitador_eye_set_state((app_cogitador_eye_handle_t)ui, EYE_FOR_VIEW[view]);
 }
 
 static void ui_set_status(void *ui, const char *text)
 {
-    (void)app_vox_eye_set_status((app_vox_eye_handle_t)ui, text);
+    (void)app_cogitador_eye_set_status((app_cogitador_eye_handle_t)ui, text);
 }
 
 static void ui_acknowledge(void *ui)
 {
-    app_vox_eye_blink((app_vox_eye_handle_t)ui);
+    app_cogitador_eye_blink((app_cogitador_eye_handle_t)ui);
 }
 
 static void ui_set_photo_count(void *ui, unsigned count)
 {
-    (void)app_vox_eye_set_photo_count((app_vox_eye_handle_t)ui, count);
+    (void)app_cogitador_eye_set_photo_count((app_cogitador_eye_handle_t)ui, count);
 }
 
 static void ui_show_photo(void *ui, const uint8_t *jpeg, size_t size, unsigned position,
                           unsigned count)
 {
-    (void)app_vox_eye_show_photo((app_vox_eye_handle_t)ui, jpeg, size, position, count);
+    (void)app_cogitador_eye_show_photo((app_cogitador_eye_handle_t)ui, jpeg, size, position, count);
 }
 
 static void ui_hide_gallery(void *ui)
 {
-    (void)app_vox_eye_hide_gallery((app_vox_eye_handle_t)ui);
+    (void)app_cogitador_eye_hide_gallery((app_cogitador_eye_handle_t)ui);
 }
 
 static void ui_set_voice_initial(void *ui, char initial)
 {
-    (void)app_vox_eye_set_voice_initial((app_vox_eye_handle_t)ui, initial);
+    (void)app_cogitador_eye_set_voice_initial((app_cogitador_eye_handle_t)ui, initial);
 }
 
 static void ui_set_role_mode(void *ui, bool enabled)
 {
-    (void)app_vox_eye_set_role_mode((app_vox_eye_handle_t)ui, enabled);
+    (void)app_cogitador_eye_set_role_mode((app_cogitador_eye_handle_t)ui, enabled);
 }
 
 static void ui_set_role_badge(void *ui, const char *text)
 {
-    (void)app_vox_eye_set_role_badge((app_vox_eye_handle_t)ui, text);
+    (void)app_cogitador_eye_set_role_badge((app_cogitador_eye_handle_t)ui, text);
 }
 
-_Static_assert(APP_VOX_SESSION_MAX_DICE == APP_VOX_EYE_MAX_DICE, "dice panel size");
+_Static_assert(APP_COGITADOR_SESSION_MAX_DICE == APP_COGITADOR_EYE_MAX_DICE, "dice panel size");
 
-static void ui_show_roll(void *ui, const app_vox_session_roll_t *roll)
+static void ui_show_roll(void *ui, const app_cogitador_session_roll_t *roll)
 {
-    app_vox_eye_roll_t view = {
+    app_cogitador_eye_roll_t view = {
         .count = roll->count,
         .tumble = roll->tumble,
     };
@@ -93,50 +93,50 @@ static void ui_show_roll(void *ui, const app_vox_session_roll_t *roll)
     memcpy(view.marks, roll->marks, sizeof(view.marks));
     memcpy(view.title, roll->title, sizeof(view.title));
     memcpy(view.result, roll->result, sizeof(view.result));
-    (void)app_vox_eye_show_roll((app_vox_eye_handle_t)ui, &view);
+    (void)app_cogitador_eye_show_roll((app_cogitador_eye_handle_t)ui, &view);
 }
 
 static void ui_show_secret(void *ui, const char *player, const char *text)
 {
-    (void)app_vox_eye_show_secret((app_vox_eye_handle_t)ui, player, text);
+    (void)app_cogitador_eye_show_secret((app_cogitador_eye_handle_t)ui, player, text);
 }
 
 /* GSP framework task: only enqueue. The enums share their values. */
-static void eye_action(app_vox_eye_action_t action, void *ctx)
+static void eye_action(app_cogitador_eye_action_t action, void *ctx)
 {
     (void)ctx;
-    app_vox_session_action((app_vox_session_action_t)action);
+    app_cogitador_session_action((app_cogitador_session_action_t)action);
 }
 
 /* GSP framework task: only enqueue. The enums share their values. */
-static void eye_gallery(app_vox_gallery_action_t action, void *ctx)
+static void eye_gallery(app_cogitador_gallery_action_t action, void *ctx)
 {
     (void)ctx;
-    app_vox_session_gallery((app_vox_session_gallery_t)action);
+    app_cogitador_session_gallery((app_cogitador_session_gallery_t)action);
 }
 
 static void eye_tapped(void *ctx)
 {
     (void)ctx;
-    app_vox_session_tap();
+    app_cogitador_session_tap();
 }
 
 static uint8_t eye_level(void *ctx)
 {
     (void)ctx;
-    return app_vox_session_output_level();
+    return app_cogitador_session_output_level();
 }
 
 static void wifi_changed(app_wifi_state_t state, void *ctx)
 {
     (void)ctx;
-    app_vox_session_wifi_changed((int)state);
+    app_cogitador_session_wifi_changed((int)state);
 }
 
 static void secrets_changed(void *ctx)
 {
     (void)ctx;
-    app_vox_session_secrets_changed();
+    app_cogitador_session_secrets_changed();
 }
 
 /* esp_restart() runs this before the reset (ESP-Iris triggers restarts for
@@ -151,7 +151,7 @@ static void quiesce_display_on_restart(void)
     }
     esp_gsp_esp_lcd_pause_t *pause = NULL;
     const esp_err_t err = esp_gsp_esp_lcd_pause(application.ui, 300, &pause);
-    esp_rom_printf("vox_m01: display quiesced before restart (%s)\n", esp_err_to_name(err));
+    esp_rom_printf("cogitador: display quiesced before restart (%s)\n", esp_err_to_name(err));
 }
 
 static esp_err_t start_eye(void)
@@ -172,7 +172,7 @@ static esp_err_t start_eye(void)
     ESP_ERROR_CHECK(esp_gsp_esp_lcd_start(&config, &display, &application.ui));
     ESP_ERROR_CHECK(iris_screen_mirror_attach(application.ui));
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_register_shutdown_handler(quiesce_display_on_restart));
-    const app_vox_eye_config_t eye = {
+    const app_cogitador_eye_config_t eye = {
         .on_tap = eye_tapped,
         .on_gallery = eye_gallery,
         .on_action = eye_action,
@@ -180,7 +180,7 @@ static esp_err_t start_eye(void)
         .seed = esp_random() | 1U,
     };
     /* GSP retains the callback context; the eye lives until reboot. */
-    return app_vox_eye_create(application.ui, &eye, &application.eye) == ESP_GSP_OK ? ESP_OK
+    return app_cogitador_eye_create(application.ui, &eye, &application.eye) == ESP_GSP_OK ? ESP_OK
                                                                                     : ESP_FAIL;
 }
 
@@ -195,8 +195,8 @@ void app_main(void)
     if (nvs_err != ESP_OK) {
         ESP_LOGE(TAG, "app NVS unavailable (%s); not erasing it", esp_err_to_name(nvs_err));
         if (start_eye() == ESP_OK) {
-            app_vox_eye_set_state(application.eye, APP_VOX_EYE_ERROR);
-            (void)app_vox_eye_set_status(application.eye, "ERROR DE NVS");
+            app_cogitador_eye_set_state(application.eye, APP_COGITADOR_EYE_ERROR);
+            (void)app_cogitador_eye_set_status(application.eye, "ERROR DE NVS");
         }
         return;
     }
@@ -205,7 +205,7 @@ void app_main(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(app_wifi_start(wifi_changed, NULL));
 
     const bool eye_ready = start_eye() == ESP_OK;
-    const app_vox_session_config_t session = {
+    const app_cogitador_session_config_t session = {
         .ui = {
             .set_view = eye_ready ? ui_set_view : NULL,
             .set_status = eye_ready ? ui_set_status : NULL,
@@ -221,13 +221,13 @@ void app_main(void)
             .ui = application.eye,
         },
     };
-    const esp_err_t err = app_vox_session_start(&session);
+    const esp_err_t err = app_cogitador_session_start(&session);
     if (err != ESP_OK) {
         /* Keep the eye and Recovery alive; show the fault instead of a silent idle eye. */
         ESP_LOGE(TAG, "session unavailable (%s)", esp_err_to_name(err));
         if (eye_ready) {
-            app_vox_eye_set_state(application.eye, APP_VOX_EYE_ERROR);
-            (void)app_vox_eye_set_status(application.eye, "ERROR INTERNO");
+            app_cogitador_eye_set_state(application.eye, APP_COGITADOR_EYE_ERROR);
+            (void)app_cogitador_eye_set_status(application.eye, "ERROR INTERNO");
         }
         return;
     }

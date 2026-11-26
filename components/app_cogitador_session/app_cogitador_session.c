@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#include "app_vox_session.h"
+#include "app_cogitador_session.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -16,7 +16,7 @@
 #include "app_wifi.h"
 #include "cJSON.h"
 #include "esp_random.h"
-#include "vox_rol.h"
+#include "cogitador_rol.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -25,36 +25,36 @@
 #include "freertos/task.h"
 #include "mbedtls/platform_util.h"
 #include "sdkconfig.h"
-#include "vox_status_text.h"
+#include "cogitador_status_text.h"
 
-#if CONFIG_VOX_GOOGLE_SEARCH
-#define VOX_GOOGLE_SEARCH 1
+#if CONFIG_COGITADOR_GOOGLE_SEARCH
+#define COGITADOR_GOOGLE_SEARCH 1
 #else
-#define VOX_GOOGLE_SEARCH 0
+#define COGITADOR_GOOGLE_SEARCH 0
 #endif
-#if CONFIG_VOX_CAMERA
-#define VOX_CAMERA 1
-#define VOX_CAMERA_JPEG_MAX_BYTES ((size_t)CONFIG_VOX_CAMERA_JPEG_MAX_KB * 1024U)
+#if CONFIG_COGITADOR_CAMERA
+#define COGITADOR_CAMERA 1
+#define COGITADOR_CAMERA_JPEG_MAX_BYTES ((size_t)CONFIG_COGITADOR_CAMERA_JPEG_MAX_KB * 1024U)
 #else
-#define VOX_CAMERA 0
-#define VOX_CAMERA_JPEG_MAX_BYTES 0U
+#define COGITADOR_CAMERA 0
+#define COGITADOR_CAMERA_JPEG_MAX_BYTES 0U
 #endif
 
-static const char *TAG = "vox_session";
+static const char *TAG = "cog_session";
 
 #define SESSION_TASK_STACK      8192    /* camera/PPA/JPEG calls run on this task */
 #define SESSION_TASK_PRIO       8
 #define SESSION_TASK_CORE       0
 #define SESSION_QUEUE_LEN       24
 #define SESSION_TICK_MS         50
-#define RESPONSE_TIMEOUT_US     ((int64_t)CONFIG_VOX_RESPONSE_TIMEOUT_S * 1000 * 1000)
+#define RESPONSE_TIMEOUT_US     ((int64_t)CONFIG_COGITADOR_RESPONSE_TIMEOUT_S * 1000 * 1000)
 #define SPEAKING_GAP_US         (2 * 1000 * 1000)   /* playback drained, turn still open */
 #define CONNECTING_TIMEOUT_US   (45 * 1000 * 1000)
 #define SQUELCH_MAX_US          (10 * 1000 * 1000)
 #define DIAG_PERIOD_US          (5 * 1000 * 1000)
 #define PLAY_TIMEOUT_MS         1500
-#define IDLE_TIMEOUT_US         ((int64_t)CONFIG_VOX_IDLE_TIMEOUT_S * 1000 * 1000)
-#define PREROLL_FRAMES          (CONFIG_VOX_PREROLL_MS / 40)   /* 40 ms uplink frames */
+#define IDLE_TIMEOUT_US         ((int64_t)CONFIG_COGITADOR_IDLE_TIMEOUT_S * 1000 * 1000)
+#define PREROLL_FRAMES          (CONFIG_COGITADOR_PREROLL_MS / 40)   /* 40 ms uplink frames */
 #define GROUNDING_ITEMS_CAPACITY 384    /* formatted status lines, '\n' separated (PSRAM) */
 #define GROUNDING_RAW_CAPACITY  384     /* scratch copy of queries/sources (PSRAM) */
 #define GROUNDING_ROTATE_US     (3 * 1000 * 1000)
@@ -76,7 +76,7 @@ static const char *TAG = "vox_session";
 #define TOOL_SAVE               "guardar_partida"
 #define TOOL_LOAD               "cargar_partida"
 #define TOOL_ARGS_CAPACITY      6144    /* function call arguments (JSON): the saved-game summary */
-#define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_VOX_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
+#define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_COGITADOR_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
 #define PLAYER_TEXT_CAPACITY    256     /* one player roll as text (10 dice fit) */
 #define NOTES_CAPACITY          1024    /* pending notes for the master (rolls, phone notices) */
 #define NOTES_RETRY_US          (500 * 1000)        /* after a failed send */
@@ -130,7 +130,7 @@ static const char PERSONA[] =
     "encajar con consecuencias. Al terminar narra el desenlace y un epílogo, resume cómo queda "
     "cada personaje y qué han aprendido del juego, deja un cabo suelto para otro día y llama a "
     "modo_rol con activar a falso. Todo es hablado: sin títulos, listas ni símbolos."
-#if CONFIG_VOX_GOOGLE_SEARCH
+#if CONFIG_COGITADOR_GOOGLE_SEARCH
     " Responde de inmediato con lo que sabes. Usa la búsqueda de Google solo cuando el "
     "operador te lo pida o cuando no conozcas la respuesta por ser un dato reciente; en ese "
     "caso responde directamente, sin mencionar fuentes ni que has buscado."
@@ -164,8 +164,8 @@ typedef enum {
     EV_AUDIO_START,
     EV_WAKE,
     EV_TOOL,        /* value = tool slot */
-    EV_GALLERY,     /* value = app_vox_session_gallery_t */
-    EV_ACTION,      /* value = app_vox_session_action_t */
+    EV_GALLERY,     /* value = app_cogitador_session_gallery_t */
+    EV_ACTION,      /* value = app_cogitador_session_action_t */
 } event_kind_t;
 
 /* Parameters shared by tirar_dados and preparar_tirada. */
@@ -184,7 +184,7 @@ typedef enum {
 /* Functions Gemini may call (Live setup functionDeclarations). */
 static const char FUNCTION_DECLARATIONS[] =
     "["
-#if CONFIG_VOX_CAMERA
+#if CONFIG_COGITADOR_CAMERA
     "{\"name\":\"" TOOL_CAPTURE "\","
     "\"description\":\"Toma una fotografía con la cámara de Co y la envía como imagen para "
     "que puedas ver lo que hay delante. Úsala solo cuando el operador te pida que mires, que "
@@ -279,7 +279,7 @@ typedef struct {
  * Cross-task flags (WebSocket/mic tasks) use __atomic builtins. */
 static struct {
     bool started;
-    app_vox_session_config_t config;
+    app_cogitador_session_config_t config;
     QueueHandle_t queue;
     app_gemini_live_handle_t gl;
     session_state_t state;
@@ -313,7 +313,7 @@ static struct {
     /* Pending reply: from the user's turn (first input transcription or model
      * output) until turnComplete. While pending, the idle return is suspended
      * and silence is shown as PROCESSING, so searches and thinking pauses are
-     * never mistaken for an abandoned conversation (VOX_RESPONSE_TIMEOUT_S). */
+     * never mistaken for an abandoned conversation (COGITADOR_RESPONSE_TIMEOUT_S). */
     bool reply_pending;
     int64_t model_progress_us; /* last model output seen by the session task */
     uint32_t model_rx_ms;   /* atomic: time of the latest model output (WebSocket task) */
@@ -343,7 +343,7 @@ static struct {
     /* Player rolls (D20 badge) not yet delivered to the master: the WebSocket
      * client is busy while the model streams a reply, so they wait for
      * turnComplete and are retried until sent or expired. */
-    vox_rol_spec_t player_roll; /* what the dice badge rolls (preparar_tirada) */
+    cogitador_rol_spec_t player_roll; /* what the dice badge rolls (preparar_tirada) */
     char notes[NOTES_CAPACITY];
     int64_t notes_since_us;  /* first pending note */
     int64_t notes_retry_us;  /* earliest next attempt */
@@ -383,16 +383,16 @@ static void post(event_kind_t kind, int value, int code)
     }
 }
 
-static app_vox_view_t view_for(session_state_t st)
+static app_cogitador_view_t view_for(session_state_t st)
 {
     switch (st) {
-    case ST_CLOSED:     return APP_VOX_VIEW_IDLE;
-    case ST_CONNECTING: return APP_VOX_VIEW_PROCESSING;
-    case ST_LISTENING:  return APP_VOX_VIEW_LISTENING;
-    case ST_PROCESSING: return APP_VOX_VIEW_PROCESSING;
-    case ST_SPEAKING:   return APP_VOX_VIEW_SPEAKING;
+    case ST_CLOSED:     return APP_COGITADOR_VIEW_IDLE;
+    case ST_CONNECTING: return APP_COGITADOR_VIEW_PROCESSING;
+    case ST_LISTENING:  return APP_COGITADOR_VIEW_LISTENING;
+    case ST_PROCESSING: return APP_COGITADOR_VIEW_PROCESSING;
+    case ST_SPEAKING:   return APP_COGITADOR_VIEW_SPEAKING;
     case ST_ERROR:
-    default:            return APP_VOX_VIEW_ERROR;
+    default:            return APP_COGITADOR_VIEW_ERROR;
     }
 }
 
@@ -508,7 +508,7 @@ static void refresh_status(void)
 static bool add_item(const char *prefix, const char *text, size_t len)
 {
     char line[STATUS_CAPACITY];
-    if (vox_status_text(prefix, text, len, line, sizeof(line), STATUS_MAX_CHARS) == 0) {
+    if (cogitador_status_text(prefix, text, len, line, sizeof(line), STATUS_MAX_CHARS) == 0) {
         return false;
     }
     const size_t used = strlen(s.items);
@@ -544,7 +544,7 @@ static void clear_grounding(void)
  * question). */
 static void load_grounding(void)
 {
-#if !CONFIG_VOX_SHOW_SEARCH_SOURCES
+#if !CONFIG_COGITADOR_SHOW_SEARCH_SOURCES
     /* Quiet search (default): count it for the diagnostics, show nothing. */
     ESP_LOGD(TAG, "grounded answer (sources not shown)");
     return;
@@ -639,7 +639,7 @@ static void enter(session_state_t st)
 }
 
 /* The user's turn is over or the model started answering: suspend the idle
- * return until turnComplete (or VOX_RESPONSE_TIMEOUT_S without model output). */
+ * return until turnComplete (or COGITADOR_RESPONSE_TIMEOUT_S without model output). */
 static void begin_reply(void)
 {
     if (!s.reply_pending) {
@@ -657,11 +657,11 @@ static void fail(session_error_t err)
 }
 
 /* The dice badge rolls `spec` from now on. */
-static void set_player_roll(vox_rol_spec_t spec)
+static void set_player_roll(cogitador_rol_spec_t spec)
 {
     s.player_roll = spec;
     char badge[8];
-    if (s.config.ui.set_role_badge && vox_rol_badge(&spec, badge, sizeof(badge)) > 0) {
+    if (s.config.ui.set_role_badge && cogitador_rol_badge(&spec, badge, sizeof(badge)) > 0) {
         s.config.ui.set_role_badge(s.config.ui.ui, badge);
     }
 }
@@ -674,9 +674,9 @@ static void set_role_mode(bool on)
     s.role_mode = on;
     ESP_LOGI(TAG, "role mode %s", on ? "on" : "off");
     if (on) {
-        set_player_roll(vox_rol_spec_default()); /* every game starts with 2d20 */
+        set_player_roll(cogitador_rol_spec_default()); /* every game starts with 2d20 */
     }
-#if CONFIG_VOX_ROLE_PHONE_PAGE
+#if CONFIG_COGITADOR_ROLE_PHONE_PAGE
     if (on) {
         (void)app_rol_web_start(); /* optional: secrets fall back to the screen card */
     } else {
@@ -704,7 +704,7 @@ static void load_stored_voice(void)
 {
     char stored[APP_SECRETS_VOICE_CAPACITY];
     use_voice(app_secrets_load_voice(stored, sizeof(stored)) == ESP_OK ? stored
-                                                                     : CONFIG_VOX_GEMINI_VOICE);
+                                                                     : CONFIG_COGITADOR_GEMINI_VOICE);
 }
 
 static void show_notice(const char *text)
@@ -722,15 +722,15 @@ static uint32_t hw_rand32(void *ctx)
 }
 
 /* Roll with the hardware RNG and show it on the dice panel. */
-static void roll(const vox_rol_spec_t *spec, uint16_t *values)
+static void roll(const cogitador_rol_spec_t *spec, uint16_t *values)
 {
-    vox_rol_roll(spec, hw_rand32, NULL, values);
+    cogitador_rol_roll(spec, hw_rand32, NULL, values);
     if (!s.config.ui.show_roll) {
         return;
     }
-    vox_rol_view_t view;
-    vox_rol_view(spec, values, &view);
-    app_vox_session_roll_t shown = { .count = view.count, .tumble = view.tumble };
+    cogitador_rol_view_t view;
+    cogitador_rol_view(spec, values, &view);
+    app_cogitador_session_roll_t shown = { .count = view.count, .tumble = view.tumble };
     _Static_assert(sizeof(shown.faces) == sizeof(view.faces), "dice faces");
     memcpy(shown.faces, view.faces, sizeof(shown.faces));
     memcpy(shown.marks, view.marks, sizeof(shown.marks));
@@ -740,14 +740,14 @@ static void roll(const vox_rol_spec_t *spec, uint16_t *values)
 }
 
 /* Spec from tirar_dados / preparar_tirada arguments. */
-static vox_rol_spec_t spec_from_args(const cJSON *args, int default_count, int default_sides)
+static cogitador_rol_spec_t spec_from_args(const cJSON *args, int default_count, int default_sides)
 {
     const cJSON *mode = cJSON_GetObjectItemCaseSensitive(args, "modo");
-    const vox_rol_mode_t m = vox_rol_mode_parse(cJSON_IsString(mode) ? mode->valuestring : NULL);
+    const cogitador_rol_mode_t m = cogitador_rol_mode_parse(cJSON_IsString(mode) ? mode->valuestring : NULL);
     const cJSON *count = cJSON_GetObjectItemCaseSensitive(args, "cantidad");
     const cJSON *sides = cJSON_GetObjectItemCaseSensitive(args, "caras");
     const cJSON *target = cJSON_GetObjectItemCaseSensitive(args, "exito_con");
-    return vox_rol_spec_make(m, cJSON_IsNumber(count) ? (int)count->valuedouble : default_count,
+    return cogitador_rol_spec_make(m, cJSON_IsNumber(count) ? (int)count->valuedouble : default_count,
                              cJSON_IsNumber(sides) ? (int)sides->valuedouble : default_sides,
                              cJSON_IsNumber(target) ? (int)target->valuedouble : 0);
 }
@@ -1025,7 +1025,7 @@ static bool check_silent_model(void)
         return false;
     }
     const uint32_t voiced = __atomic_load_n(&s.voiced_frames, __ATOMIC_ACQUIRE) - s.voiced_base;
-    if (voiced < (uint32_t)CONFIG_VOX_SILENT_MODEL_VOICED_FRAMES) {
+    if (voiced < (uint32_t)CONFIG_COGITADOR_SILENT_MODEL_VOICED_FRAMES) {
         return false;
     }
     app_gemini_live_stats_t stats;
@@ -1048,7 +1048,7 @@ static bool check_silent_model(void)
     return true;
 }
 
-#if CONFIG_VOX_CAMERA_BOOT_TEST
+#if CONFIG_COGITADOR_CAMERA_BOOT_TEST
 /* Diagnostic still while idle, once per boot: tells conversation load apart
  * from a camera/driver problem. Logged only, never sent. */
 static void camera_boot_test(int64_t now)
@@ -1060,7 +1060,7 @@ static void camera_boot_test(int64_t now)
     done = true;
     app_camera_still_t still;
     ESP_LOGI(TAG, "camera boot test: taking one still while idle");
-    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    const esp_err_t err = app_camera_capture_jpeg(COGITADOR_CAMERA_JPEG_MAX_BYTES, &still);
     ESP_LOGI(TAG, "camera boot test: %s", err == ESP_OK ? "OK" : esp_err_to_name(err));
 }
 #endif
@@ -1068,7 +1068,7 @@ static void camera_boot_test(int64_t now)
 static void on_tick(void)
 {
     const int64_t now = esp_timer_get_time();
-#if CONFIG_VOX_CAMERA_BOOT_TEST
+#if CONFIG_COGITADOR_CAMERA_BOOT_TEST
     camera_boot_test(now);
 #endif
     log_diagnostics(now);
@@ -1098,13 +1098,13 @@ static void on_tick(void)
         refresh_status(); /* back to the error/sources line or hidden */
     }
     if (s.reply_pending && now - s.model_progress_us > RESPONSE_TIMEOUT_US) {
-        ESP_LOGW(TAG, "no model output for %d s; reply abandoned", CONFIG_VOX_RESPONSE_TIMEOUT_S);
+        ESP_LOGW(TAG, "no model output for %d s; reply abandoned", CONFIG_COGITADOR_RESPONSE_TIMEOUT_S);
         s.reply_pending = false;
         if (s.state == ST_PROCESSING) {
             enter(ST_LISTENING); /* the idle countdown starts now */
         }
     }
-#if CONFIG_VOX_ROLE_PHONE_PAGE
+#if CONFIG_COGITADOR_ROLE_PHONE_PAGE
     if (s.role_mode && s.state != ST_CLOSED && s.state != ST_ERROR) {
         char notice[384];
         if (app_rol_web_take_notices(notice, sizeof(notice)) > 0) {
@@ -1185,7 +1185,7 @@ static void run_capture(const tool_slot_t *slot)
     }
     set_mic(false);
     app_camera_still_t still;
-    const esp_err_t err = app_camera_capture_jpeg(VOX_CAMERA_JPEG_MAX_BYTES, &still);
+    const esp_err_t err = app_camera_capture_jpeg(COGITADOR_CAMERA_JPEG_MAX_BYTES, &still);
     if (err == ESP_OK && !__atomic_load_n(&slot->cancelled, __ATOMIC_ACQUIRE) &&
             app_gemini_live_send_image(s.gl, still.data, still.size) == ESP_OK) {
         s.stills_sent++;
@@ -1219,11 +1219,11 @@ static void saved_title(char *out, size_t cap);
 
 static void run_dice(const tool_slot_t *slot, const cJSON *args)
 {
-    const vox_rol_spec_t spec = spec_from_args(args, 1, 0);
-    uint16_t values[VOX_ROL_MAX_DICE];
+    const cogitador_rol_spec_t spec = spec_from_args(args, 1, 0);
+    uint16_t values[COGITADOR_ROL_MAX_DICE];
     roll(&spec, values);
     char json[320];
-    if (vox_rol_roll_json(&spec, values, json, sizeof(json)) == 0) {
+    if (cogitador_rol_roll_json(&spec, values, json, sizeof(json)) == 0) {
         snprintf(json, sizeof(json), "{\"error\":\"No se pudo formatear la tirada.\"}");
     }
     ESP_LOGI(TAG, "dice %s", json);
@@ -1240,8 +1240,8 @@ static void run_prepare(const tool_slot_t *slot, const cJSON *args)
     set_player_roll(spec_from_args(args, 2, 0));
     char what[96];
     char badge[8];
-    (void)vox_rol_spec_text(&s.player_roll, what, sizeof(what));
-    (void)vox_rol_badge(&s.player_roll, badge, sizeof(badge));
+    (void)cogitador_rol_spec_text(&s.player_roll, what, sizeof(what));
+    (void)cogitador_rol_badge(&s.player_roll, badge, sizeof(badge));
     ESP_LOGI(TAG, "player roll prepared: %s", what);
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "tirada_preparada", what);
@@ -1258,7 +1258,7 @@ static void run_prepare(const tool_slot_t *slot, const cJSON *args)
 static void run_voice(const tool_slot_t *slot, const cJSON *args)
 {
     const char *name = arg_str(args, "voz");
-    if (!name || vox_rol_voice_index(name) < 0) {
+    if (!name || cogitador_rol_voice_index(name) < 0) {
         answer_tool(slot, "{\"error\":\"Voz no disponible: usa Charon, Algenib, Kore o Sulafat.\"}");
         return;
     }
@@ -1424,10 +1424,10 @@ static void run_sheet(const tool_slot_t *slot, const cJSON *args)
     }
 }
 
-static const char *mode_name(const vox_rol_spec_t *spec)
+static const char *mode_name(const cogitador_rol_spec_t *spec)
 {
-    return spec->mode == VOX_ROL_PERCENT ? "porcentaje"
-           : (spec->mode == VOX_ROL_POOL ? "reserva" : "suma");
+    return spec->mode == COGITADOR_ROL_PERCENT ? "porcentaje"
+           : (spec->mode == COGITADOR_ROL_POOL ? "reserva" : "suma");
 }
 
 static void run_save(const tool_slot_t *slot, const cJSON *args)
@@ -1491,7 +1491,7 @@ static void run_load(const tool_slot_t *slot, const cJSON *args)
         (void)rol_game_restore(json, &meta, NULL, false);
     }
     free(json);
-    set_player_roll(vox_rol_spec_make(vox_rol_mode_parse(meta.dice_mode), meta.dice_count,
+    set_player_roll(cogitador_rol_spec_make(cogitador_rol_mode_parse(meta.dice_mode), meta.dice_count,
                                       meta.dice_sides, meta.dice_target));
     if (!keep_story) {
         cJSON *item = NULL;
@@ -1524,7 +1524,7 @@ static void run_tool(int index)
     const tool_slot_t *slot = &s.tools[index];
     const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
     cJSON *args = open ? cJSON_Parse(slot->args) : NULL;
-    if (open && strcmp(slot->name, TOOL_CAPTURE) == 0 && VOX_CAMERA) {
+    if (open && strcmp(slot->name, TOOL_CAPTURE) == 0 && COGITADOR_CAMERA) {
         run_capture(slot);
     } else if (open && strcmp(slot->name, TOOL_DICE) == 0) {
         run_dice(slot, args);
@@ -1619,11 +1619,11 @@ static void gallery_show(void)
     s.gallery_touch_us = esp_timer_get_time();
 }
 
-static void on_gallery(app_vox_session_gallery_t action)
+static void on_gallery(app_cogitador_session_gallery_t action)
 {
     const size_t count = app_photos_count();
     switch (action) {
-    case APP_VOX_SESSION_GALLERY_OPEN:
+    case APP_COGITADOR_SESSION_GALLERY_OPEN:
         /* Not while Co is answering: the conversation keeps the screen. */
         if (s.gallery_open || count == 0 || s.state == ST_SPEAKING || s.state == ST_PROCESSING ||
                 s.state == ST_CONNECTING) {
@@ -1632,22 +1632,22 @@ static void on_gallery(app_vox_session_gallery_t action)
         s.gallery_pos = count - 1; /* newest first */
         gallery_show();
         break;
-    case APP_VOX_SESSION_GALLERY_PREV:
-    case APP_VOX_SESSION_GALLERY_NEXT:
+    case APP_COGITADOR_SESSION_GALLERY_PREV:
+    case APP_COGITADOR_SESSION_GALLERY_NEXT:
         if (!s.gallery_open || count == 0) {
             return;
         }
-        if (action == APP_VOX_SESSION_GALLERY_PREV) {
+        if (action == APP_COGITADOR_SESSION_GALLERY_PREV) {
             s.gallery_pos = s.gallery_pos == 0 ? count - 1 : s.gallery_pos - 1;
         } else {
             s.gallery_pos = s.gallery_pos + 1 >= count ? 0 : s.gallery_pos + 1;
         }
         gallery_show();
         break;
-    case APP_VOX_SESSION_GALLERY_CLOSE:
+    case APP_COGITADOR_SESSION_GALLERY_CLOSE:
         gallery_close();
         break;
-    case APP_VOX_SESSION_GALLERY_DELETE_ALL:
+    case APP_COGITADOR_SESSION_GALLERY_DELETE_ALL:
         if (!s.gallery_open) {
             return;
         }
@@ -1664,17 +1664,17 @@ static void on_gallery(app_vox_session_gallery_t action)
         }
         s.notice_until_us = esp_timer_get_time() + NOTICE_US;
         break;
-    case APP_VOX_SESSION_GALLERY_TOUCH:
+    case APP_COGITADOR_SESSION_GALLERY_TOUCH:
     default:
         s.gallery_touch_us = esp_timer_get_time();
         break;
     }
 }
 
-static void on_action(app_vox_session_action_t action)
+static void on_action(app_cogitador_session_action_t action)
 {
-    if (action == APP_VOX_SESSION_ACTION_VOICE_NEXT) {
-        const vox_rol_voice_t *next = vox_rol_voice_next(s.voice);
+    if (action == APP_COGITADOR_SESSION_ACTION_VOICE_NEXT) {
+        const cogitador_rol_voice_t *next = cogitador_rol_voice_next(s.voice);
         (void)app_secrets_store_voice(next->name);
         const bool open = s.state != ST_CLOSED && s.state != ST_ERROR;
         use_voice(next->name); /* the open conversation keeps its voice until it closes */
@@ -1695,18 +1695,18 @@ static void on_action(app_vox_session_action_t action)
                  open ? " from the next conversation" : "");
         return;
     }
-    if (action == APP_VOX_SESSION_ACTION_CLOSE_HOLD) {
+    if (action == APP_COGITADOR_SESSION_ACTION_CLOSE_HOLD) {
         if (s.state != ST_CLOSED && s.state != ST_ERROR) {
             ESP_LOGI(TAG, "eye held in role mode; leaving the game");
             close_conversation();
         }
         return;
     }
-    if (action == APP_VOX_SESSION_ACTION_ROLE_ROLL && s.role_mode) {
-        uint16_t values[VOX_ROL_MAX_DICE];
+    if (action == APP_COGITADOR_SESSION_ACTION_ROLE_ROLL && s.role_mode) {
+        uint16_t values[COGITADOR_ROL_MAX_DICE];
         roll(&s.player_roll, values);
         char text[PLAYER_TEXT_CAPACITY];
-        if (vox_rol_player_text(&s.player_roll, values, text, sizeof(text)) == 0) {
+        if (cogitador_rol_player_text(&s.player_roll, values, text, sizeof(text)) == 0) {
             return;
         }
         ESP_LOGI(TAG, "player roll: %s", text);
@@ -1760,10 +1760,10 @@ static void session_task(void *arg)
                 run_tool(ev.value);
                 break;
             case EV_GALLERY:
-                on_gallery((app_vox_session_gallery_t)ev.value);
+                on_gallery((app_cogitador_session_gallery_t)ev.value);
                 break;
             case EV_ACTION:
-                on_action((app_vox_session_action_t)ev.value);
+                on_action((app_cogitador_session_action_t)ev.value);
                 break;
             case EV_WAKE:
                 if (s.state == ST_CLOSED) {
@@ -1810,7 +1810,7 @@ static void gl_event(const app_gemini_live_event_t *event, void *ctx)
         ESP_LOGD(TAG, "user: %s", event->text);
         break;
     case APP_GL_EVT_OUTPUT_TRANSCRIPT:
-        ESP_LOGD(TAG, "vox: %s", event->text);
+        ESP_LOGD(TAG, "cog: %s", event->text);
         return;
     case APP_GL_EVT_MODEL_ACTIVITY:
         __atomic_store_n(&s.model_rx_ms, now_ms(), __ATOMIC_RELEASE);
@@ -1869,43 +1869,43 @@ static void on_mic(const int16_t *pcm, size_t samples, void *ctx)
             const int v = pcm[i] < 0 ? -(int)pcm[i] : pcm[i];
             peak = v > peak ? v : peak;
         }
-        if (peak >= CONFIG_VOX_VOICED_PEAK_THRESHOLD) {
+        if (peak >= CONFIG_COGITADOR_VOICED_PEAK_THRESHOLD) {
             __atomic_add_fetch(&s.voiced_frames, 1U, __ATOMIC_RELEASE);
         }
     }
 }
 
-void app_vox_session_tap(void)
+void app_cogitador_session_tap(void)
 {
     post(EV_TAP, 0, 0);
 }
 
-void app_vox_session_gallery(app_vox_session_gallery_t action)
+void app_cogitador_session_gallery(app_cogitador_session_gallery_t action)
 {
     post(EV_GALLERY, (int)action, 0);
 }
 
-void app_vox_session_action(app_vox_session_action_t action)
+void app_cogitador_session_action(app_cogitador_session_action_t action)
 {
     post(EV_ACTION, (int)action, 0);
 }
 
-void app_vox_session_wifi_changed(int app_wifi_state)
+void app_cogitador_session_wifi_changed(int app_wifi_state)
 {
     post(EV_WIFI, app_wifi_state, 0);
 }
 
-void app_vox_session_secrets_changed(void)
+void app_cogitador_session_secrets_changed(void)
 {
     post(EV_SECRETS, 0, 0);
 }
 
-uint8_t app_vox_session_output_level(void)
+uint8_t app_cogitador_session_output_level(void)
 {
     return app_audio_output_level();
 }
 
-esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
+esp_err_t app_cogitador_session_start(const app_cogitador_session_config_t *config)
 {
     if (!config) {
         return ESP_ERR_INVALID_ARG;
@@ -1931,25 +1931,25 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
 
     /* Model: provisioned override first, the other approved model as fallback. */
     char override[APP_SECRETS_MODEL_CAPACITY];
-    const char *primary = CONFIG_VOX_GEMINI_MODEL;
-    const char *fallback = CONFIG_VOX_GEMINI_FALLBACK_MODEL;
+    const char *primary = CONFIG_COGITADOR_GEMINI_MODEL;
+    const char *fallback = CONFIG_COGITADOR_GEMINI_FALLBACK_MODEL;
     if (app_secrets_load_model(override, sizeof(override)) == ESP_OK) {
         primary = override;
-        if (strcmp(override, CONFIG_VOX_GEMINI_MODEL) != 0) {
-            fallback = CONFIG_VOX_GEMINI_MODEL;
+        if (strcmp(override, CONFIG_COGITADOR_GEMINI_MODEL) != 0) {
+            fallback = CONFIG_COGITADOR_GEMINI_MODEL;
         }
     }
     char stored_voice[APP_SECRETS_VOICE_CAPACITY];
     snprintf(s.voice, sizeof(s.voice), "%s",
              app_secrets_load_voice(stored_voice, sizeof(stored_voice)) == ESP_OK
-             ? stored_voice : CONFIG_VOX_GEMINI_VOICE);
+             ? stored_voice : CONFIG_COGITADOR_GEMINI_VOICE);
     const app_gemini_live_config_t gl_config = {
         .model = primary,
         .fallback_model = fallback,
         .voice = s.voice,
-        .language = CONFIG_VOX_GEMINI_LANGUAGE,
+        .language = CONFIG_COGITADOR_GEMINI_LANGUAGE,
         .system_instruction = PERSONA,
-        .google_search = VOX_GOOGLE_SEARCH,
+        .google_search = COGITADOR_GOOGLE_SEARCH,
         .function_declarations = FUNCTION_DECLARATIONS,
         .on_event = gl_event,
     };
@@ -1966,15 +1966,15 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const app_audio_config_t audio = {
         .on_mic = on_mic,
-        .mic_gain_db = config->mic_gain_db > 0.0f ? config->mic_gain_db : (float)CONFIG_VOX_MIC_GAIN_DB,
-        .volume = config->volume > 0 ? config->volume : CONFIG_VOX_SPEAKER_VOLUME,
+        .mic_gain_db = config->mic_gain_db > 0.0f ? config->mic_gain_db : (float)CONFIG_COGITADOR_MIC_GAIN_DB,
+        .volume = config->volume > 0 ? config->volume : CONFIG_COGITADOR_SPEAKER_VOLUME,
     };
     err = app_audio_start(&audio);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "audio unavailable (%s)", esp_err_to_name(err));
         goto fail_gl;
     }
-#if CONFIG_VOX_WAKE_WORD
+#if CONFIG_COGITADOR_WAKE_WORD
     /* Optional: without the model partition Co keeps working with touch only. */
     s.preroll = heap_caps_calloc((size_t)PREROLL_FRAMES * APP_AUDIO_MIC_FRAME, sizeof(int16_t),
                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -1983,7 +1983,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         ESP_LOGW(TAG, "wake word unavailable; touch only");
     }
 #endif
-    if (xTaskCreatePinnedToCore(session_task, "vox_session", SESSION_TASK_STACK, NULL,
+    if (xTaskCreatePinnedToCore(session_task, "cog_session", SESSION_TASK_STACK, NULL,
                                 SESSION_TASK_PRIO, NULL, SESSION_TASK_CORE) != pdPASS) {
         /* Audio tasks keep running on silence; nothing else references gl yet. */
         err = ESP_ERR_NO_MEM;
@@ -1991,7 +1991,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
     }
     s.started = true;
     if (s.config.ui.set_view) {
-        s.config.ui.set_view(s.config.ui.ui, APP_VOX_VIEW_IDLE);
+        s.config.ui.set_view(s.config.ui.ui, APP_COGITADOR_VIEW_IDLE);
     }
     set_wake_listening(true); /* starts CLOSED: arm local listening */
     update_photo_count();
@@ -1999,7 +1999,7 @@ esp_err_t app_vox_session_start(const app_vox_session_config_t *config)
         s.config.ui.set_voice_initial(s.config.ui.ui, s.voice[0]);
     }
     ESP_LOGI(TAG, "Cogitador M-01 ready (model %s, fallback %s, voice %s, search %s); tap%s to talk",
-             primary, fallback, s.voice, VOX_GOOGLE_SEARCH ? "on" : "off",
+             primary, fallback, s.voice, COGITADOR_GOOGLE_SEARCH ? "on" : "off",
              s.wake_available ? " or say \"Hola ESP\"" : "");
     return ESP_OK;
 

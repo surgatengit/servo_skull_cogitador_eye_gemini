@@ -1,4 +1,4 @@
-# app_vox_eye
+# app_cogitador_eye
 
 Mechanical eye of Cogitador M-01: a full-screen GSP scene (`ui/main.json`) with an
 animated iris group, pupil, eyelids, status glow ring and a transparent
@@ -22,20 +22,20 @@ generated from `ui/main.json`; it never imports BSP, networking or `main`.
 ## Contract
 
 ```c
-app_vox_eye_handle_t eye;
-const app_vox_eye_config_t cfg = { .on_tap = tapped, .level = level, .seed = esp_random() | 1 };
-ESP_ERROR_CHECK(app_vox_eye_create(ui, &cfg, &eye) == ESP_GSP_OK ? ESP_OK : ESP_FAIL);
-app_vox_eye_set_state(eye, APP_VOX_EYE_LISTENING);   /* any task */
-app_vox_eye_set_status(eye, "SIN WI-FI");            /* any task; "" hides */
+app_cogitador_eye_handle_t eye;
+const app_cogitador_eye_config_t cfg = { .on_tap = tapped, .level = level, .seed = esp_random() | 1 };
+ESP_ERROR_CHECK(app_cogitador_eye_create(ui, &cfg, &eye) == ESP_GSP_OK ? ESP_OK : ESP_FAIL);
+app_cogitador_eye_set_state(eye, APP_COGITADOR_EYE_LISTENING);   /* any task */
+app_cogitador_eye_set_status(eye, "SIN WI-FI");            /* any task; "" hides */
 ```
 
 - Create once from the startup task; the controller claims the UI's single
   application event callback and one timer. `ui` must outlive it.
 - `on_tap` runs on the GSP framework task and `level` on the render task: both
   must return quickly and never block.
-- `app_vox_eye_set_state()` writes one aligned 32-bit word read by the render
+- `app_cogitador_eye_set_state()` writes one aligned 32-bit word read by the render
   task (single writer: the session task). Only GSP callbacks touch scene state.
-- `app_vox_eye_set_status()` uses a queued GSP setter. Text must use the
+- `app_cogitador_eye_set_status()` uses a queued GSP setter. Text must use the
   scene charset: uppercase Spanish letters, digits and ` -·.:/`.
 - Errors: create returns `ESP_GSP_ERR_INVALID_ARG`, `ESP_GSP_ERR_NO_MEM` or a GSP
   setter/registration error; setter failures during animation are kept in the
@@ -50,49 +50,49 @@ a tap toggles idle/listening. Networking and audio are not simulated.
 ## RoleMaster controls (1.6.0)
 
 - Voice badge (top right, mirrors the photo counter): shows the voice's initial
-  (`app_vox_eye_set_voice_initial`). A tap reports `APP_VOX_EYE_ACTION_VOICE_NEXT` through
+  (`app_cogitador_eye_set_voice_initial`). A tap reports `APP_COGITADOR_EYE_ACTION_VOICE_NEXT` through
   `on_action`.
-- Role badge (right bezel, hidden): shown in role mode (`app_vox_eye_set_role_mode`). Its label
-  is the prepared roll, «2D20», «D%» or «6D10» (`app_vox_eye_set_role_badge`). A tap reports
-  `APP_VOX_EYE_ACTION_ROLE_ROLL`.
-- Dice panel (`app_vox_eye_show_roll`):
+- Role badge (right bezel, hidden): shown in role mode (`app_cogitador_eye_set_role_mode`). Its label
+  is the prepared roll, «2D20», «D%» or «6D10» (`app_cogitador_eye_set_role_badge`). A tap reports
+  `APP_COGITADOR_EYE_ACTION_ROLE_ROLL`.
+- Dice panel (`app_cogitador_eye_show_roll`):
   - up to 10 dice of 64 px: one centred row up to 5, two rows from 6 (the top row takes the odd
     die). The `dieN_slot` containers have a ranged x and y (`_set_position`);
   - the caller supplies the face texts, a mark per die (gold, red or none), the title and the
-    result line (`vox_rol_view()` in `app_vox_session` builds them for the three roll modes);
+    result line (`cogitador_rol_view()` in `app_cogitador_session` builds them for the three roll modes);
   - the render task tumbles random numbers 1..`tumble` for ~0.8 s, then shows the faces, the
     marks and the result;
   - it hides after ~6 s, or on a tap once the dice have settled;
   - the caller hands the roll over through a sequence counter (release/acquire on the device,
     plain volatile in the single-threaded PC preview).
-- Secret card (`app_vox_eye_show_secret`):
+- Secret card (`app_cogitador_eye_show_secret`):
   - full screen, «SOLO PARA <NOMBRE>»;
   - the text is mapped to the card charset and word-wrapped by `secret_text.c` (27 columns,
     11 lines; host-tested);
   - it stays until it is tapped.
 - The eye animation pauses under the dice panel and the secret card, as it does under the gallery.
 - In role mode (device only, input interceptor), a press held ~1.5 s on the eye, outside the badges
-  and overlays, reports `APP_VOX_EYE_ACTION_CLOSE_HOLD`, and its release is swallowed.
+  and overlays, reports `APP_COGITADOR_EYE_ACTION_CLOSE_HOLD`, and its release is swallowed.
 - PC preview: the voice badge cycles C/A/K/S and shows a secret on the fourth voice. The dice
   badge cycles a 2d20 critical, a 1d20 fumble, a percentile roll, a 6d10 pool and a 10d10 pool
-  (the preview builds `app_vox_session/vox_rol.c` for this).
+  (the preview builds `app_cogitador_session/cogitador_rol.c` for this).
 
 ## Photo counter and gallery (1.5.0)
 
 - **Counter:** `photo_badge` / `photo_count` on the bezel at about 10:30 (60,60 56×56), above the
   full-screen `tap` button. It is hidden while the count is 0.
-  - `app_vox_eye_set_photo_count()` updates it.
-  - A tap on it raises `APP_VOX_GALLERY_OPEN` through `config.on_gallery`.
+  - `app_cogitador_eye_set_photo_count()` updates it.
+  - A tap on it raises `APP_COGITADOR_GALLERY_OPEN` through `config.on_gallery`.
 - **Gallery:** the `gallery` container covers the screen and starts hidden.
   - Contents: the `gallery_photo` image (264×352, bound resource with a 240×320 placeholder that fixes
     the pixel format), the X (`gallery_close`), the arrows (`gallery_prev` / `gallery_next`) and the
     position (`gallery_index`, "n / m").
-  - A full-screen `gallery_bg` button swallows other touches (`APP_VOX_GALLERY_TOUCH`), so no tap
+  - A full-screen `gallery_bg` button swallows other touches (`APP_COGITADOR_GALLERY_TOUCH`), so no tap
     reaches the eye's `tap` while the gallery is shown.
-  - `app_vox_eye_show_photo()` copies the JPEG (GSP decodes it), sets the position and shows the
-    gallery. `app_vox_eye_hide_gallery()` hides it.
+  - `app_cogitador_eye_show_photo()` copies the JPEG (GSP decodes it), sets the position and shows the
+    gallery. `app_cogitador_eye_hide_gallery()` hides it.
   - The eye animation pauses while the gallery is shown: no repaints and no DMA traffic underneath.
-- **Delete all:** holding the X for 1.5 s raises `APP_VOX_GALLERY_DELETE_ALL`.
+- **Delete all:** holding the X for 1.5 s raises `APP_COGITADOR_GALLERY_DELETE_ALL`.
   - It is detected through the GSP input interceptor (`esp_gsp_set_input_interceptor`): a press that
     starts on the X is timed with the animation timer, which keeps ticking while the eye is paused.
     The action fires while the X is still held, and the release is swallowed so it does not also

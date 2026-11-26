@@ -74,7 +74,7 @@ Un toque en el ojo solo interrumpe al máster. Para salir de la partida, **mant�
 > **RoleMaster está en beta.** Ya se ha probado en el dispositivo: voces, dados en los tres sistemas,
 > secretos en el móvil y la salida manteniendo pulsado. La sala de espera, las fichas y las partidas
 > guardadas están probadas en el simulador y pendientes de la primera partida real con jugadores. El
-> firmware compilado de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-vox) sigue
+> firmware compilado de la [Guía A](#🅰️-guía-a-tengo-un-esp-mosaico-nuevo-y-quiero-instalar-cogitador) sigue
 > siendo la versión estable 1.5.0; para probar RoleMaster hoy, compílalo desde el código
 > ([Para desarrolladores](#️-para-desarrolladores)).
 
@@ -304,8 +304,8 @@ si el dispositivo va a cambiar de manos.
 
 | Componente | Responsabilidad |
 |---|---|
-| [`app_vox_eye`](components/app_vox_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
-| [`app_vox_session`](components/app_vox_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
+| [`app_cogitador_eye`](components/app_cogitador_eye/README.md) | Ojo mecánico GSP (iris, parpadeo, colores, toque, galería, hasta 10 dados, secretos, botones de voz y de dados); también corre en el simulador |
+| [`app_cogitador_session`](components/app_cogitador_session/README.md) | Máquina de estados de la conversación; herramientas `capturar_imagen`, `tirar_dados`, `preparar_tirada`, `cambiar_voz`, `modo_rol`, `mostrar_secreto`, `estado_jugadores`, `actualizar_ficha`, `guardar_partida` y `cargar_partida`; galería |
 | [`app_gemini_live`](components/app_gemini_live/README.md) | Cliente Gemini Live por WSS (setup, audio, imágenes, herramientas, reanudación, grounding) |
 | [`app_camera`](components/app_camera/README.md) | Fotos bajo demanda: cámara izquierda, reset del sensor, PPA y JPEG por hardware |
 | [`app_photos`](components/app_photos/README.md) | Últimas 10 fotos en la partición `photos` |
@@ -323,7 +323,7 @@ Este repositorio va en `esp-mosaico-vibe/projects/servocraneo_gemini_direct/` (u
 `7b9cc1ac79f865983f59bb8ff3ff43eb74ff1dbe` para `esp32s31`.
 
 Copias mínimas en `third_party/` (Apache-2.0), comprobadas con `python tools/check_bsp_fork.py`:
-el BSP con un cambio para la memoria DMA de la pantalla (`VOX_FORK.md`) y `mosaico_module_camera`
+el BSP con un cambio para la memoria DMA de la pantalla (`COGITADOR_FORK.md`) y `mosaico_module_camera`
 con el arreglo oficial de PWDN `b60f5d8`. Los submódulos no se modifican.
 
 ### Compilar, simular e instalar (desde la raíz del espacio de trabajo)

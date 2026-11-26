@@ -4,7 +4,7 @@
 /* Saved role-playing game (1.6.0): one JSON document, kept on Cogitador and offered
  * for download/upload on the phone page. Pure C + cJSON, host-tested.
  *
- * {"vox_partida":1,"titulo":"…","juego":"…","resumen":"…",
+ * {"cogitador_partida":1,"titulo":"…","juego":"…","resumen":"…",
  *  "dados":{"modo":"reserva","cantidad":6,"caras":10,"exito_con":8},
  *  "jugadores":[{"nombre":"Ana","ficha":"…","secreto":"…"}]}
  */
@@ -17,6 +17,8 @@ extern "C" {
 #endif
 
 #define ROL_GAME_VERSION      1
+#define ROL_GAME_VERSION_KEY  "cogitador_partida"
+#define ROL_GAME_LEGACY_VERSION_KEY "vox_partida"  /* read only: games saved up to 1.6 */
 #define ROL_GAME_MAX_BYTES    (16 * 1024)
 #define ROL_GAME_TEXT_CAP     80
 #define ROL_GAME_SUMMARY_CAP  6000

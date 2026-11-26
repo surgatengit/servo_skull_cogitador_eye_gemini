@@ -81,11 +81,11 @@ main (composición; app_main solo inicializa y conecta)
  ├─ app_wifi          estación Wi-Fi, reintentos con backoff, eventos de estado
  ├─ app_audio         I2S/ES8311: captura 48k→16k mono, reproducción 24k→48k estéreo
  ├─ app_gemini_live   WSS + protocolo Live: setup, envío, reensamblado, parseo y reanudación
- ├─ app_vox_session   máquina de estados: une audio ↔ Gemini ↔ ojo y gestiona los toques
- └─ app_vox_eye       UI GSP del ojo mecánico (portable al simulador; sustituye a app_hello)
+ ├─ app_cogitador_session   máquina de estados: une audio ↔ Gemini ↔ ojo y gestiona los toques
+ └─ app_cogitador_eye       UI GSP del ojo mecánico (portable al simulador; sustituye a app_hello)
 ```
 
-Las dependencias van en una sola dirección. `app_vox_eye` no conoce la red: recibe estados
+Las dependencias van en una sola dirección. `app_cogitador_eye` no conoce la red: recibe estados
 y emite toques. Cada componente guarda su estado en un contexto privado y expone `include/` mínimos.
 
 ### 3.1 `app_wifi`
@@ -109,8 +109,8 @@ y emite toques. Cada componente guarda su estado en un contexto privado y expone
 - `goAway` o cierre → reconexión con el último *handle* de reanudación y backoff.
 - El modelo alternativo se usa automáticamente si el principal falla durante el `setup`
   y se puede fijar por RPC.
-- **Vigilante de modelo mudo** (en `app_vox_session`): si en una conexión salen al menos
-  `VOX_SILENT_MODEL_VOICED_FRAMES` tramas con voz (100 = 4 s; pico ≥ `VOX_VOICED_PEAK_THRESHOLD`,
+- **Vigilante de modelo mudo** (en `app_cogitador_session`): si en una conexión salen al menos
+  `COGITADOR_SILENT_MODEL_VOICED_FRAMES` tramas con voz (100 = 4 s; pico ≥ `COGITADOR_VOICED_PEAK_THRESHOLD`,
   ≈ −30 dBFS) y no llega ninguna transcripción ni audio, la sesión reconecta **una vez por arranque**
   con el otro modelo (`app_gemini_live_swap_model`).
 
@@ -125,7 +125,7 @@ SPK  ring 24k (PSRAM, ~4 s) → interpolación ×2 con FIR → 48k → estéreo 
 - Tareas de captura y reproducción en el núcleo 1; la red en el núcleo 0.
 - `flush_playback()` vacía el ring al instante (interrupción); el nivel de salida mueve la pupila.
 
-### 3.4 `app_vox_session` — estados y toques
+### 3.4 `app_cogitador_session` — estados y toques
 
 ```
 CERRADA ──toque──▶ CONECTANDO ──setupComplete──▶ ESCUCHANDO ──(audio del modelo)──▶ HABLANDO
@@ -144,7 +144,7 @@ ESCUCHANDO ──actividad detectada/turno enviado──▶ PROCESANDO (ámbar) 
 - Para cerrar la sesión hay que tocar en ESCUCHANDO, PROCESANDO o ERROR. En HABLANDO,
   el toque solo interrumpe; un segundo toque cierra.
 
-### 3.5 `app_vox_eye`
+### 3.5 `app_cogitador_eye`
 
 - Escena GSP 480×480: carcasa metálica, anillo luminoso de estado, cuenca oscura, grupo del iris
   (anillo de color, anillo interior, pupila y brillo) con `x/y` dinámicos acotados, párpados
@@ -156,7 +156,7 @@ ESCUCHANDO ──actividad detectada/turno enviado──▶ PROCESANDO (ámbar) 
 
 ## 4. Clave de API: almacenamiento y protecciones
 
-**Almacén:** partición `nvs` propia de la aplicación (0x200000), espacio de nombres `vox_secret`,
+**Almacén:** partición `nvs` propia de la aplicación (0x200000), espacio de nombres `cog_secret` (hasta 1.6, `vox_secret`; se migra solo al arrancar),
 claves `api_key` (≤ 128 B) y `model` (opcional). Es distinta de `sysmeta/shared` de Vibe Mode.
 
 **Provisión privada tras la instalación:** RPC binaria de ESP-Iris registrada por `app_secrets`
@@ -290,13 +290,13 @@ que este proyecto no usa. Plan:
 - Nuevo componente `app_wake` (WakeNet10 sin AFE: un solo micrófono, sin referencia AEC).
   Reagrupa tramas de 640 a 512 muestras en un ring propio y detecta en su tarea, en el núcleo 1
   con prioridad inferior a la de audio. La tarea de captura nunca se bloquea.
-- `app_vox_session`: en CERRADA, el micrófono va **solo** a `app_wake`. Con una detección se llama
+- `app_cogitador_session`: en CERRADA, el micrófono va **solo** a `app_wake`. Con una detección se llama
   a `open_conversation()` (las mismas comprobaciones de Wi-Fi y clave). WakeNet queda en pausa mientras
   la conversación está abierta, para evitar disparos con el altavoz y ahorrar CPU.
 - Pre-roll: se guardan los ~2 s posteriores a «Hola ESP» y se envían a Gemini al recibir
   `setupComplete`, para no perder la pregunta mientras conecta.
-- Temporizador de inactividad de 15 s en la sesión (Kconfig `VOX_IDLE_TIMEOUT_S`), con un evento
-  de cierre limpio. Kconfig `VOX_WAKE_WORD` para activarlo o desactivarlo.
+- Temporizador de inactividad de 15 s en la sesión (Kconfig `COGITADOR_IDLE_TIMEOUT_S`), con un evento
+  de cierre limpio. Kconfig `COGITADOR_WAKE_WORD` para activarlo o desactivarlo.
 
 ### 7.5 Riesgos y validación pendiente
 

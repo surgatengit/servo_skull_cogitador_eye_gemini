@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#include "app_vox_eye.h"
+#include "app_cogitador_eye.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -79,20 +79,20 @@ typedef struct {
     float pupil;            /* base pupil diameter, px */
 } eye_style_t;
 
-static const eye_style_t STYLES[APP_VOX_EYE_STATE_COUNT] = {
-    [APP_VOX_EYE_IDLE]       = { 0x00E5FF, 1.00f, 700, 2800, 2.6f, 84.0f },
-    [APP_VOX_EYE_LISTENING]  = { 0xFF1A1A, 0.45f, 1200, 3200, 2.2f, 104.0f },
-    [APP_VOX_EYE_PROCESSING] = { 0xFFB000, 0.70f, 250, 700, 3.4f, 70.0f },
-    [APP_VOX_EYE_SPEAKING]   = { 0x20FF60, 0.30f, 900, 2400, 2.0f, 82.0f },
-    [APP_VOX_EYE_ERROR]      = { 0xB040FF, 0.85f, 1500, 4000, 1.2f, 60.0f },
+static const eye_style_t STYLES[APP_COGITADOR_EYE_STATE_COUNT] = {
+    [APP_COGITADOR_EYE_IDLE]       = { 0x00E5FF, 1.00f, 700, 2800, 2.6f, 84.0f },
+    [APP_COGITADOR_EYE_LISTENING]  = { 0xFF1A1A, 0.45f, 1200, 3200, 2.2f, 104.0f },
+    [APP_COGITADOR_EYE_PROCESSING] = { 0xFFB000, 0.70f, 250, 700, 3.4f, 70.0f },
+    [APP_COGITADOR_EYE_SPEAKING]   = { 0x20FF60, 0.30f, 900, 2400, 2.0f, 82.0f },
+    [APP_COGITADOR_EYE_ERROR]      = { 0xB040FF, 0.85f, 1500, 4000, 1.2f, 60.0f },
 };
 
 /* Render-task state is touched only by the GSP timer/event callbacks.
  * requested_state is the single cross-task word: an aligned 32-bit store from
  * the application task and a load on the render task (no read-modify-write). */
-struct app_vox_eye {
+struct app_cogitador_eye {
     esp_gsp_handle_t ui;
-    app_vox_eye_config_t config;
+    app_cogitador_eye_config_t config;
     void *timer;
     volatile int32_t requested_state;
     volatile int32_t blink_request; /* set by any task, consumed by the timer */
@@ -104,10 +104,10 @@ struct app_vox_eye {
     uint32_t x_since;
     /* Dice: the producer fills dice_req_* and then bumps dice_req_seq (release);
      * the render task copies them when it sees a new sequence (acquire). */
-    app_vox_eye_roll_t dice_req;
+    app_cogitador_eye_roll_t dice_req;
     uint32_t dice_req_seq;
     uint32_t dice_seen_seq;         /* render task only from here on */
-    app_vox_eye_roll_t dice;
+    app_cogitador_eye_roll_t dice;
     uint32_t dice_tick;
     bool dice_active;
     volatile int32_t secret_open;   /* set by any task, cleared on the render task */
@@ -116,7 +116,7 @@ struct app_vox_eye {
     bool eye_held;
     bool eye_fired;
     uint32_t eye_since;
-    app_vox_eye_state_t drawn_state;
+    app_cogitador_eye_state_t drawn_state;
     uint32_t rng;
     /* Gaze spring (offsets from centre, px). */
     float gx, gy, vx, vy, tx, ty;
@@ -134,12 +134,12 @@ struct app_vox_eye {
     uint32_t last_glow, last_ring, last_core;
     uint32_t glow_ticks;   /* ticks since the last glow repaint */
     float phase;
-    app_vox_eye_snapshot_t stats;
+    app_cogitador_eye_snapshot_t stats;
 };
 
 /* Record a setter error; returns true on success so callers cache only values
  * the scene accepted (a rejected setter is retried on the next tick). */
-static bool remember(struct app_vox_eye *eye, esp_gsp_err_t err)
+static bool remember(struct app_cogitador_eye *eye, esp_gsp_err_t err)
 {
     if (err != ESP_GSP_OK) {
         eye->stats.last_error = err;
@@ -148,7 +148,7 @@ static bool remember(struct app_vox_eye *eye, esp_gsp_err_t err)
     return true;
 }
 
-static uint32_t rng_next(struct app_vox_eye *eye)
+static uint32_t rng_next(struct app_cogitador_eye *eye)
 {
     uint32_t x = eye->rng;
     x ^= x << 13;
@@ -158,12 +158,12 @@ static uint32_t rng_next(struct app_vox_eye *eye)
     return x;
 }
 
-static float rng_unit(struct app_vox_eye *eye)
+static float rng_unit(struct app_cogitador_eye *eye)
 {
     return (float)(rng_next(eye) & 0xFFFFFF) / (float)0x1000000;
 }
 
-static uint32_t rng_range(struct app_vox_eye *eye, uint32_t lo, uint32_t hi)
+static uint32_t rng_range(struct app_cogitador_eye *eye, uint32_t lo, uint32_t hi)
 {
     return lo + (hi > lo ? rng_next(eye) % (hi - lo + 1U) : 0U);
 }
@@ -197,7 +197,7 @@ static uint32_t lighten_rgb(uint32_t rgb, float k)
            (b + (uint32_t)((255U - b) * k));
 }
 
-static void pick_gaze_target(struct app_vox_eye *eye)
+static void pick_gaze_target(struct app_cogitador_eye *eye)
 {
     const eye_style_t *style = &STYLES[eye->drawn_state];
     const float angle = rng_unit(eye) * 6.2831853f;
@@ -208,18 +208,18 @@ static void pick_gaze_target(struct app_vox_eye *eye)
     }
     eye->tx = cosf(angle) * radius;
     eye->ty = sinf(angle) * radius * 0.8f; /* eyes travel less vertically */
-    if (eye->drawn_state == APP_VOX_EYE_PROCESSING) {
+    if (eye->drawn_state == APP_COGITADOR_EYE_PROCESSING) {
         eye->ty -= 18.0f; /* "thinking": glance upwards */
     }
     eye->hold_ticks = ms_to_ticks(rng_range(eye, style->hold_min_ms, style->hold_max_ms));
 }
 
-static void schedule_blink(struct app_vox_eye *eye)
+static void schedule_blink(struct app_cogitador_eye *eye)
 {
     eye->blink_wait_ticks = ms_to_ticks(rng_range(eye, 2500, 7000));
 }
 
-static void apply_colors(struct app_vox_eye *eye, float glow_gain)
+static void apply_colors(struct app_cogitador_eye *eye, float glow_gain)
 {
     const uint32_t base = STYLES[eye->drawn_state].color;
     /* The glow ring is a 400x400 px repaint. Quantize the pulse to 8 levels and at
@@ -232,21 +232,21 @@ static void apply_colors(struct app_vox_eye *eye, float glow_gain)
         glow_gain = -1.0f; /* skip the glow this tick */
     }
     if (glow_gain >= 0.0f && glow != eye->last_glow &&
-            remember(eye, gsp_vox_glow_set_color_rgb888(eye->ui, glow))) {
+            remember(eye, gsp_cogitador_glow_set_color_rgb888(eye->ui, glow))) {
         eye->last_glow = glow;
         eye->glow_ticks = 0;
     }
     const uint32_t ring = base;
     const uint32_t core = lighten_rgb(base, 0.35f);
-    if (ring != eye->last_ring && remember(eye, gsp_vox_iris_ring_set_color_rgb888(eye->ui, ring))) {
+    if (ring != eye->last_ring && remember(eye, gsp_cogitador_iris_ring_set_color_rgb888(eye->ui, ring))) {
         eye->last_ring = ring;
     }
-    if (core != eye->last_core && remember(eye, gsp_vox_iris_core_set_color_rgb888(eye->ui, core))) {
+    if (core != eye->last_core && remember(eye, gsp_cogitador_iris_core_set_color_rgb888(eye->ui, core))) {
         eye->last_core = core;
     }
 }
 
-static float blink_closure(struct app_vox_eye *eye)
+static float blink_closure(struct app_cogitador_eye *eye)
 {
     if (!eye->blinking) {
         return 0.0f;
@@ -262,7 +262,7 @@ static float blink_closure(struct app_vox_eye *eye)
     return 1.0f - (float)(open + 1U) / BLINK_OPEN_TICKS;
 }
 
-static void step_blink(struct app_vox_eye *eye)
+static void step_blink(struct app_cogitador_eye *eye)
 {
     if (eye->blinking) {
         if (++eye->blink_tick >= BLINK_TOTAL_TICKS) {
@@ -290,40 +290,40 @@ static void step_blink(struct app_vox_eye *eye)
 #define DIE_CALL(i, suffix, ...)                                                            \
     do {                                                                                    \
         switch (i) {                                                                        \
-        case 0: remember(eye, (esp_gsp_err_t)gsp_vox_die0##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 1: remember(eye, (esp_gsp_err_t)gsp_vox_die1##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 2: remember(eye, (esp_gsp_err_t)gsp_vox_die2##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 3: remember(eye, (esp_gsp_err_t)gsp_vox_die3##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 4: remember(eye, (esp_gsp_err_t)gsp_vox_die4##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 5: remember(eye, (esp_gsp_err_t)gsp_vox_die5##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 6: remember(eye, (esp_gsp_err_t)gsp_vox_die6##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 7: remember(eye, (esp_gsp_err_t)gsp_vox_die7##suffix(eye->ui, __VA_ARGS__)); break; \
-        case 8: remember(eye, (esp_gsp_err_t)gsp_vox_die8##suffix(eye->ui, __VA_ARGS__)); break; \
-        default: remember(eye, (esp_gsp_err_t)gsp_vox_die9##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 0: remember(eye, (esp_gsp_err_t)gsp_cogitador_die0##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 1: remember(eye, (esp_gsp_err_t)gsp_cogitador_die1##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 2: remember(eye, (esp_gsp_err_t)gsp_cogitador_die2##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 3: remember(eye, (esp_gsp_err_t)gsp_cogitador_die3##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 4: remember(eye, (esp_gsp_err_t)gsp_cogitador_die4##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 5: remember(eye, (esp_gsp_err_t)gsp_cogitador_die5##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 6: remember(eye, (esp_gsp_err_t)gsp_cogitador_die6##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 7: remember(eye, (esp_gsp_err_t)gsp_cogitador_die7##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 8: remember(eye, (esp_gsp_err_t)gsp_cogitador_die8##suffix(eye->ui, __VA_ARGS__)); break; \
+        default: remember(eye, (esp_gsp_err_t)gsp_cogitador_die9##suffix(eye->ui, __VA_ARGS__)); break; \
         }                                                                                   \
     } while (0)
 
-static void set_die_visible(struct app_vox_eye *eye, unsigned i, bool visible)
+static void set_die_visible(struct app_cogitador_eye *eye, unsigned i, bool visible)
 {
     DIE_CALL(i, _set_visible, visible);
 }
 
-static void set_die_position(struct app_vox_eye *eye, unsigned i, int32_t x, int32_t y)
+static void set_die_position(struct app_cogitador_eye *eye, unsigned i, int32_t x, int32_t y)
 {
     DIE_CALL(i, _slot_set_position, x, y);
 }
 
-static void set_die_color(struct app_vox_eye *eye, unsigned i, uint32_t rgb)
+static void set_die_color(struct app_cogitador_eye *eye, unsigned i, uint32_t rgb)
 {
     DIE_CALL(i, _face_set_color_rgb888, rgb);
 }
 
-static void set_die_text(struct app_vox_eye *eye, unsigned i, const char *text)
+static void set_die_text(struct app_cogitador_eye *eye, unsigned i, const char *text)
 {
     DIE_CALL(i, _value_set_text, text);
 }
 
-static void set_die_number(struct app_vox_eye *eye, unsigned i, unsigned value)
+static void set_die_number(struct app_cogitador_eye *eye, unsigned i, unsigned value)
 {
     char text[12];
     snprintf(text, sizeof(text), "%u", value);
@@ -331,7 +331,7 @@ static void set_die_number(struct app_vox_eye *eye, unsigned i, unsigned value)
 }
 
 /* Up to DIE_ROW_MAX dice in one centred row; more in two (the top one gets the odd die). */
-static void place_dice(struct app_vox_eye *eye, unsigned count)
+static void place_dice(struct app_cogitador_eye *eye, unsigned count)
 {
     const unsigned top = count <= DIE_ROW_MAX ? count : (count + 1U) / 2U;
     for (unsigned i = 0; i < count; ++i) {
@@ -346,23 +346,23 @@ static void place_dice(struct app_vox_eye *eye, unsigned count)
     }
 }
 
-static void hide_dice(struct app_vox_eye *eye)
+static void hide_dice(struct app_cogitador_eye *eye)
 {
     eye->dice_active = false;
-    remember(eye, gsp_vox_dice_set_visible(eye->ui, false));
+    remember(eye, gsp_cogitador_dice_set_visible(eye->ui, false));
 }
 
 /* Render task: start a new roll, tumble, settle on the results, hide. */
-static void step_dice(struct app_vox_eye *eye)
+static void step_dice(struct app_cogitador_eye *eye)
 {
     const uint32_t seq = SEQ_LOAD(&eye->dice_req_seq);
     if (seq != eye->dice_seen_seq) {
         eye->dice_seen_seq = seq;
         eye->dice = eye->dice_req;
-        remember(eye, (esp_gsp_err_t)gsp_vox_dice_title_set_text(eye->ui, eye->dice.title));
-        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, " "));
+        remember(eye, (esp_gsp_err_t)gsp_cogitador_dice_title_set_text(eye->ui, eye->dice.title));
+        remember(eye, (esp_gsp_err_t)gsp_cogitador_dice_total_set_text(eye->ui, " "));
         place_dice(eye, eye->dice.count);
-        for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+        for (unsigned i = 0; i < APP_COGITADOR_EYE_MAX_DICE; ++i) {
             const bool used = i < eye->dice.count;
             if (used) {
                 set_die_color(eye, i, DIE_COLOR_NORMAL);
@@ -371,7 +371,7 @@ static void step_dice(struct app_vox_eye *eye)
         }
         eye->dice_tick = 0;
         eye->dice_active = true;
-        remember(eye, gsp_vox_dice_set_visible(eye->ui, true));
+        remember(eye, gsp_cogitador_dice_set_visible(eye->ui, true));
     }
     if (!eye->dice_active) {
         return;
@@ -387,11 +387,11 @@ static void step_dice(struct app_vox_eye *eye)
         for (unsigned i = 0; i < eye->dice.count; ++i) {
             const uint8_t mark = eye->dice.marks[i];
             set_die_text(eye, i, eye->dice.faces[i][0] ? eye->dice.faces[i] : "?");
-            set_die_color(eye, i, mark == APP_VOX_EYE_DIE_GOOD ? DIE_COLOR_GOOD
-                                  : (mark == APP_VOX_EYE_DIE_BAD ? DIE_COLOR_BAD
+            set_die_color(eye, i, mark == APP_COGITADOR_EYE_DIE_GOOD ? DIE_COLOR_GOOD
+                                  : (mark == APP_COGITADOR_EYE_DIE_BAD ? DIE_COLOR_BAD
                                                                  : DIE_COLOR_NORMAL));
         }
-        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(
+        remember(eye, (esp_gsp_err_t)gsp_cogitador_dice_total_set_text(
                           eye->ui, eye->dice.result[0] ? eye->dice.result : " "));
     } else if (eye->dice_tick > DICE_ROLL_TICKS + DICE_SHOW_TICKS) {
         hide_dice(eye);
@@ -401,19 +401,19 @@ static void step_dice(struct app_vox_eye *eye)
 static void animate(esp_gsp_handle_t ui, void *ctx)
 {
     (void)ui;
-    struct app_vox_eye *eye = ctx;
+    struct app_cogitador_eye *eye = ctx;
     eye->ticks++;
     if (eye->x_held && !eye->x_fired && eye->ticks - eye->x_since >= DELETE_HOLD_TICKS) {
         eye->x_fired = true; /* fire while still held; the release is swallowed */
         if (eye->config.on_gallery) {
-            eye->config.on_gallery(APP_VOX_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
+            eye->config.on_gallery(APP_COGITADOR_GALLERY_DELETE_ALL, eye->config.gallery_ctx);
         }
     }
     if (eye->eye_held && !eye->eye_fired && eye->ticks - eye->eye_since >= DELETE_HOLD_TICKS) {
         eye->eye_fired = true; /* fire while still held; the release is swallowed */
         eye->blink_request = 1;
         if (eye->config.on_action) {
-            eye->config.on_action(APP_VOX_EYE_ACTION_CLOSE_HOLD, eye->config.action_ctx);
+            eye->config.on_action(APP_COGITADOR_EYE_ACTION_CLOSE_HOLD, eye->config.action_ctx);
         }
     }
     step_dice(eye);
@@ -423,11 +423,11 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     eye->stats.frames++;
 
     int32_t requested = eye->requested_state;
-    if (requested < 0 || requested >= APP_VOX_EYE_STATE_COUNT) {
-        requested = APP_VOX_EYE_ERROR;
+    if (requested < 0 || requested >= APP_COGITADOR_EYE_STATE_COUNT) {
+        requested = APP_COGITADOR_EYE_ERROR;
     }
-    if ((app_vox_eye_state_t)requested != eye->drawn_state) {
-        eye->drawn_state = (app_vox_eye_state_t)requested;
+    if ((app_cogitador_eye_state_t)requested != eye->drawn_state) {
+        eye->drawn_state = (app_cogitador_eye_state_t)requested;
         eye->stats.state = eye->drawn_state;
         pick_gaze_target(eye);
     }
@@ -457,7 +457,7 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     const int32_t ix = IRIS_HOME + (int32_t)lroundf(eye->gx);
     const int32_t iy = IRIS_HOME + (int32_t)lroundf(eye->gy);
     if ((ix != eye->last_iris_x || iy != eye->last_iris_y) &&
-            remember(eye, gsp_vox_iris_set_position(eye->ui, ix, iy))) {
+            remember(eye, gsp_cogitador_iris_set_position(eye->ui, ix, iy))) {
         eye->last_iris_x = ix;
         eye->last_iris_y = iy;
     }
@@ -466,15 +466,15 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     eye->phase += EYE_DT;
     float target = style->pupil;
     float glow_gain = 1.0f;
-    if (eye->drawn_state == APP_VOX_EYE_SPEAKING && eye->config.level) {
+    if (eye->drawn_state == APP_COGITADOR_EYE_SPEAKING && eye->config.level) {
         const float level = (float)eye->config.level(eye->config.level_ctx) / 100.0f;
         target += level * 40.0f;
         glow_gain = 0.55f + 0.45f * level;
-    } else if (eye->drawn_state == APP_VOX_EYE_PROCESSING) {
+    } else if (eye->drawn_state == APP_COGITADOR_EYE_PROCESSING) {
         glow_gain = 0.6f + 0.4f * (0.5f + 0.5f * sinf(eye->phase * 9.0f));
-    } else if (eye->drawn_state == APP_VOX_EYE_LISTENING) {
+    } else if (eye->drawn_state == APP_COGITADOR_EYE_LISTENING) {
         glow_gain = 0.8f + 0.2f * (0.5f + 0.5f * sinf(eye->phase * 3.0f));
-    } else if (eye->drawn_state == APP_VOX_EYE_ERROR) {
+    } else if (eye->drawn_state == APP_COGITADOR_EYE_ERROR) {
         glow_gain = (fmodf(eye->phase, 1.2f) < 0.6f) ? 1.0f : 0.35f;
     }
     eye->pupil += (target - eye->pupil) * 0.25f;
@@ -482,10 +482,10 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     pupil = pupil < PUPIL_MIN ? PUPIL_MIN : (pupil > PUPIL_MAX ? PUPIL_MAX : pupil);
     pupil &= ~1; /* even diameter keeps the pupil centred */
     if (pupil != eye->last_pupil) {
-        bool ok = remember(eye, gsp_vox_pupil_set_w(eye->ui, pupil));
-        ok = remember(eye, gsp_vox_pupil_set_h(eye->ui, pupil)) && ok;
-        ok = remember(eye, gsp_vox_pupil_set_radius(eye->ui, pupil / 2)) && ok;
-        ok = remember(eye, gsp_vox_pupil_set_position(eye->ui, IRIS_HALF - pupil / 2,
+        bool ok = remember(eye, gsp_cogitador_pupil_set_w(eye->ui, pupil));
+        ok = remember(eye, gsp_cogitador_pupil_set_h(eye->ui, pupil)) && ok;
+        ok = remember(eye, gsp_cogitador_pupil_set_radius(eye->ui, pupil / 2)) && ok;
+        ok = remember(eye, gsp_cogitador_pupil_set_position(eye->ui, IRIS_HALF - pupil / 2,
                                                       IRIS_HALF - pupil / 2)) && ok;
         if (ok) {
             eye->last_pupil = pupil;
@@ -504,27 +504,27 @@ static void animate(esp_gsp_handle_t ui, void *ctx)
     step_blink(eye);
     const int32_t lid = (int32_t)lroundf(blink_closure(eye) * LID_TRAVEL);
     if (lid != eye->last_lid) {
-        bool ok = remember(eye, gsp_vox_lid_top_set_y(eye->ui, LID_TOP_OPEN + lid));
-        ok = remember(eye, gsp_vox_lid_bottom_set_y(eye->ui, LID_BOTTOM_OPEN - lid)) && ok;
+        bool ok = remember(eye, gsp_cogitador_lid_top_set_y(eye->ui, LID_TOP_OPEN + lid));
+        ok = remember(eye, gsp_cogitador_lid_bottom_set_y(eye->ui, LID_BOTTOM_OPEN - lid)) && ok;
         if (ok) {
             eye->last_lid = lid;
         }
     }
 }
 
-static bool gallery_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
+static bool gallery_event(struct app_cogitador_eye *eye, const esp_gsp_event_t *event)
 {
-    app_vox_gallery_action_t action;
-    if (gsp_vox_event_is_photos_open(event)) {
-        action = APP_VOX_GALLERY_OPEN;
-    } else if (gsp_vox_event_is_gallery_close(event)) {
-        action = APP_VOX_GALLERY_CLOSE;
-    } else if (gsp_vox_event_is_gallery_prev(event)) {
-        action = APP_VOX_GALLERY_PREV;
-    } else if (gsp_vox_event_is_gallery_next(event)) {
-        action = APP_VOX_GALLERY_NEXT;
-    } else if (gsp_vox_event_is_gallery_touch(event)) {
-        action = APP_VOX_GALLERY_TOUCH;
+    app_cogitador_gallery_action_t action;
+    if (gsp_cogitador_event_is_photos_open(event)) {
+        action = APP_COGITADOR_GALLERY_OPEN;
+    } else if (gsp_cogitador_event_is_gallery_close(event)) {
+        action = APP_COGITADOR_GALLERY_CLOSE;
+    } else if (gsp_cogitador_event_is_gallery_prev(event)) {
+        action = APP_COGITADOR_GALLERY_PREV;
+    } else if (gsp_cogitador_event_is_gallery_next(event)) {
+        action = APP_COGITADOR_GALLERY_NEXT;
+    } else if (gsp_cogitador_event_is_gallery_touch(event)) {
+        action = APP_COGITADOR_GALLERY_TOUCH;
     } else {
         return false;
     }
@@ -541,7 +541,7 @@ static bool gallery_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
 static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, void *ctx)
 {
     (void)ui;
-    struct app_vox_eye *eye = ctx;
+    struct app_cogitador_eye *eye = ctx;
     /* Role mode: a press held on the eye (not on a bezel badge or an overlay)
      * leaves the game; a short tap still interrupts. */
     const bool on_badge = (x >= VOICE_X0 && x < VOICE_X1 && y >= VOICE_Y0 && y < VOICE_Y1) ||
@@ -586,24 +586,24 @@ static bool on_input(esp_gsp_handle_t ui, int32_t x, int32_t y, bool pressed, vo
 #endif
 
 /* Overlays and bezel buttons (1.6.0). Returns true when the event was consumed. */
-static bool rol_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
+static bool rol_event(struct app_cogitador_eye *eye, const esp_gsp_event_t *event)
 {
-    if (gsp_vox_event_is_dice_close(event)) {
+    if (gsp_cogitador_event_is_dice_close(event)) {
         if (eye->dice_tick >= DICE_ROLL_TICKS) {
             hide_dice(eye); /* keep it while tumbling */
         }
         return true;
     }
-    if (gsp_vox_event_is_secret_close(event)) {
-        remember(eye, gsp_vox_secret_set_visible(eye->ui, false));
+    if (gsp_cogitador_event_is_secret_close(event)) {
+        remember(eye, gsp_cogitador_secret_set_visible(eye->ui, false));
         eye->secret_open = 0;
         return true;
     }
-    app_vox_eye_action_t action;
-    if (gsp_vox_event_is_voice_next(event)) {
-        action = APP_VOX_EYE_ACTION_VOICE_NEXT;
-    } else if (gsp_vox_event_is_role_roll(event)) {
-        action = APP_VOX_EYE_ACTION_ROLE_ROLL;
+    app_cogitador_eye_action_t action;
+    if (gsp_cogitador_event_is_voice_next(event)) {
+        action = APP_COGITADOR_EYE_ACTION_VOICE_NEXT;
+    } else if (gsp_cogitador_event_is_role_roll(event)) {
+        action = APP_COGITADOR_EYE_ACTION_ROLE_ROLL;
     } else {
         return false;
     }
@@ -616,11 +616,11 @@ static bool rol_event(struct app_vox_eye *eye, const esp_gsp_event_t *event)
 static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ctx)
 {
     (void)ui;
-    struct app_vox_eye *eye = ctx;
+    struct app_cogitador_eye *eye = ctx;
     if (gallery_event(eye, event) || rol_event(eye, event)) {
         return;
     }
-    if (!gsp_vox_event_is_eye_tap(event) || eye->gallery_open || eye->dice_active ||
+    if (!gsp_cogitador_event_is_eye_tap(event) || eye->gallery_open || eye->dice_active ||
             eye->secret_open) {
         return;
     }
@@ -634,8 +634,8 @@ static void on_event(esp_gsp_handle_t ui, const esp_gsp_event_t *event, void *ct
     }
 }
 
-esp_gsp_err_t app_vox_eye_create(esp_gsp_handle_t ui, const app_vox_eye_config_t *config,
-                                 app_vox_eye_handle_t *out_handle)
+esp_gsp_err_t app_cogitador_eye_create(esp_gsp_handle_t ui, const app_cogitador_eye_config_t *config,
+                                 app_cogitador_eye_handle_t *out_handle)
 {
     if (!out_handle) {
         return ESP_GSP_ERR_INVALID_ARG;
@@ -644,23 +644,23 @@ esp_gsp_err_t app_vox_eye_create(esp_gsp_handle_t ui, const app_vox_eye_config_t
     if (!ui || !config) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    struct app_vox_eye *eye = calloc(1, sizeof(*eye));
+    struct app_cogitador_eye *eye = calloc(1, sizeof(*eye));
     if (!eye) {
         return ESP_GSP_ERR_NO_MEM;
     }
     eye->ui = ui;
     eye->config = *config;
     eye->rng = config->seed ? config->seed : 0x5EED1234u;
-    eye->requested_state = APP_VOX_EYE_IDLE;
-    eye->drawn_state = APP_VOX_EYE_IDLE;
-    eye->pupil = STYLES[APP_VOX_EYE_IDLE].pupil;
+    eye->requested_state = APP_COGITADOR_EYE_IDLE;
+    eye->drawn_state = APP_COGITADOR_EYE_IDLE;
+    eye->pupil = STYLES[APP_COGITADOR_EYE_IDLE].pupil;
     eye->last_iris_x = eye->last_iris_y = eye->last_pupil = eye->last_lid = -1000;
     eye->last_glow = eye->last_ring = eye->last_core = 0xFFFFFFFFu;
     pick_gaze_target(eye);
     schedule_blink(eye);
 
     remember(eye, esp_gsp_set_press_feedback_enabled(ui, false));
-    remember(eye, (esp_gsp_err_t)gsp_vox_status_set_text(ui, " "));
+    remember(eye, (esp_gsp_err_t)gsp_cogitador_status_set_text(ui, " "));
     esp_gsp_err_t err = eye->stats.last_error;
     if (err == ESP_GSP_OK) {
         eye->timer = esp_gsp_timer_create(ui, EYE_TICK_MS, animate, eye);
@@ -689,42 +689,42 @@ esp_gsp_err_t app_vox_eye_create(esp_gsp_handle_t ui, const app_vox_eye_config_t
     return ESP_GSP_OK;
 }
 
-void app_vox_eye_set_state(app_vox_eye_handle_t handle, app_vox_eye_state_t state)
+void app_cogitador_eye_set_state(app_cogitador_eye_handle_t handle, app_cogitador_eye_state_t state)
 {
-    if (handle && state >= APP_VOX_EYE_IDLE && state < APP_VOX_EYE_STATE_COUNT) {
+    if (handle && state >= APP_COGITADOR_EYE_IDLE && state < APP_COGITADOR_EYE_STATE_COUNT) {
         handle->requested_state = (int32_t)state;
     }
 }
 
-void app_vox_eye_blink(app_vox_eye_handle_t handle)
+void app_cogitador_eye_blink(app_cogitador_eye_handle_t handle)
 {
     if (handle) {
         handle->blink_request = 1;
     }
 }
 
-esp_gsp_err_t app_vox_eye_set_status(app_vox_eye_handle_t handle, const char *utf8)
+esp_gsp_err_t app_cogitador_eye_set_status(app_cogitador_eye_handle_t handle, const char *utf8)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    return (esp_gsp_err_t)gsp_vox_status_set_text(handle->ui,
+    return (esp_gsp_err_t)gsp_cogitador_status_set_text(handle->ui,
                                                   (utf8 && utf8[0]) ? utf8 : " ");
 }
 
-esp_gsp_err_t app_vox_eye_set_photo_count(app_vox_eye_handle_t handle, unsigned count)
+esp_gsp_err_t app_cogitador_eye_set_photo_count(app_cogitador_eye_handle_t handle, unsigned count)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
     char text[8];
     snprintf(text, sizeof(text), "%u", count > 99U ? 99U : count);
-    esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_photo_count_set_text(handle->ui, text);
-    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_photo_badge_set_visible(handle->ui, count > 0U);
+    esp_gsp_err_t err = (esp_gsp_err_t)gsp_cogitador_photo_count_set_text(handle->ui, text);
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_cogitador_photo_badge_set_visible(handle->ui, count > 0U);
     return err != ESP_GSP_OK ? err : vis;
 }
 
-esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t *jpeg, size_t size,
+esp_gsp_err_t app_cogitador_eye_show_photo(app_cogitador_eye_handle_t handle, const uint8_t *jpeg, size_t size,
                                      unsigned position, unsigned count)
 {
     if (!handle) {
@@ -733,27 +733,27 @@ esp_gsp_err_t app_vox_eye_show_photo(app_vox_eye_handle_t handle, const uint8_t 
     esp_gsp_err_t err = ESP_GSP_OK;
     if (jpeg && size > 0) {
         /* The previous picture stays visible while this one decodes. */
-        err = (esp_gsp_err_t)gsp_vox_gallery_photo_set_image(handle->ui, jpeg, size);
+        err = (esp_gsp_err_t)gsp_cogitador_gallery_photo_set_image(handle->ui, jpeg, size);
     }
     char text[16];
     snprintf(text, sizeof(text), "%u / %u", position, count);
-    const esp_gsp_err_t idx = (esp_gsp_err_t)gsp_vox_gallery_index_set_text(handle->ui, text);
+    const esp_gsp_err_t idx = (esp_gsp_err_t)gsp_cogitador_gallery_index_set_text(handle->ui, text);
     handle->gallery_open = 1;
-    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, true);
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_cogitador_gallery_set_visible(handle->ui, true);
     return err != ESP_GSP_OK ? err : (idx != ESP_GSP_OK ? idx : vis);
 }
 
-esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle)
+esp_gsp_err_t app_cogitador_eye_hide_gallery(app_cogitador_eye_handle_t handle)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    const esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_gallery_set_visible(handle->ui, false);
+    const esp_gsp_err_t err = (esp_gsp_err_t)gsp_cogitador_gallery_set_visible(handle->ui, false);
     handle->gallery_open = 0;
     return err;
 }
 
-esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char initial)
+esp_gsp_err_t app_cogitador_eye_set_voice_initial(app_cogitador_eye_handle_t handle, char initial)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
@@ -762,35 +762,35 @@ esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char in
         initial = (char)(initial - 32);
     }
     const char text[2] = { (initial >= 'A' && initial <= 'Z') ? initial : 'V', '\0' };
-    return (esp_gsp_err_t)gsp_vox_voice_badge_text_set_text(handle->ui, text);
+    return (esp_gsp_err_t)gsp_cogitador_voice_badge_text_set_text(handle->ui, text);
 }
 
-esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enabled)
+esp_gsp_err_t app_cogitador_eye_set_role_mode(app_cogitador_eye_handle_t handle, bool enabled)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
     handle->role_mode = enabled ? 1 : 0;
-    return (esp_gsp_err_t)gsp_vox_role_badge_set_visible(handle->ui, enabled);
+    return (esp_gsp_err_t)gsp_cogitador_role_badge_set_visible(handle->ui, enabled);
 }
 
-esp_gsp_err_t app_vox_eye_set_role_badge(app_vox_eye_handle_t handle, const char *text)
+esp_gsp_err_t app_cogitador_eye_set_role_badge(app_cogitador_eye_handle_t handle, const char *text)
 {
     if (!handle || !text || !text[0]) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    return (esp_gsp_err_t)gsp_vox_role_badge_text_set_text(handle->ui, text);
+    return (esp_gsp_err_t)gsp_cogitador_role_badge_text_set_text(handle->ui, text);
 }
 
-esp_gsp_err_t app_vox_eye_show_roll(app_vox_eye_handle_t handle, const app_vox_eye_roll_t *roll)
+esp_gsp_err_t app_cogitador_eye_show_roll(app_cogitador_eye_handle_t handle, const app_cogitador_eye_roll_t *roll)
 {
-    if (!handle || !roll || roll->count == 0 || roll->count > APP_VOX_EYE_MAX_DICE ||
+    if (!handle || !roll || roll->count == 0 || roll->count > APP_COGITADOR_EYE_MAX_DICE ||
             roll->tumble < 2 || roll->tumble > 100) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
     handle->dice_req = *roll;
     /* Terminate the copied strings whatever the caller sent. */
-    for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+    for (unsigned i = 0; i < APP_COGITADOR_EYE_MAX_DICE; ++i) {
         handle->dice_req.faces[i][sizeof(handle->dice_req.faces[i]) - 1] = '\0';
     }
     handle->dice_req.title[sizeof(handle->dice_req.title) - 1] = '\0';
@@ -799,7 +799,7 @@ esp_gsp_err_t app_vox_eye_show_roll(app_vox_eye_handle_t handle, const app_vox_e
     return ESP_GSP_OK;
 }
 
-esp_gsp_err_t app_vox_eye_show_secret(app_vox_eye_handle_t handle, const char *player,
+esp_gsp_err_t app_cogitador_eye_show_secret(app_cogitador_eye_handle_t handle, const char *player,
                                       const char *text)
 {
     if (!handle || !text) {
@@ -813,15 +813,15 @@ esp_gsp_err_t app_vox_eye_show_secret(app_vox_eye_handle_t handle, const char *p
     snprintf(title, sizeof(title), "SOLO PARA %s", name[0] ? name : "TI");
     secret_text_sanitize(text, clean, sizeof(clean), false);
     secret_text_wrap(clean, SECRET_COLUMNS, SECRET_LINES, wrapped, sizeof(wrapped));
-    esp_gsp_err_t err = (esp_gsp_err_t)gsp_vox_secret_title_set_text(handle->ui, title);
-    const esp_gsp_err_t body = (esp_gsp_err_t)gsp_vox_secret_text_set_text(
+    esp_gsp_err_t err = (esp_gsp_err_t)gsp_cogitador_secret_title_set_text(handle->ui, title);
+    const esp_gsp_err_t body = (esp_gsp_err_t)gsp_cogitador_secret_text_set_text(
         handle->ui, wrapped[0] ? wrapped : " ");
     handle->secret_open = 1;
-    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_vox_secret_set_visible(handle->ui, true);
+    const esp_gsp_err_t vis = (esp_gsp_err_t)gsp_cogitador_secret_set_visible(handle->ui, true);
     return err != ESP_GSP_OK ? err : (body != ESP_GSP_OK ? body : vis);
 }
 
-esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot_t *out_snapshot)
+esp_gsp_err_t app_cogitador_eye_read(app_cogitador_eye_handle_t handle, app_cogitador_eye_snapshot_t *out_snapshot)
 {
     if (!handle || !out_snapshot) {
         return ESP_GSP_ERR_INVALID_ARG;
@@ -830,12 +830,12 @@ esp_gsp_err_t app_vox_eye_read(app_vox_eye_handle_t handle, app_vox_eye_snapshot
     return ESP_GSP_OK;
 }
 
-esp_gsp_err_t app_vox_eye_destroy(app_vox_eye_handle_t *handle)
+esp_gsp_err_t app_cogitador_eye_destroy(app_cogitador_eye_handle_t *handle)
 {
     if (!handle) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    struct app_vox_eye *eye = *handle;
+    struct app_cogitador_eye *eye = *handle;
     if (!eye) {
         return ESP_GSP_OK;
     }

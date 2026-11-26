@@ -61,8 +61,8 @@ particiones NVS (`nvs`, `nvs_keys`). Vibe Mode vuelve a validar el manifiesto en
 | Wi-Fi e información compartida de Vibe | `sysmeta` | Se conserva | Se conserva | No se escribe |
 | Identidad del dispositivo y emparejamientos | `sysmeta` / NVS protegida | Se conserva | Se conserva | No se escribe |
 | Ideas descargadas (Mis Ideas) | NAND | Se conserva | Se conserva | No se escribe |
-| Datos de ESP-Claw en NVS de app | `nvs` `0x200000` | Se conservan (Cogitador usa su propio espacio de nombres `vox_secret`) | Siguen ahí | No se escribe |
-| Clave de Gemini de Cogitador | `nvs` `vox_secret` | — | **Sigue ahí si no se borra antes** | No se escribe |
+| Datos de ESP-Claw en NVS de app | `nvs` `0x200000` | Se conservan (Cogitador usa su propio espacio de nombres `cog_secret`) | Siguen ahí | No se escribe |
+| Clave de Gemini de Cogitador | `nvs` `cog_secret` | — | **Sigue ahí si no se borra antes** | No se escribe |
 | Binario de ESP-Claw en NOR | `main_app` | **Se sobrescribe** | Se reinstala desde la NAND | Ver nota |
 | Volcados de memoria previos | `coredump` | Se conservan; `mosaico.py` los guarda antes de escribir | — | — |
 
@@ -228,7 +228,7 @@ empujaba a buscar y a alargar las respuestas.
 **Búsqueda discreta (2026-11-25, autorizada; commit `10a6eaf`):**
 
 - Cambios: Cogitador responde de inmediato, busca solo si se le pide o ante un dato reciente que desconoce,
-  y no cita fuentes ni muestra nada en pantalla (`VOX_SHOW_SEARCH_SOURCES=n`).
+  y no cita fuentes ni muestra nada en pantalla (`COGITADOR_SHOW_SEARCH_SOURCES=n`).
 - `iris system-update` correcto en 42 s.
 - Después:
   - mismo Device ID, `firmware_mode=normal`, `app_version=1.2.0`;
@@ -251,12 +251,12 @@ responde que se ha **excedido la cuota** con los dos modelos. El propietario usa
 gratuito**.
 
 **Decisión del propietario:** la búsqueda queda **opcional y desactivada por defecto**
-(`VOX_GOOGLE_SEARCH=n`). Para activarla hay que recompilar con `VOX_GOOGLE_SEARCH=y` y tener cuota
+(`COGITADOR_GOOGLE_SEARCH=n`). Para activarla hay que recompilar con `COGITADOR_GOOGLE_SEARCH=y` y tener cuota
 disponible.
 
 **Corrección:**
 
-- `VOX_GOOGLE_SEARCH` desactivado por defecto: Cogitador conecta como en 1.1.0 y conserva el resto de 1.2.0.
+- `COGITADOR_GOOGLE_SEARCH` desactivado por defecto: Cogitador conecta como en 1.1.0 y conserva el resto de 1.2.0.
 - El cliente registra ahora `server close reason: …` en las tramas de cierre.
 - `tools/test_live_setup.py`: el propietario lo ejecuta en el PC con su clave para ver qué
   variante del `setup` acepta Google y con qué motivo rechaza las demás.
@@ -282,7 +282,7 @@ Pendiente de la búsqueda discreta, si se activa con cuota disponible:
    `Cogitador M-01 ready (… search on)` y `diag st=0 … largest=` ≥ 8192.
 2. «Hola ESP» → `connected; setup sent (model gemini-3.1-flash-live-preview, google search)` →
    `session ready`. **Si no llega `session ready`, el servidor rechaza el campo `tools`**: se anota y
-   se recompila con `VOX_GOOGLE_SEARCH=n`.
+   se recompila con `COGITADOR_GOOGLE_SEARCH=n`.
 3. Pregunta sin búsqueda («¿Cuánto es siete por ocho?»). Debe comportarse como en 1.1.0, sin línea
    de fuentes.
 4. Pregunta con búsqueda («¿Qué tiempo hará mañana en Madrid?»):
@@ -345,7 +345,7 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
    - Logs: `toolCall capturar_imagen` → `app_camera: still 240x320 JPEG … B (q…) in … ms` →
      `image … B … sent` → `toolResponse capturar_imagen sent`.
 4. **Orientación y color:** pregunta por un objeto de color conocido y si la imagen está derecha. Si sale
-   girada o en espejo, cambia `VOX_CAMERA_ROTATION` / `MIRROR_*`. Si los colores salen cambiados
+   girada o en espejo, cambia `COGITADOR_CAMERA_ROTATION` / `MIRROR_*`. Si los colores salen cambiados
    (rojo↔azul), anotarlo.
 5. Memoria: `largest=` durante y después de la foto, y ningún `allocation failures`.
 6. Después de la foto, comprobar que `iris logs` y `iris device-status` siguen funcionando por USB.
@@ -372,7 +372,7 @@ Rama `feat/camera` (RESEARCH.md, fase 2). Requisito previo opcional: ejecutar
 
 - Código desde flash.
 - Tiempo de espera del fotograma de 2 s.
-- Una foto de prueba 8 s después del arranque, sin conversación (`VOX_CAMERA_BOOT_TEST`): solo se
+- Una foto de prueba 8 s después del arranque, sin conversación (`COGITADOR_CAMERA_BOOT_TEST`): solo se
   registra y no se envía.
 - Coste: unos 19 KB más de RAM interna, porque los búferes de ESP-Iris dejan la PSRAM.
 
@@ -428,7 +428,7 @@ mientras que openai-live-esp32 usa `esp_video` 2.5.0 con este mismo BSP.
   RGB565).
 - `largest=` entre 47 104 y 63 488 B, sin `allocation failures` ni errores de pantalla.
 
-**Prueba 12 superada.** Se retira el código de diagnóstico; `VOX_CAMERA_BOOT_TEST` queda disponible pero
+**Prueba 12 superada.** Se retira el código de diagnóstico; `COGITADOR_CAMERA_BOOT_TEST` queda disponible pero
 apagado.
 
 ### Prueba 13 (pendiente de autorización): 1.5.0, galería de fotos
@@ -559,7 +559,7 @@ Al leer el código salió que la premisa era falsa:
     (`Doing SW reset of sensor` en `esp_camera.c`). `esp_video`/`esp_cam_sensor` tienen la orden
     (`ESP_CAM_SENSOR_IOC_SW_RESET`, registro 0x3103 bit 0) pero **nadie la llama**.
 - **Corrección (commit siguiente):** `app_camera` hace ese reset antes de cada foto y vuelve a escribir
-  el formato (Kconfig `VOX_CAMERA_SENSOR_RESET`, activado). Sin tocar código de Espressif.
+  el formato (Kconfig `COGITADOR_CAMERA_SENSOR_RESET`, activado). Sin tocar código de Espressif.
 - **Resultado del reset por software (firmware `be522037…`):**
   - Tras la instalación, 2 fotos correctas sin apagar.
   - Tras `iris restart`, fallo (`DQBUF`), **también sin ninguna foto antes del reinicio** (captura en
@@ -760,8 +760,8 @@ Revisar la identidad, el modo, la aplicación actual y la versión de Vibe Mode,
 ```powershell
 python mosaico.py iris system-update --project projects/servocraneo_gemini_direct
 python mosaico.py iris device-status --project projects/servocraneo_gemini_direct --json
-python mosaico.py iris logs --snapshot --project projects/servocraneo_gemini_direct --grep vox
-python mosaico.py iris screenshot vox-idle.png --project projects/servocraneo_gemini_direct --json
+python mosaico.py iris logs --snapshot --project projects/servocraneo_gemini_direct --grep cog_session
+python mosaico.py iris screenshot cogitador-idle.png --project projects/servocraneo_gemini_direct --json
 ```
 
 Aceptación de la instalación: el mismo Device ID pasa por normal → Vibe Mode → normal con
@@ -775,5 +775,5 @@ python projects/servocraneo_gemini_direct/tools/provision_key.py --status
 
 Prueba funcional: tocar la pantalla (cian → ámbar → rojo), preguntar «¿Cuánto es siete por
 ocho?» (rojo → ámbar → verde con voz Charon en español), tocar mientras habla (vuelve a rojo)
-y tocar para cerrar (cian). Las evidencias son `iris logs --grep "vox_session\|gemini_live"`
+y tocar para cerrar (cian). Las evidencias son `iris logs --grep "cog_session\|gemini_live"`
 y `iris screenshot` en cada estado.

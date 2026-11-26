@@ -1,6 +1,6 @@
 menu "Cogitador M-01 Gemini Direct"
 
-    config VOX_GEMINI_MODEL
+    config COGITADOR_GEMINI_MODEL
         string "Primary Gemini Live model"
         default "gemini-3.1-flash-live-preview"
         help
@@ -9,14 +9,14 @@ menu "Cogitador M-01 Gemini Direct"
             gemini-3.8-live accepted setup but never transcribed or answered
             over a raw WebSocket in the 2026-11-24 hardware tests.
 
-    config VOX_GEMINI_FALLBACK_MODEL
+    config COGITADOR_GEMINI_FALLBACK_MODEL
         string "Fallback Gemini Live model"
         default "gemini-3.8-live"
         help
             Used after repeated setup failures, or once per boot when the
             active model stays silent while the user speaks.
 
-    config VOX_SILENT_MODEL_VOICED_FRAMES
+    config COGITADOR_SILENT_MODEL_VOICED_FRAMES
         int "Voiced 40 ms frames without transcription before swapping model"
         range 25 1000
         default 250
@@ -25,22 +25,22 @@ menu "Cogitador M-01 Gemini Direct"
             this many loud uplink frames (default 10 s of speech) with no input
             transcription on the connection, reconnect with the other model.
 
-    config VOX_VOICED_PEAK_THRESHOLD
+    config COGITADOR_VOICED_PEAK_THRESHOLD
         int "Uplink frame peak counted as voiced (0..32767)"
         range 100 32767
         default 1036
         help
             1036 is about -30 dBFS; the room noise floor measured about -42 dBFS.
 
-    config VOX_GEMINI_VOICE
+    config COGITADOR_GEMINI_VOICE
         string "Prebuilt voice"
         default "Charon"
 
-    config VOX_GEMINI_LANGUAGE
+    config COGITADOR_GEMINI_LANGUAGE
         string "Speech language (BCP-47)"
         default "es-ES"
 
-    config VOX_WAKE_WORD
+    config COGITADOR_WAKE_WORD
         bool "Wake on \"Hola ESP\" (local WakeNet10, wn10_es_holaesp)"
         default y
         help
@@ -49,7 +49,7 @@ menu "Cogitador M-01 Gemini Direct"
             "model" partition with the esp-sr model image; without it Cogitador keeps
             working with touch only.
 
-    config VOX_ROLE_PHONE_PAGE
+    config COGITADOR_ROLE_PHONE_PAGE
         bool "Phone page for private secrets in role mode"
         default y
         help
@@ -57,7 +57,7 @@ menu "Cogitador M-01 Gemini Direct"
             Wi-Fi lets each player register by name and read only their own
             secrets. Without it, secrets use the on-screen card.
 
-    config VOX_ROLE_IDLE_TIMEOUT_S
+    config COGITADOR_ROLE_IDLE_TIMEOUT_S
         int "Seconds without activity before returning to idle in role mode"
         range 30 900
         default 180
@@ -65,18 +65,18 @@ menu "Cogitador M-01 Gemini Direct"
             Role-play players think, roll and talk among themselves: the
             conversation waits longer before closing while modo_rol is on.
 
-    config VOX_IDLE_TIMEOUT_S
+    config COGITADOR_IDLE_TIMEOUT_S
         int "Seconds without activity before returning to idle"
         range 10 600
         default 15
         help
             While listening, close the conversation after this time with no local
-            voice (uplink frames above VOX_VOICED_PEAK_THRESHOLD), user
+            voice (uplink frames above COGITADOR_VOICED_PEAK_THRESHOLD), user
             transcription, model output, turn or tap. Counted from the end of
             Cogitador's speech. Suspended while a reply is pending (see
-            VOX_RESPONSE_TIMEOUT_S).
+            COGITADOR_RESPONSE_TIMEOUT_S).
 
-    config VOX_GOOGLE_SEARCH
+    config COGITADOR_GOOGLE_SEARCH
         bool "Grounding with Google Search (native Live API tool)"
         default n
         help
@@ -89,16 +89,16 @@ menu "Cogitador M-01 Gemini Direct"
             search the web by itself (server side, no intermediate service). Each
             search may be billed separately: see docs/GOOGLE_SEARCH.md.
 
-    config VOX_SHOW_SEARCH_SOURCES
+    config COGITADOR_SHOW_SEARCH_SOURCES
         bool "Show Google search suggestions and sources on the status line"
-        depends on VOX_GOOGLE_SEARCH
+        depends on COGITADOR_GOOGLE_SEARCH
         default n
         help
             Off by default at the owner's request: Cogitador searches quietly and never
             cites sources. When on, the status line rotates "GOOGLE: <query>" and
             "FUENTE n/m: <domain>" (see docs/GOOGLE_SEARCH.md section 4).
 
-    config VOX_RESPONSE_TIMEOUT_S
+    config COGITADOR_RESPONSE_TIMEOUT_S
         int "Seconds to wait for Gemini to finish a turn (search, thinking)"
         range 10 120
         default 30
@@ -108,7 +108,7 @@ menu "Cogitador M-01 Gemini Direct"
             amber until this many seconds pass without any server output.
             Protects searches and reasoning pauses from the idle return.
 
-    config VOX_PREROLL_MS
+    config COGITADOR_PREROLL_MS
         int "Audio kept after the wake word while connecting (ms)"
         range 400 4000
         default 2000
@@ -116,12 +116,12 @@ menu "Cogitador M-01 Gemini Direct"
             Frames captured between "Hola ESP" and setupComplete are sent first so
             the question spoken right after the wake word is not lost.
 
-    config VOX_SPEAKER_VOLUME
+    config COGITADOR_SPEAKER_VOLUME
         int "Speaker volume (0-100)"
         range 1 100
         default 70
 
-    config VOX_MIC_GAIN_DB
+    config COGITADOR_MIC_GAIN_DB
         int "Microphone gain (dB)"
         range 0 42
         default 24

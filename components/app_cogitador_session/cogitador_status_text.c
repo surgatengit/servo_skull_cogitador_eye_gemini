@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#include "vox_status_text.h"
+#include "cogitador_status_text.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -77,7 +77,7 @@ static size_t map_char(const unsigned char *p, size_t left, char mapped[2], size
     return len;
 }
 
-size_t vox_status_text(const char *prefix, const char *text, size_t text_len,
+size_t cogitador_status_text(const char *prefix, const char *text, size_t text_len,
                        char *out, size_t cap, size_t max_chars)
 {
     if (!out || cap == 0) {

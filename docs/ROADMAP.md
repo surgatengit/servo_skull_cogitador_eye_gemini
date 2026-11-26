@@ -55,7 +55,7 @@ Más detalles en la [ficha oficial](https://aistudio.google.com/docs/models/gemi
 
 **Qué ya está preparado en 1.2.0.** `interactionStatus` (`IN_PROGRESS` no cierra el turno), partes
 `thought` sin reproducir y el estado de respuesta pendiente con su límite de 30 s
-(`VOX_RESPONSE_TIMEOUT_S`, que podría necesitar 60 s o más con razonamientos largos).
+(`COGITADOR_RESPONSE_TIMEOUT_S`, que podría necesitar 60 s o más con razonamientos largos).
 
 **Pendiente.**
 

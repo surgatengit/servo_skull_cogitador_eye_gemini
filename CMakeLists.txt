@@ -25,10 +25,10 @@ endif()
 # never uses. Ship the "Hola ESP" model image in the System Update bundle instead,
 # targeting the application-owned "model" data partition.
 if(TARGET srmodels_bin)
-    idf_build_get_property(vox_build_dir BUILD_DIR)
+    idf_build_get_property(cogitador_build_dir BUILD_DIR)
     set_property(GLOBAL APPEND PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_LABELS model)
     set_property(GLOBAL PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_model_IMAGE
-        "${vox_build_dir}/srmodels/srmodels.bin")
+        "${cogitador_build_dir}/srmodels/srmodels.bin")
     set_property(GLOBAL PROPERTY MOSAICO_SYSTEM_UPDATE_DATA_model_TARGET srmodels_bin)
 endif()
 include("${MOSAICO_UTILS_ROOT}/mosaico-tools/cmake/system_update.cmake")

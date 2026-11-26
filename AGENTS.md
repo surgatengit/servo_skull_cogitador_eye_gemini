@@ -6,7 +6,7 @@ install with `iris system-update`, never `recover`), the known pitfalls (panel D
 bounce buffers, regenerating `build/sdkconfig`) and the next steps.
 
 Read the owning component and its README before editing. Keep `main` as the
-device composition root and `app_vox_eye` portable between device and PC.
+device composition root and `app_cogitador_eye` portable between device and PC.
 
 For Wi-Fi credentials and other user-provisioned shared configuration, default
 to Vibe Mode's shared information through the public `mosaico_shared_get()` API.

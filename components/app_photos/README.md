@@ -1,13 +1,13 @@
 # app_photos
 
 Persistent ring of the latest camera stills for the eye's gallery (1.5.0). Kconfig:
-`VOX_PHOTOS_SLOTS` (10).
+`COGITADOR_PHOTOS_SLOTS` (10).
 
 ## Storage
 
 - Partition **`photos`** (data, subtype 0x41), 512 KiB at 0xD80000. It was carved out of `main_app`,
   which went from 12 224 K to 11 712 K in 1.5.0. System Update writes the new table.
-- Up to 10 slots of 48 KiB. Each slot is a 32-byte header (`VOXP`, version, sequence, size, CRC32)
+- Up to 10 slots of 48 KiB. Each slot is a 32-byte header (`COGP`, or `VOXP` from 1.6, still read; version, sequence, size, CRC32)
   followed by the JPEG.
 - Save order: erase the slot, write the JPEG, then **write the header last**. A cut save leaves no
   valid header, so the slot is simply empty.

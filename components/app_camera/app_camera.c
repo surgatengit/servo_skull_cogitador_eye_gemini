@@ -15,7 +15,7 @@
 #include "mosaico_module_camera.h"
 #include "sdkconfig.h"
 
-#if CONFIG_VOX_CAMERA_SENSOR_RESET
+#if CONFIG_COGITADOR_CAMERA_SENSOR_RESET
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -34,26 +34,26 @@
 #define CAMERA_RESET_GPIO       GPIO_NUM_53  /* CAM_RESET, left slot */
 #endif
 
-#if CONFIG_VOX_CAMERA
+#if CONFIG_COGITADOR_CAMERA
 
 static const char *TAG = "app_camera";
 
-#define OUT_W               CONFIG_VOX_CAMERA_WIDTH
-#define OUT_H               CONFIG_VOX_CAMERA_HEIGHT
-#define SETTLE_FRAMES       CONFIG_VOX_CAMERA_SETTLE_FRAMES
+#define OUT_W               CONFIG_COGITADOR_CAMERA_WIDTH
+#define OUT_H               CONFIG_COGITADOR_CAMERA_HEIGHT
+#define SETTLE_FRAMES       CONFIG_COGITADOR_CAMERA_SETTLE_FRAMES
 #define FRAME_TIMEOUT_MS    2000
 #define CAPTURE_W           1280
 #define CAPTURE_H           720
 #define JPEG_TIMEOUT_MS     1000
 #define JPEG_OUT_CAPACITY   (64 * 1024)   /* hard ceiling; callers ask for less */
 
-#if CONFIG_VOX_CAMERA_ROTATE_90
+#if CONFIG_COGITADOR_CAMERA_ROTATE_90
 #define ROTATION  PPA_SRM_ROTATION_ANGLE_90
 #define SWAP_AXES true
-#elif CONFIG_VOX_CAMERA_ROTATE_180
+#elif CONFIG_COGITADOR_CAMERA_ROTATE_180
 #define ROTATION  PPA_SRM_ROTATION_ANGLE_180
 #define SWAP_AXES false
-#elif CONFIG_VOX_CAMERA_ROTATE_270
+#elif CONFIG_COGITADOR_CAMERA_ROTATE_270
 #define ROTATION  PPA_SRM_ROTATION_ANGLE_270
 #define SWAP_AXES true
 #else
@@ -61,12 +61,12 @@ static const char *TAG = "app_camera";
 #define SWAP_AXES false
 #endif
 
-#if CONFIG_VOX_CAMERA_MIRROR_X
+#if CONFIG_COGITADOR_CAMERA_MIRROR_X
 #define MIRROR_X true
 #else
 #define MIRROR_X false
 #endif
-#if CONFIG_VOX_CAMERA_MIRROR_Y
+#if CONFIG_COGITADOR_CAMERA_MIRROR_Y
 #define MIRROR_Y true
 #else
 #define MIRROR_Y false
@@ -156,7 +156,7 @@ static esp_err_t convert_frame(const mosaico_camera_frame_t *frame)
     return esp_cache_msync(s.rgb, s.rgb_size, ESP_CACHE_MSYNC_FLAG_DIR_M2C | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
 }
 
-#if CONFIG_VOX_CAMERA_SENSOR_RESET
+#if CONFIG_COGITADOR_CAMERA_SENSOR_RESET
 /* Hardware reset through CAM_RESET. Official SC101IOT CameraBoard V1.4
  * schematic: GPIO53 -> CAM_RESET (sensor FPC pin 19), 10 kΩ pull-up to
  * DOVDD_2V8, "0: Reset, 1: Normal". The SC101IOT driver ignores it
@@ -252,7 +252,7 @@ static esp_err_t grab_converted_frame(void)
     }
     mosaico_camera_frame_t frame = { 0 };
     bool borrowed = false;
-#if CONFIG_VOX_CAMERA_SENSOR_RESET
+#if CONFIG_COGITADOR_CAMERA_SENSOR_RESET
     reset_sensor(); /* best effort: logs and carries on */
 #endif
     err = mosaico_camera_open(camera);
@@ -335,7 +335,7 @@ esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)
     return ESP_OK;
 }
 
-#else /* !CONFIG_VOX_CAMERA */
+#else /* !CONFIG_COGITADOR_CAMERA */
 
 
 esp_err_t app_camera_capture_jpeg(size_t max_bytes, app_camera_still_t *out)

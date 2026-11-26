@@ -1,6 +1,6 @@
 # app_rol_web
 
-Role-mode phone page (1.6.0, Kconfig `VOX_ROLE_PHONE_PAGE`). Each player sees **only their own
+Role-mode phone page (1.6.0, Kconfig `COGITADOR_ROLE_PHONE_PAGE`). Each player sees **only their own
 secrets and character sheet** on their own phone, without anyone having to look away from the
 screen. The same page offers the saved game for download and upload.
 
@@ -21,7 +21,7 @@ screen. The same page offers the saved game for download and upload.
     `ok:false` for an unknown token (a new game, or the name moved to another phone).
   - `POST /seen?t=TOKEN&s=SEQ`: the player revealed secret number SEQ.
   - `GET /partida`: the saved game as `partida_cogitador.json` (404 if none).
-  - `POST /partida`: upload a saved game (JSON, < 16 KiB, `"vox_partida":1`); it replaces the
+  - `POST /partida`: upload a saved game (JSON, < 16 KiB, `"cogitador_partida":1`, or the 1.6 key `"vox_partida":1`); it replaces the
     one on Cogitador.
 - Players:
   - A name gets an entry when a phone joins, or earlier when the master gives it a secret or a sheet
@@ -41,8 +41,8 @@ screen. The same page offers the saved game for download and upload.
 ## Saved game
 
 - `rol_game.c` (pure C + cJSON, host-tested) builds and reads one document:
-  `{"vox_partida":1,"titulo","juego","resumen","dados":{…},"jugadores":[{"nombre","ficha","secreto"}]}`.
-- `app_rol_web_store_game` keeps it in the application NVS (`vox_game`/`partida`, one game, up to
+  `{"cogitador_partida":1,"titulo","juego","resumen","dados":{…},"jugadores":[{"nombre","ficha","secreto"}]}`.
+- `app_rol_web_store_game` keeps it in the application NVS (`cog_game`/`partida`; the 1.6 `vox_game` is moved there once, one game, up to
   16 KiB). If the old and new copies do not fit together, the old one is erased first.
 - `app_rol_web_restore_game` puts the saved players into the table as reserved entries: sheets
   always, secrets only to continue the same story. Players already on a phone keep it.

@@ -1,7 +1,7 @@
 # app_secrets
 
 Stores the device-exclusive Gemini API key and an optional model override in the
-application's own `nvs` partition (namespace `vox_secret`), separate from Vibe
+application's own `nvs` partition (namespace `cog_secret`; the 1.6 `vox_secret` is moved there once at init), separate from Vibe
 Mode's shared information. Depends on ESP-Iris (RPC), NVS and Mbed TLS zeroization.
 
 ## Provisioning RPC (service `0x5658`)

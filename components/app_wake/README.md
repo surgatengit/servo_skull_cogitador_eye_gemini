@@ -15,7 +15,7 @@ because esp-sr itself only flashes it through `idf.py flash`.
 
 - `app_wake_init(cb, ctx)`: singleton, once. Loads the model list with
   `esp_srmodel_init("model")`; returns `ESP_ERR_NOT_FOUND` when the partition or
-  model is missing (Cogitador then works with touch only). Starts `vox_wake`
+  model is missing (Cogitador then works with touch only). Starts `cog_wake`
   (core 1, prio 5, below audio capture/playback).
 - `app_wake_set_active(bool)`: any task. The wake task creates the WakeNet
   detector (≈16 KB internal RAM, ~0.5 MB PSRAM) only while active and destroys it
