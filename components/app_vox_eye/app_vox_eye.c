@@ -38,14 +38,18 @@
 #define ROLE_X1                460
 #define ROLE_Y0                212
 #define ROLE_Y1                268
-/* Dice panel (ui/main.json "dice"; keep in sync). */
-#define DIE_SIZE               76
-#define DIE_GAP                16
+/* Dice panel (ui/main.json "dice"; keep in sync): up to 5 per row. */
+#define DIE_SIZE               64
+#define DIE_GAP                12
+#define DIE_ROW_MAX            5
+#define DIE_ROW_Y_SINGLE       196
+#define DIE_ROW_Y_TOP          162
+#define DIE_ROW_Y_BOTTOM       236
 #define DICE_ROLL_TICKS        24       /* ~0.8 s of tumbling numbers */
 #define DICE_SHOW_TICKS        180      /* ~6 s with the result */
 #define DIE_COLOR_NORMAL       0x1E2A33
-#define DIE_COLOR_MAX          0xB37800 /* gold: critical on a d20 */
-#define DIE_COLOR_ONE          0xA0102A /* red: fumble on a d20 */
+#define DIE_COLOR_GOOD         0xB37800 /* gold: maximum or success */
+#define DIE_COLOR_BAD          0xA0102A /* red: a 1 */
 /* Dice request handoff: release/acquire on the device; the PC preview (MSVC)
  * runs GSP and the demo on one thread. */
 #if defined(__GNUC__)
@@ -100,14 +104,10 @@ struct app_vox_eye {
     uint32_t x_since;
     /* Dice: the producer fills dice_req_* and then bumps dice_req_seq (release);
      * the render task copies them when it sees a new sequence (acquire). */
-    uint16_t dice_req_values[APP_VOX_EYE_MAX_DICE];
-    uint32_t dice_req_count;
-    uint32_t dice_req_sides;
+    app_vox_eye_roll_t dice_req;
     uint32_t dice_req_seq;
     uint32_t dice_seen_seq;         /* render task only from here on */
-    uint16_t dice_values[APP_VOX_EYE_MAX_DICE];
-    uint32_t dice_count;
-    uint32_t dice_sides;
+    app_vox_eye_roll_t dice;
     uint32_t dice_tick;
     bool dice_active;
     volatile int32_t secret_open;   /* set by any task, cleared on the render task */
@@ -286,45 +286,63 @@ static void step_blink(struct app_vox_eye *eye)
     eye->double_blink = eye->double_blink || (rng_next(eye) % 5U) == 0U;
 }
 
+/* The generated setters are per object (die0..die9): dispatch on the index. */
+#define DIE_CALL(i, suffix, ...)                                                            \
+    do {                                                                                    \
+        switch (i) {                                                                        \
+        case 0: remember(eye, (esp_gsp_err_t)gsp_vox_die0##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 1: remember(eye, (esp_gsp_err_t)gsp_vox_die1##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 2: remember(eye, (esp_gsp_err_t)gsp_vox_die2##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 3: remember(eye, (esp_gsp_err_t)gsp_vox_die3##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 4: remember(eye, (esp_gsp_err_t)gsp_vox_die4##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 5: remember(eye, (esp_gsp_err_t)gsp_vox_die5##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 6: remember(eye, (esp_gsp_err_t)gsp_vox_die6##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 7: remember(eye, (esp_gsp_err_t)gsp_vox_die7##suffix(eye->ui, __VA_ARGS__)); break; \
+        case 8: remember(eye, (esp_gsp_err_t)gsp_vox_die8##suffix(eye->ui, __VA_ARGS__)); break; \
+        default: remember(eye, (esp_gsp_err_t)gsp_vox_die9##suffix(eye->ui, __VA_ARGS__)); break; \
+        }                                                                                   \
+    } while (0)
+
 static void set_die_visible(struct app_vox_eye *eye, unsigned i, bool visible)
 {
-    switch (i) {
-    case 0: remember(eye, gsp_vox_die0_set_visible(eye->ui, visible)); break;
-    case 1: remember(eye, gsp_vox_die1_set_visible(eye->ui, visible)); break;
-    case 2: remember(eye, gsp_vox_die2_set_visible(eye->ui, visible)); break;
-    default: remember(eye, gsp_vox_die3_set_visible(eye->ui, visible)); break;
-    }
+    DIE_CALL(i, _set_visible, visible);
 }
 
-static void set_die_x(struct app_vox_eye *eye, unsigned i, int32_t x)
+static void set_die_position(struct app_vox_eye *eye, unsigned i, int32_t x, int32_t y)
 {
-    switch (i) {
-    case 0: remember(eye, gsp_vox_die0_slot_set_x(eye->ui, x)); break;
-    case 1: remember(eye, gsp_vox_die1_slot_set_x(eye->ui, x)); break;
-    case 2: remember(eye, gsp_vox_die2_slot_set_x(eye->ui, x)); break;
-    default: remember(eye, gsp_vox_die3_slot_set_x(eye->ui, x)); break;
-    }
+    DIE_CALL(i, _slot_set_position, x, y);
 }
 
 static void set_die_color(struct app_vox_eye *eye, unsigned i, uint32_t rgb)
 {
-    switch (i) {
-    case 0: remember(eye, gsp_vox_die0_face_set_color_rgb888(eye->ui, rgb)); break;
-    case 1: remember(eye, gsp_vox_die1_face_set_color_rgb888(eye->ui, rgb)); break;
-    case 2: remember(eye, gsp_vox_die2_face_set_color_rgb888(eye->ui, rgb)); break;
-    default: remember(eye, gsp_vox_die3_face_set_color_rgb888(eye->ui, rgb)); break;
-    }
+    DIE_CALL(i, _face_set_color_rgb888, rgb);
 }
 
-static void set_die_value(struct app_vox_eye *eye, unsigned i, unsigned value)
+static void set_die_text(struct app_vox_eye *eye, unsigned i, const char *text)
 {
-    char text[8];
+    DIE_CALL(i, _value_set_text, text);
+}
+
+static void set_die_number(struct app_vox_eye *eye, unsigned i, unsigned value)
+{
+    char text[12];
     snprintf(text, sizeof(text), "%u", value);
-    switch (i) {
-    case 0: remember(eye, (esp_gsp_err_t)gsp_vox_die0_value_set_text(eye->ui, text)); break;
-    case 1: remember(eye, (esp_gsp_err_t)gsp_vox_die1_value_set_text(eye->ui, text)); break;
-    case 2: remember(eye, (esp_gsp_err_t)gsp_vox_die2_value_set_text(eye->ui, text)); break;
-    default: remember(eye, (esp_gsp_err_t)gsp_vox_die3_value_set_text(eye->ui, text)); break;
+    set_die_text(eye, i, text);
+}
+
+/* Up to DIE_ROW_MAX dice in one centred row; more in two (the top one gets the odd die). */
+static void place_dice(struct app_vox_eye *eye, unsigned count)
+{
+    const unsigned top = count <= DIE_ROW_MAX ? count : (count + 1U) / 2U;
+    for (unsigned i = 0; i < count; ++i) {
+        const bool first_row = i < top;
+        const unsigned in_row = first_row ? top : count - top;
+        const unsigned col = first_row ? i : i - top;
+        const int32_t width = (int32_t)in_row * DIE_SIZE + ((int32_t)in_row - 1) * DIE_GAP;
+        const int32_t x = 240 - width / 2 + (int32_t)col * (DIE_SIZE + DIE_GAP);
+        const int32_t y = count <= DIE_ROW_MAX ? DIE_ROW_Y_SINGLE
+                          : (first_row ? DIE_ROW_Y_TOP : DIE_ROW_Y_BOTTOM);
+        set_die_position(eye, i, x, y);
     }
 }
 
@@ -340,21 +358,13 @@ static void step_dice(struct app_vox_eye *eye)
     const uint32_t seq = SEQ_LOAD(&eye->dice_req_seq);
     if (seq != eye->dice_seen_seq) {
         eye->dice_seen_seq = seq;
-        eye->dice_count = eye->dice_req_count;
-        eye->dice_sides = eye->dice_req_sides;
-        memcpy(eye->dice_values, eye->dice_req_values, sizeof(eye->dice_values));
-        char title[24];
-        snprintf(title, sizeof(title), "TIRADA %uD%u", (unsigned)eye->dice_count,
-                 (unsigned)eye->dice_sides);
-        remember(eye, (esp_gsp_err_t)gsp_vox_dice_title_set_text(eye->ui, title));
+        eye->dice = eye->dice_req;
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_title_set_text(eye->ui, eye->dice.title));
         remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, " "));
-        const int32_t width = (int32_t)eye->dice_count * DIE_SIZE +
-                              ((int32_t)eye->dice_count - 1) * DIE_GAP;
-        const int32_t x0 = 240 - width / 2;
+        place_dice(eye, eye->dice.count);
         for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
-            const bool used = i < eye->dice_count;
+            const bool used = i < eye->dice.count;
             if (used) {
-                set_die_x(eye, i, x0 + (int32_t)i * (DIE_SIZE + DIE_GAP));
                 set_die_color(eye, i, DIE_COLOR_NORMAL);
             }
             set_die_visible(eye, i, used);
@@ -369,37 +379,20 @@ static void step_dice(struct app_vox_eye *eye)
     eye->dice_tick++;
     if (eye->dice_tick < DICE_ROLL_TICKS) {
         if ((eye->dice_tick & 1U) == 0U) {
-            for (unsigned i = 0; i < eye->dice_count; ++i) {
-                set_die_value(eye, i, rng_range(eye, 1, eye->dice_sides));
+            for (unsigned i = 0; i < eye->dice.count; ++i) {
+                set_die_number(eye, i, rng_range(eye, 1, eye->dice.tumble));
             }
         }
     } else if (eye->dice_tick == DICE_ROLL_TICKS) {
-        unsigned total = 0;
-        bool any_max = false;
-        bool any_one = false;
-        for (unsigned i = 0; i < eye->dice_count; ++i) {
-            const unsigned v = eye->dice_values[i];
-            const bool max = v == eye->dice_sides;
-            const bool one = v == 1U;
-            total += v;
-            any_max = any_max || max;
-            any_one = any_one || one;
-            set_die_value(eye, i, v);
-            set_die_color(eye, i, max ? DIE_COLOR_MAX : (one ? DIE_COLOR_ONE : DIE_COLOR_NORMAL));
+        for (unsigned i = 0; i < eye->dice.count; ++i) {
+            const uint8_t mark = eye->dice.marks[i];
+            set_die_text(eye, i, eye->dice.faces[i][0] ? eye->dice.faces[i] : "?");
+            set_die_color(eye, i, mark == APP_VOX_EYE_DIE_GOOD ? DIE_COLOR_GOOD
+                                  : (mark == APP_VOX_EYE_DIE_BAD ? DIE_COLOR_BAD
+                                                                 : DIE_COLOR_NORMAL));
         }
-        const char *mark = "";
-        if (eye->dice_sides == 20U && any_max) {
-            mark = eye->dice_count > 1 ? " · CRÍTICO" : "CRÍTICO";
-        } else if (eye->dice_sides == 20U && any_one) {
-            mark = eye->dice_count > 1 ? " · PIFIA" : "PIFIA";
-        }
-        char text[40];
-        if (eye->dice_count > 1) {
-            snprintf(text, sizeof(text), "TOTAL %u%s", total, mark);
-        } else {
-            snprintf(text, sizeof(text), "%s", mark[0] ? mark : " ");
-        }
-        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(eye->ui, text));
+        remember(eye, (esp_gsp_err_t)gsp_vox_dice_total_set_text(
+                          eye->ui, eye->dice.result[0] ? eye->dice.result : " "));
     } else if (eye->dice_tick > DICE_ROLL_TICKS + DICE_SHOW_TICKS) {
         hide_dice(eye);
     }
@@ -781,16 +774,27 @@ esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enable
     return (esp_gsp_err_t)gsp_vox_role_badge_set_visible(handle->ui, enabled);
 }
 
-esp_gsp_err_t app_vox_eye_show_dice(app_vox_eye_handle_t handle, const uint16_t *values,
-                                    unsigned count, unsigned sides)
+esp_gsp_err_t app_vox_eye_set_role_badge(app_vox_eye_handle_t handle, const char *text)
 {
-    if (!handle || !values || count == 0 || count > APP_VOX_EYE_MAX_DICE || sides < 2 ||
-            sides > 100) {
+    if (!handle || !text || !text[0]) {
         return ESP_GSP_ERR_INVALID_ARG;
     }
-    memcpy(handle->dice_req_values, values, count * sizeof(values[0]));
-    handle->dice_req_count = count;
-    handle->dice_req_sides = sides;
+    return (esp_gsp_err_t)gsp_vox_role_badge_text_set_text(handle->ui, text);
+}
+
+esp_gsp_err_t app_vox_eye_show_roll(app_vox_eye_handle_t handle, const app_vox_eye_roll_t *roll)
+{
+    if (!handle || !roll || roll->count == 0 || roll->count > APP_VOX_EYE_MAX_DICE ||
+            roll->tumble < 2 || roll->tumble > 100) {
+        return ESP_GSP_ERR_INVALID_ARG;
+    }
+    handle->dice_req = *roll;
+    /* Terminate the copied strings whatever the caller sent. */
+    for (unsigned i = 0; i < APP_VOX_EYE_MAX_DICE; ++i) {
+        handle->dice_req.faces[i][sizeof(handle->dice_req.faces[i]) - 1] = '\0';
+    }
+    handle->dice_req.title[sizeof(handle->dice_req.title) - 1] = '\0';
+    handle->dice_req.result[sizeof(handle->dice_req.result) - 1] = '\0';
     SEQ_BUMP(&handle->dice_req_seq);
     return ESP_GSP_OK;
 }

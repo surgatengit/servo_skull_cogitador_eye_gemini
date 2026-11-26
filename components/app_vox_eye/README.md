@@ -52,14 +52,18 @@ a tap toggles idle/listening. Networking and audio are not simulated.
 - Voice badge (top right, mirrors the photo counter): shows the voice's initial
   (`app_vox_eye_set_voice_initial`). A tap reports `APP_VOX_EYE_ACTION_VOICE_NEXT` through
   `on_action`.
-- Role badge «D20» (right bezel, hidden): shown in role mode (`app_vox_eye_set_role_mode`). A tap
-  reports `APP_VOX_EYE_ACTION_ROLE_ROLL`.
-- Dice panel (`app_vox_eye_show_dice`):
-  - up to 4 dice;
-  - the render task tumbles random numbers for ~0.8 s, then shows the results: maximum in gold,
-    1 in red, total, and «CRÍTICO»/«PIFIA» on a d20;
+- Role badge (right bezel, hidden): shown in role mode (`app_vox_eye_set_role_mode`). Its label
+  is the prepared roll, «2D20», «D%» or «6D10» (`app_vox_eye_set_role_badge`). A tap reports
+  `APP_VOX_EYE_ACTION_ROLE_ROLL`.
+- Dice panel (`app_vox_eye_show_roll`):
+  - up to 10 dice of 64 px: one centred row up to 5, two rows from 6 (the top row takes the odd
+    die). The `dieN_slot` containers have a ranged x and y (`_set_position`);
+  - the caller supplies the face texts, a mark per die (gold, red or none), the title and the
+    result line (`vox_rol_view()` in `app_vox_session` builds them for the three roll modes);
+  - the render task tumbles random numbers 1..`tumble` for ~0.8 s, then shows the faces, the
+    marks and the result;
   - it hides after ~6 s, or on a tap once the dice have settled;
-  - the caller hands the values over through a sequence counter (release/acquire on the device,
+  - the caller hands the roll over through a sequence counter (release/acquire on the device,
     plain volatile in the single-threaded PC preview).
 - Secret card (`app_vox_eye_show_secret`):
   - full screen, «SOLO PARA <NOMBRE>»;
@@ -69,8 +73,9 @@ a tap toggles idle/listening. Networking and audio are not simulated.
 - The eye animation pauses under the dice panel and the secret card, as it does under the gallery.
 - In role mode (device only, input interceptor), a press held ~1.5 s on the eye, outside the badges
   and overlays, reports `APP_VOX_EYE_ACTION_CLOSE_HOLD`, and its release is swallowed.
-- PC preview: the voice badge cycles C/A/K/S and shows a secret on the fourth voice. The D20 badge
-  alternates a 2d20 critical and a 1d20 fumble.
+- PC preview: the voice badge cycles C/A/K/S and shows a secret on the fourth voice. The dice
+  badge cycles a 2d20 critical, a 1d20 fumble, a percentile roll, a 6d10 pool and a 10d10 pool
+  (the preview builds `app_vox_session/vox_rol.c` for this).
 
 ## Photo counter and gallery (1.5.0)
 

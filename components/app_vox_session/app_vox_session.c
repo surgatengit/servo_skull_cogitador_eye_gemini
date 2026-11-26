@@ -68,11 +68,11 @@ static const char *TAG = "vox_session";
 #define TOOL_VOICE              "cambiar_voz"
 #define TOOL_ROLE               "modo_rol"
 #define TOOL_SECRET             "mostrar_secreto"
+#define TOOL_PREPARE            "preparar_tirada"
 #define TOOL_ARGS_CAPACITY      640     /* function call arguments (JSON), secrets included */
 #define ROLE_IDLE_TIMEOUT_US    ((int64_t)CONFIG_VOX_ROLE_IDLE_TIMEOUT_S * 1000 * 1000)
-#define PLAYER_DICE             2       /* D20 badge: the player rolls 2d20 */
-#define PLAYER_SIDES            20
-#define ROLL_TEXT_CAPACITY      480     /* pending player rolls (about three) */
+#define PLAYER_TEXT_CAPACITY    256     /* one player roll as text (10 dice fit) */
+#define ROLL_TEXT_CAPACITY      640     /* pending player rolls (three or more) */
 #define ROLL_RETRY_US           (500 * 1000)        /* after a failed send */
 #define ROLL_EXPIRE_US          (90 * 1000 * 1000)  /* undelivered rolls are dropped */
 #define GALLERY_IDLE_US         (30 * 1000 * 1000)  /* back to the eye without touches */
@@ -104,9 +104,13 @@ static const char PERSONA[] =
     "voz propia cambiando tono, ritmo y actitud (narrador, villano, criaturas), añade un consejo "
     "de máster de una frase sobre una regla o idea del juego, y termina preguntando qué hace "
     "cada jugador, por orden. Cuando hagan algo arriesgado, di qué habilidad usan y qué número "
-    "necesitan y tira con tirar_dados; si un jugador quiere tirar él, espera su resultado (puede "
-    "usar el botón D20 de la pantalla). En el d20, un 20 es crítico y un 1 es pifia: explícalo "
-    "la primera vez que salga. Acepta cualquier acción, aunque sea absurda o de humor, y hazla "
+    "necesitan. Usa el sistema de dados del juego: suma (1d20, 3d6...), porcentaje (d100 con dos "
+    "d10, decenas y unidades; 0 y 0 es 100) o reserva (un dado por punto de habilidad, contando "
+    "éxitos). Tira tú con tirar_dados; si un jugador quiere tirar él, prepara antes su tirada con "
+    "preparar_tirada, dile cuántos dados tira y espera su resultado: él toca el botón de dados "
+    "de la pantalla. Las reglas especiales del juego, como dieces que repiten o unos que restan, "
+    "las aplicas tú con los valores que recibes. En el d20, un 20 es crítico y un 1 es pifia: "
+    "explícalo la primera vez que salga. Acepta cualquier acción, aunque sea absurda o de humor, y hazla "
     "encajar con consecuencias. Al terminar narra el desenlace y un epílogo, resume cómo queda "
     "cada personaje y qué han aprendido del juego, deja un cabo suelto para otro día y llama a "
     "modo_rol con activar a falso. Todo es hablado: sin títulos, listas ni símbolos."
@@ -148,6 +152,19 @@ typedef enum {
     EV_ACTION,      /* value = app_vox_session_action_t */
 } event_kind_t;
 
+/* Parameters shared by tirar_dados and preparar_tirada. */
+#define DICE_PARAMS                                                                         \
+    "{\"modo\":{\"type\":\"STRING\",\"enum\":[\"suma\",\"porcentaje\",\"reserva\"],"        \
+    "\"description\":\"suma: se suman los dados. porcentaje: d100 con dos d10 (decenas y "     \
+    "unidades, 0 y 0 es 100); ignora cantidad y caras. reserva: se cuentan los dados que "    \
+    "igualan o superan exito_con.\"},"                                                        \
+    "\"cantidad\":{\"type\":\"INTEGER\",\"description\":\"Número de dados, de 1 a 10.\"},"    \
+    "\"caras\":{\"type\":\"INTEGER\",\"description\":\"Caras de cada dado: 4, 6, 8, 10, 12, " \
+    "20 o 100.\"},"                                                                           \
+    "\"exito_con\":{\"type\":\"INTEGER\",\"description\":\"Solo en reserva: valor mínimo "   \
+    "para que un dado sea un éxito (por defecto 8 en un d10).\"}},"                           \
+    "\"required\":[\"modo\"]"
+
 /* Functions Gemini may call (Live setup functionDeclarations). */
 static const char FUNCTION_DECLARATIONS[] =
     "["
@@ -160,12 +177,15 @@ static const char FUNCTION_DECLARATIONS[] =
 #endif
     "{\"name\":\"" TOOL_DICE "\","
     "\"description\":\"Tira dados reales con el generador aleatorio de VOX y los muestra "
-    "animados en la pantalla. Úsala siempre que haya que tirar dados. Devuelve cada resultado, "
-    "el total y si hay crítico o pifia en un d20.\","
-    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":{"
-    "\"cantidad\":{\"type\":\"INTEGER\",\"description\":\"Número de dados, de 1 a 4.\"},"
-    "\"caras\":{\"type\":\"INTEGER\",\"description\":\"Caras de cada dado: 4, 6, 8, 10, 12, "
-    "20 o 100.\"}},\"required\":[\"cantidad\",\"caras\"]}},"
+    "animados en la pantalla. Úsala siempre que haya que tirar dados. Devuelve cada resultado "
+    "y, según el modo, el total (con crítico o pifia en un d20), el porcentaje o los éxitos.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":" DICE_PARAMS "}},"
+    "{\"name\":\"" TOOL_PREPARE "\","
+    "\"description\":\"Modo rol: prepara la tirada del botón de dados de la pantalla, el que "
+    "tocan los jugadores. Úsala antes de pedir a un jugador que tire, por ejemplo 6 dados de "
+    "10 en reserva si su habilidad es 6, o porcentaje en un juego de d100. Se mantiene hasta "
+    "que la cambies; al empezar la partida es 2d20 en suma.\","
+    "\"parameters\":{\"type\":\"OBJECT\",\"properties\":" DICE_PARAMS "}},"
     "{\"name\":\"" TOOL_VOICE "\","
     "\"description\":\"Cambia la voz de VOX. Al terminar tu respuesta la conversación se "
     "reconecta con la voz nueva (se pierde lo hablado).\","
@@ -268,6 +288,7 @@ static struct {
     /* Player rolls (D20 badge) not yet delivered to the master: the WebSocket
      * client is busy while the model streams a reply, so they wait for
      * turnComplete and are retried until sent or expired. */
+    vox_rol_spec_t player_roll; /* what the dice badge rolls (preparar_tirada) */
     char roll_text[ROLL_TEXT_CAPACITY];
     int64_t roll_since_us;  /* first pending roll */
     int64_t roll_retry_us;  /* earliest next attempt */
@@ -580,6 +601,16 @@ static void fail(session_error_t err)
     enter(ST_ERROR);
 }
 
+/* The dice badge rolls `spec` from now on. */
+static void set_player_roll(vox_rol_spec_t spec)
+{
+    s.player_roll = spec;
+    char badge[8];
+    if (s.config.ui.set_role_badge && vox_rol_badge(&spec, badge, sizeof(badge)) > 0) {
+        s.config.ui.set_role_badge(s.config.ui.ui, badge);
+    }
+}
+
 static void set_role_mode(bool on)
 {
     if (s.role_mode == on) {
@@ -587,6 +618,9 @@ static void set_role_mode(bool on)
     }
     s.role_mode = on;
     ESP_LOGI(TAG, "role mode %s", on ? "on" : "off");
+    if (on) {
+        set_player_roll(vox_rol_spec_default()); /* every game starts with 2d20 */
+    }
 #if CONFIG_VOX_ROLE_PHONE_PAGE
     if (on) {
         (void)app_rol_web_start(); /* optional: secrets fall back to the screen card */
@@ -632,14 +666,35 @@ static uint32_t hw_rand32(void *ctx)
     return esp_random(); /* hardware RNG (true random while the radio is on) */
 }
 
-static void roll(uint16_t *values, int count, int sides)
+/* Roll with the hardware RNG and show it on the dice panel. */
+static void roll(const vox_rol_spec_t *spec, uint16_t *values)
 {
-    for (int i = 0; i < count; ++i) {
-        values[i] = (uint16_t)vox_rol_die(hw_rand32, NULL, (unsigned)sides);
+    vox_rol_roll(spec, hw_rand32, NULL, values);
+    if (!s.config.ui.show_roll) {
+        return;
     }
-    if (s.config.ui.show_dice) {
-        s.config.ui.show_dice(s.config.ui.ui, values, (unsigned)count, (unsigned)sides);
-    }
+    vox_rol_view_t view;
+    vox_rol_view(spec, values, &view);
+    app_vox_session_roll_t shown = { .count = view.count, .tumble = view.tumble };
+    _Static_assert(sizeof(shown.faces) == sizeof(view.faces), "dice faces");
+    memcpy(shown.faces, view.faces, sizeof(shown.faces));
+    memcpy(shown.marks, view.marks, sizeof(shown.marks));
+    memcpy(shown.title, view.title, sizeof(shown.title));
+    memcpy(shown.result, view.result, sizeof(shown.result));
+    s.config.ui.show_roll(s.config.ui.ui, &shown);
+}
+
+/* Spec from tirar_dados / preparar_tirada arguments. */
+static vox_rol_spec_t spec_from_args(const cJSON *args, int default_count, int default_sides)
+{
+    const cJSON *mode = cJSON_GetObjectItemCaseSensitive(args, "modo");
+    const vox_rol_mode_t m = vox_rol_mode_parse(cJSON_IsString(mode) ? mode->valuestring : NULL);
+    const cJSON *count = cJSON_GetObjectItemCaseSensitive(args, "cantidad");
+    const cJSON *sides = cJSON_GetObjectItemCaseSensitive(args, "caras");
+    const cJSON *target = cJSON_GetObjectItemCaseSensitive(args, "exito_con");
+    return vox_rol_spec_make(m, cJSON_IsNumber(count) ? (int)count->valuedouble : default_count,
+                             cJSON_IsNumber(sides) ? (int)sides->valuedouble : default_sides,
+                             cJSON_IsNumber(target) ? (int)target->valuedouble : 0);
 }
 
 /* Pending player rolls belong to the open conversation only. */
@@ -1066,12 +1121,6 @@ static void run_capture(const tool_slot_t *slot)
     refresh_status();
 }
 
-static int arg_int(const cJSON *args, const char *name, int fallback)
-{
-    const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, name);
-    return cJSON_IsNumber(v) ? (int)v->valuedouble : fallback;
-}
-
 static const char *arg_str(const cJSON *args, const char *name)
 {
     const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, name);
@@ -1080,17 +1129,40 @@ static const char *arg_str(const cJSON *args, const char *name)
 
 static void run_dice(const tool_slot_t *slot, const cJSON *args)
 {
-    int count = arg_int(args, "cantidad", 1);
-    int sides = arg_int(args, "caras", 20);
-    vox_rol_clamp(&count, &sides);
+    const vox_rol_spec_t spec = spec_from_args(args, 1, 0);
     uint16_t values[VOX_ROL_MAX_DICE];
-    roll(values, count, sides);
-    char json[200];
-    if (vox_rol_roll_json(values, (unsigned)count, (unsigned)sides, json, sizeof(json)) == 0) {
+    roll(&spec, values);
+    char json[320];
+    if (vox_rol_roll_json(&spec, values, json, sizeof(json)) == 0) {
         snprintf(json, sizeof(json), "{\"error\":\"No se pudo formatear la tirada.\"}");
     }
     ESP_LOGI(TAG, "dice %s", json);
     answer_tool(slot, json);
+}
+
+static void run_prepare(const tool_slot_t *slot, const cJSON *args)
+{
+    if (!s.role_mode) {
+        answer_tool(slot, "{\"error\":\"El botón de dados solo está en modo rol: llama antes a "
+                    "modo_rol.\"}");
+        return;
+    }
+    set_player_roll(spec_from_args(args, 2, 0));
+    char what[96];
+    char badge[8];
+    (void)vox_rol_spec_text(&s.player_roll, what, sizeof(what));
+    (void)vox_rol_badge(&s.player_roll, badge, sizeof(badge));
+    ESP_LOGI(TAG, "player roll prepared: %s", what);
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "tirada_preparada", what);
+    cJSON_AddStringToObject(root, "boton", badge);
+    cJSON_AddStringToObject(root, "result",
+                            "Dile al jugador que toque el botón de dados de la derecha de la "
+                            "pantalla. Recibirás su resultado como un mensaje de texto.");
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    answer_tool(slot, json ? json : "{\"result\":\"Tirada preparada.\"}");
+    cJSON_free(json);
 }
 
 static void run_voice(const tool_slot_t *slot, const cJSON *args)
@@ -1124,7 +1196,9 @@ static void run_role(const tool_slot_t *slot, const cJSON *args)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "result",
                             "Modo rol activado: la conversación espera más antes de cerrarse y "
-                            "los jugadores tienen un botón D20 en la pantalla. Un toque solo te "
+                            "los jugadores tienen un botón de dados en la pantalla, que tira 2d20 "
+                            "sumados hasta que prepares otra tirada con preparar_tirada. Un "
+                            "toque solo te "
                             "interrumpe; para salir de la partida se mantiene pulsada la pantalla "
                             "o te lo piden.");
     if (app_rol_web_running() && app_rol_web_address(address, sizeof(address)) == ESP_OK) {
@@ -1192,6 +1266,8 @@ static void run_tool(int index)
         run_role(slot, args);
     } else if (open && strcmp(slot->name, TOOL_SECRET) == 0) {
         run_secret(slot, args);
+    } else if (open && strcmp(slot->name, TOOL_PREPARE) == 0) {
+        run_prepare(slot, args);
     } else if (open) {
         answer_tool(slot, "{\"error\":\"Función desconocida.\"}");
     }
@@ -1347,10 +1423,10 @@ static void on_action(app_vox_session_action_t action)
         return;
     }
     if (action == APP_VOX_SESSION_ACTION_ROLE_ROLL && s.role_mode) {
-        uint16_t values[PLAYER_DICE];
-        roll(values, PLAYER_DICE, PLAYER_SIDES);
-        char text[160];
-        if (vox_rol_player_text(values, PLAYER_DICE, PLAYER_SIDES, text, sizeof(text)) <= 0) {
+        uint16_t values[VOX_ROL_MAX_DICE];
+        roll(&s.player_roll, values);
+        char text[PLAYER_TEXT_CAPACITY];
+        if (vox_rol_player_text(&s.player_roll, values, text, sizeof(text)) == 0) {
             return;
         }
         ESP_LOGI(TAG, "player roll: %s", text);

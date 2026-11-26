@@ -4,8 +4,10 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include "app_vox_eye.h"
 #include "gsp_sim_bridge.h"
+#include "vox_rol.h"
 
 #define DEMO_STEP_MS 3000
 
@@ -87,9 +89,26 @@ static void on_gallery(app_vox_gallery_action_t action, void *ctx)
     fprintf(stderr, "vox_eye_backend: gallery %u / %u\n", backend.photo, DEMO_PHOTOS);
 }
 
+/* Show a fixed roll through the same view code the device uses. */
+static void demo_roll(vox_rol_spec_t spec, const uint16_t *values)
+{
+    vox_rol_view_t view;
+    vox_rol_view(&spec, values, &view);
+    app_vox_eye_roll_t roll = { .count = view.count, .tumble = view.tumble };
+    memcpy(roll.faces, view.faces, sizeof(roll.faces));
+    memcpy(roll.marks, view.marks, sizeof(roll.marks));
+    memcpy(roll.title, view.title, sizeof(roll.title));
+    memcpy(roll.result, view.result, sizeof(roll.result));
+    (void)app_vox_eye_show_roll(backend.eye, &roll);
+    char badge[8];
+    if (vox_rol_badge(&spec, badge, sizeof(badge)) > 0) {
+        (void)app_vox_eye_set_role_badge(backend.eye, badge);
+    }
+}
+
 /* RoleMaster demo (1.6.0): the voice badge cycles C/A/K/S and shows a secret
- * card on the last voice; the D20 badge alternates a 2d20 roll with a critical
- * and a 1d20 fumble. */
+ * card on the last voice; the dice badge cycles a 2d20 critical, a 1d20
+ * fumble, a percentile roll, a 6d10 pool and a 10d10 pool. */
 static void on_action(app_vox_eye_action_t action, void *ctx)
 {
     (void)ctx;
@@ -105,13 +124,17 @@ static void on_action(app_vox_eye_action_t action, void *ctx)
         }
         return;
     }
-    backend.rolls++;
-    if (backend.rolls % 2) {
-        const uint16_t two[] = { 20, 7 };
-        (void)app_vox_eye_show_dice(backend.eye, two, 2, 20);
-    } else {
-        const uint16_t one[] = { 1 };
-        (void)app_vox_eye_show_dice(backend.eye, one, 1, 20);
+    static const uint16_t crit[] = { 20, 7 };
+    static const uint16_t fumble[] = { 1 };
+    static const uint16_t percent[] = { 4, 7 };
+    static const uint16_t pool6[] = { 9, 3, 10, 8, 1, 5 };
+    static const uint16_t pool10[] = { 10, 2, 8, 6, 1, 9, 4, 8, 3, 7 };
+    switch (backend.rolls++ % 5) {
+    case 0: demo_roll(vox_rol_spec_default(), crit); break;
+    case 1: demo_roll(vox_rol_spec_make(VOX_ROL_SUM, 1, 20, 0), fumble); break;
+    case 2: demo_roll(vox_rol_spec_make(VOX_ROL_PERCENT, 2, 10, 0), percent); break;
+    case 3: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 8), pool6); break;
+    default: demo_roll(vox_rol_spec_make(VOX_ROL_POOL, 10, 10, 8), pool10); break;
     }
     fprintf(stderr, "vox_eye_backend: roll %u\n", backend.rolls);
 }

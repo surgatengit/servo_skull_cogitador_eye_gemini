@@ -72,11 +72,17 @@ closes the conversation and re-arms local listening.
   - The `diag` line reports `tools{calls=… stills=…}`.
   - The session task stack is 8 KiB.
 - RoleMaster (1.6.0). Function declarations are always sent; `capturar_imagen` only with the camera.
-  - `tirar_dados(cantidad, caras)`:
-    - clamped to 1–4 dice of 2–100 sides;
-    - each die comes from `esp_random()` with rejection sampling (`vox_rol.c`);
-    - the result is shown with `show_dice`;
-    - the response is JSON with the results, the total and `critico`/`pifia` (d20).
+  - Roll modes (`vox_rol.c`, host-tested), argument `modo`:
+    - `suma`: the dice are added; `critico`/`pifia` on a d20;
+    - `porcentaje`: always 2d10 read as tens and units (0 and 0 = 100);
+    - `reserva`: count the dice that reach `exito_con` (default `sides - sides/5`: 8 on a d10,
+      5 on a d6); the ones and maximums are reported too, so the model applies special rules.
+    - 1–10 dice of 2–100 sides; each die comes from `esp_random()` with rejection sampling.
+  - `tirar_dados(modo, cantidad, caras, exito_con)`: the master's roll. It is shown with
+    `show_roll`, and the response is JSON for the mode (results, total, percentage or successes).
+  - `preparar_tirada(modo, cantidad, caras, exito_con)` (role mode only): what the dice badge
+    rolls from now on, e.g. one d10 per skill point. The badge label follows («2D20», «D%»,
+    «6D10»). Every game starts with 2d20 `suma`.
   - `cambiar_voz(voz)`: one of Charon, Algenib, Kore or Sulafat (genders from Google Cloud
     Chirp 3 HD).
     - The voice is stored in NVS.
@@ -97,10 +103,12 @@ closes the conversation and re-arms local listening.
   - `mostrar_secreto(jugador, texto)`: delivered to that player's phone when they joined the phone
     page; otherwise shown on the screen card (`show_secret`). The response tells the model which
     one happened.
-  - D20 badge (role mode only): the player rolls 2d20 on the device. The roll is shown and sent to
-    Gemini as a `clientContent` text turn (`app_gemini_live_send_text`).
+  - Dice badge (role mode only): the player rolls the prepared roll on the device. The roll is
+    shown and sent to Gemini as a `clientContent` text turn (`app_gemini_live_send_text`), e.g.
+    «Tirada de reserva del jugador…: 6d10, éxito con 8 o más; resultados …; 3 éxitos, 1 uno y 1
+    máximo (10).»
   - While the model streams a reply, the WebSocket client is busy and a send fails. Pending rolls
-    are therefore kept (up to 480 bytes, several rolls in one message) and sent once
+    are therefore kept (up to 640 bytes, several rolls in one message) and sent once
     `reply_pending` clears, retrying every 0.5 s. They are dropped after 90 s, on close, or on a
     voice reconnect (`player roll delivered` / `player roll not delivered (…)`).
   - Tool arguments are copied into the slot (640 bytes each) by the WebSocket task. They are parsed

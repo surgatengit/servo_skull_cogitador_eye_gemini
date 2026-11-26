@@ -596,7 +596,8 @@ y muestra «BORRANDO...» y después «FOTOS BORRADAS» durante 3 s.
 Comprobado en el PC:
 - tests de voces, dados (rango y reparto en 200 000 tiradas), textos de tirada, tarjeta de secreto y
   tabla de jugadores;
-- simulador: botones de voz y D20, dados con crítico y pifia, tarjeta «SOLO PARA ÍÑIGO»;
+- simulador: botones de voz y de dados, dados con crítico y pifia, tirada porcentual, reservas de
+  6d10 y 10d10 (dos filas), tarjeta «SOLO PARA ÍÑIGO»;
 - página del móvil con un servidor simulado: alta, secreto que llega borroso y se lee manteniendo
   pulsado.
 
@@ -608,15 +609,21 @@ En el dispositivo, por orden:
    escuchar con Algenib.
 3. **Dados:** «Tira dos dados de veinte». Salen animados en pantalla y VOX dice el resultado.
 4. **Modo rol:** «Vamos a jugar una partida de rol».
-   - Aparece «D20» a la derecha y «MÓVIL: 192.168.x.x» abajo.
+   - Aparece «2D20» a la derecha y «MÓVIL: 192.168.x.x» abajo.
    - Abre esa dirección en el móvil, en la misma Wi-Fi, y escribe tu nombre.
 5. **Secreto:** cuando el máster reparta secretos, el tuyo llega al móvil (vibra; mantén pulsado
    para leerlo). El de un jugador sin móvil sale en la pantalla hasta tocarla.
-6. **Tirada del jugador:** toca «D20», también mientras el máster habla. Salen tus 2d20 y el
+6. **Tirada del jugador:** toca «2D20», también mientras el máster habla. Salen tus 2d20 y el
    máster los usa: si estaba hablando, la tirada le llega en cuanto termina su frase.
 7. Deja de hablar 2–3 minutos en modo rol: no debe cerrarse antes de unos 180 s.
 8. En modo rol, un toque mientras escucha no cierra (pone «MANTÉN PARA SALIR»). Mantén el dedo
    1,5 s sobre el ojo: sale de la partida.
+9. **Tipos de tirada** (en una partida):
+   - «Quiero tirar con mi habilidad de 6 en reserva de d10»: el botón pasa a «6D10». Al tocarlo
+     salen 6 dados; los de 8 o más en dorado, los 1 en rojo, y abajo «N ÉXITOS».
+   - «Ahora jugamos con porcentaje, tira tú»: el máster tira d100 y salen dos dados, decenas
+     («40») y unidades («7»), con «RESULTADO 47».
+   - Con 6 a 10 dados salen en dos filas.
 
 **Primer intento (2026-11-26, firmware `da1a7c52…`):**
 - Correcto: `cambiar_voz` (Kore), el botón de voz (Sulafat, guardada tras reiniciar), la reconexión
@@ -636,8 +643,13 @@ En el dispositivo, por orden:
   reintenta cada 0,5 s, se agrupan varias tiradas en un solo mensaje y se descartan a los 90 s o
   al cerrar la conversación.
 
+**Tercer intento (2026-11-26, commit `06dfd94`):** una tirada hecha mientras el máster hablaba le
+llegó 2 s después, al acabar su frase (`player roll delivered`). Después se añadieron los tipos de
+tirada (paso 9).
+
 En el registro (`iris logs`), busca:
-- `dice {...}`;
+- `dice {...}` (con `"modo":"suma"`, `"porcentaje"` o `"reserva"`);
+- `player roll prepared: …`;
 - `voice … requested by the model` y `reconnecting with voice …`;
 - `role mode on`;
 - `phone page at http://…` y `player joined: …`;

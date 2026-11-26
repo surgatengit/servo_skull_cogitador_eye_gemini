@@ -43,15 +43,32 @@ typedef void (*app_vox_gallery_cb_t)(app_vox_gallery_action_t action, void *ctx)
 /** Bezel buttons added in 1.6.0 (RoleMaster). */
 typedef enum {
     APP_VOX_EYE_ACTION_VOICE_NEXT = 0, /**< voice badge (top right) tapped */
-    APP_VOX_EYE_ACTION_ROLE_ROLL,      /**< "D20" badge (role mode, right) tapped */
+    APP_VOX_EYE_ACTION_ROLE_ROLL,      /**< dice badge (role mode, right) tapped */
     APP_VOX_EYE_ACTION_CLOSE_HOLD,     /**< role mode: eye held ~1.5 s (leave the game) */
 } app_vox_eye_action_t;
 
 /** Bezel button notification. Runs on the GSP framework task: never block. */
 typedef void (*app_vox_eye_action_cb_t)(app_vox_eye_action_t action, void *ctx);
 
-/** Most dice shown at once by app_vox_eye_show_dice(). */
-#define APP_VOX_EYE_MAX_DICE 4
+/** Most dice shown at once by app_vox_eye_show_roll() (two rows of 5). */
+#define APP_VOX_EYE_MAX_DICE 10
+
+/** Die highlight. */
+typedef enum {
+    APP_VOX_EYE_DIE_NORMAL = 0,
+    APP_VOX_EYE_DIE_GOOD,      /**< gold: maximum or success */
+    APP_VOX_EYE_DIE_BAD,       /**< red: a 1 */
+} app_vox_eye_die_mark_t;
+
+/** A roll as shown on the dice panel (texts in the card charset, uppercase). */
+typedef struct {
+    unsigned count;                         /**< 1..APP_VOX_EYE_MAX_DICE */
+    char faces[APP_VOX_EYE_MAX_DICE][4];    /**< final text per die ("17", "40") */
+    uint8_t marks[APP_VOX_EYE_MAX_DICE];    /**< app_vox_eye_die_mark_t */
+    unsigned tumble;                        /**< random 1..tumble while rolling (2..100) */
+    char title[32];                         /**< "TIRADA 2D20" */
+    char result[40];                        /**< "TOTAL 29 · CRÍTICO" */
+} app_vox_eye_roll_t;
 
 /** Output loudness 0..100 sampled at the animation rate on the render task.
  * Must be lock-free and non-blocking. */
@@ -111,17 +128,19 @@ esp_gsp_err_t app_vox_eye_hide_gallery(app_vox_eye_handle_t handle);
 /** Voice badge letter (A-Z, usually the voice's initial). Any task. */
 esp_gsp_err_t app_vox_eye_set_voice_initial(app_vox_eye_handle_t handle, char initial);
 
-/** Show or hide the role-mode "D20" badge. Any task. */
+/** Show or hide the role-mode dice badge. Any task. */
 esp_gsp_err_t app_vox_eye_set_role_mode(app_vox_eye_handle_t handle, bool enabled);
 
+/** Role badge label ("2D20", "D%", "6D10"; digits, D and % only). Any task. */
+esp_gsp_err_t app_vox_eye_set_role_badge(app_vox_eye_handle_t handle, const char *text);
+
 /**
- * Show a dice roll: the render task animates ~0.8 s of tumbling numbers, then
- * the results (maximum in gold, 1 in red), the total, and hides it after ~6 s
- * or on a tap. values[0..count-1] are copied; count 1..APP_VOX_EYE_MAX_DICE,
- * sides 2..100. A newer roll replaces the current one. Single producer task.
+ * Show a roll: the render task animates ~0.8 s of tumbling numbers, then the
+ * faces with their marks, the result line, and hides it after ~6 s or on a tap.
+ * Up to 5 dice in one row, 6..10 in two. *roll is copied. A newer roll
+ * replaces the current one. Single producer task.
  */
-esp_gsp_err_t app_vox_eye_show_dice(app_vox_eye_handle_t handle, const uint16_t *values,
-                                    unsigned count, unsigned sides);
+esp_gsp_err_t app_vox_eye_show_roll(app_vox_eye_handle_t handle, const app_vox_eye_roll_t *roll);
 
 /**
  * Show a private card "SOLO PARA <player>" with `text` (UTF-8; mapped to the

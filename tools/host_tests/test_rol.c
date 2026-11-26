@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/* PC tests for the 1.6.0 RoleMaster helpers: voices, dice, roll text, secret card. */
+/* PC tests for the 1.6.0 RoleMaster helpers: voices, dice and roll modes, roll text,
+ * secret card, phone players. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,42 +74,170 @@ static void test_dice(void)
     CHECK(vox_rol_die(scripted, NULL, 20) == 20);
     CHECK(seq_pos == 2);
     CHECK(vox_rol_die(lcg, NULL, 1) == 1);
+}
 
-    int count = 0, sides = 1;
-    vox_rol_clamp(&count, &sides);
-    CHECK(count == 1 && sides == 20);
-    count = 9;
-    sides = 500;
-    vox_rol_clamp(&count, &sides);
-    CHECK(count == 4 && sides == 100);
-    count = 2;
-    sides = 6;
-    vox_rol_clamp(&count, &sides);
-    CHECK(count == 2 && sides == 6);
+static void test_specs(void)
+{
+    vox_rol_spec_t s = vox_rol_spec_default();
+    CHECK(s.mode == VOX_ROL_SUM && s.count == 2 && s.sides == 20 && s.target == 0);
+
+    CHECK(vox_rol_mode_parse(NULL) == VOX_ROL_SUM);
+    CHECK(vox_rol_mode_parse("suma") == VOX_ROL_SUM);
+    CHECK(vox_rol_mode_parse("Porcentaje") == VOX_ROL_PERCENT);
+    CHECK(vox_rol_mode_parse("porcentual") == VOX_ROL_PERCENT);
+    CHECK(vox_rol_mode_parse("RESERVA") == VOX_ROL_POOL);
+    CHECK(vox_rol_mode_parse("reservas") == VOX_ROL_SUM);
+    CHECK(vox_rol_mode_parse("otro") == VOX_ROL_SUM);
+
+    s = vox_rol_spec_make(VOX_ROL_SUM, 0, 1, 0);           /* defaults */
+    CHECK(s.count == 1 && s.sides == 20 && s.target == 0);
+    s = vox_rol_spec_make(VOX_ROL_SUM, 99, 500, 7);        /* clamps; no target */
+    CHECK(s.count == 10 && s.sides == 100 && s.target == 0);
+    s = vox_rol_spec_make(VOX_ROL_PERCENT, 5, 20, 3);      /* always 2d10 */
+    CHECK(s.mode == VOX_ROL_PERCENT && s.count == 2 && s.sides == 10 && s.target == 0);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 6, 0, 0);          /* d10, success on 8+ */
+    CHECK(s.mode == VOX_ROL_POOL && s.count == 6 && s.sides == 10 && s.target == 8);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 12, 6, 0);         /* d6: 5+ */
+    CHECK(s.count == 10 && s.sides == 6 && s.target == 5);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 4, 10, 6);
+    CHECK(s.target == 6);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 4, 10, 11);        /* above the sides -> default */
+    CHECK(s.target == 8);
+    s = vox_rol_spec_make((vox_rol_mode_t)9, 3, 6, 0);     /* unknown mode -> sum */
+    CHECK(s.mode == VOX_ROL_SUM && s.count == 3 && s.sides == 6);
+
+    uint16_t values[VOX_ROL_MAX_DICE];
+    s = vox_rol_spec_make(VOX_ROL_POOL, 10, 10, 8);
+    lcg_state = 99u;
+    vox_rol_roll(&s, lcg, NULL, values);
+    for (int i = 0; i < 10; ++i) {
+        CHECK(values[i] >= 1 && values[i] <= 10);
+    }
+
+    char badge[8];
+    s = vox_rol_spec_default();
+    CHECK(vox_rol_badge(&s, badge, sizeof(badge)) == 4 && strcmp(badge, "2D20") == 0);
+    s = vox_rol_spec_make(VOX_ROL_PERCENT, 0, 0, 0);
+    CHECK(vox_rol_badge(&s, badge, sizeof(badge)) == 2 && strcmp(badge, "D%") == 0);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 10, 10, 0);
+    CHECK(vox_rol_badge(&s, badge, sizeof(badge)) == 5 && strcmp(badge, "10D10") == 0);
+    s = vox_rol_spec_make(VOX_ROL_SUM, 1, 100, 0);
+    CHECK(vox_rol_badge(&s, badge, sizeof(badge)) == 4 && strcmp(badge, "D100") == 0);
+    CHECK(vox_rol_badge(&s, badge, 3) == 0);
+
+    char text[96];
+    s = vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 0);
+    CHECK(vox_rol_spec_text(&s, text, sizeof(text)) > 0);
+    CHECK(strcmp(text, "6d10 de reserva, éxito con 8 o más") == 0);
+    s = vox_rol_spec_default();
+    CHECK(vox_rol_spec_text(&s, text, sizeof(text)) > 0 && strcmp(text, "2d20 sumados") == 0);
+}
+
+static void test_view(void)
+{
+    vox_rol_view_t v;
+    vox_rol_spec_t s = vox_rol_spec_default();
+    const uint16_t crit[] = { 20, 7 };
+    vox_rol_view(&s, crit, &v);
+    CHECK(v.count == 2 && v.tumble == 20);
+    CHECK(strcmp(v.faces[0], "20") == 0 && strcmp(v.faces[1], "7") == 0);
+    CHECK(v.marks[0] == VOX_ROL_MARK_GOOD && v.marks[1] == VOX_ROL_MARK_NONE);
+    CHECK(strcmp(v.title, "TIRADA 2D20") == 0);
+    CHECK(strcmp(v.result, "TOTAL 27 · CRÍTICO") == 0);
+
+    s = vox_rol_spec_make(VOX_ROL_SUM, 1, 20, 0);
+    const uint16_t fumble[] = { 1 };
+    vox_rol_view(&s, fumble, &v);
+    CHECK(strcmp(v.result, "PIFIA") == 0 && v.marks[0] == VOX_ROL_MARK_BAD);
+    s = vox_rol_spec_make(VOX_ROL_SUM, 1, 6, 0);
+    const uint16_t four[] = { 4 };
+    vox_rol_view(&s, four, &v);
+    CHECK(strcmp(v.result, " ") == 0);
+
+    s = vox_rol_spec_make(VOX_ROL_PERCENT, 0, 0, 0);
+    const uint16_t p47[] = { 4, 7 };
+    vox_rol_view(&s, p47, &v);
+    CHECK(strcmp(v.faces[0], "40") == 0 && strcmp(v.faces[1], "7") == 0);
+    CHECK(strcmp(v.title, "TIRADA D%") == 0 && strcmp(v.result, "RESULTADO 47") == 0);
+    const uint16_t p100[] = { 10, 10 };                    /* 0 and 0 = 100 */
+    vox_rol_view(&s, p100, &v);
+    CHECK(strcmp(v.faces[0], "00") == 0 && strcmp(v.faces[1], "0") == 0);
+    CHECK(strcmp(v.result, "RESULTADO 100") == 0);
+    const uint16_t p05[] = { 10, 5 };
+    CHECK(vox_rol_percent(p05) == 5);
+    const uint16_t p90[] = { 9, 10 };
+    CHECK(vox_rol_percent(p90) == 90);
+
+    s = vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 8);
+    const uint16_t pool[] = { 9, 3, 10, 8, 1, 5 };
+    CHECK(vox_rol_successes(&s, pool) == 3);
+    vox_rol_view(&s, pool, &v);
+    CHECK(v.count == 6);
+    CHECK(v.marks[0] == VOX_ROL_MARK_GOOD && v.marks[1] == VOX_ROL_MARK_NONE &&
+          v.marks[2] == VOX_ROL_MARK_GOOD && v.marks[3] == VOX_ROL_MARK_GOOD &&
+          v.marks[4] == VOX_ROL_MARK_BAD && v.marks[5] == VOX_ROL_MARK_NONE);
+    CHECK(strcmp(v.title, "RESERVA 6D10 · 8+") == 0);
+    CHECK(strcmp(v.result, "3 ÉXITOS") == 0);
+    const uint16_t none[] = { 2, 3, 4, 5, 6, 7 };
+    vox_rol_view(&s, none, &v);
+    CHECK(strcmp(v.result, "NINGÚN ÉXITO") == 0);
+    s = vox_rol_spec_make(VOX_ROL_POOL, 1, 10, 8);
+    const uint16_t single[] = { 8 };
+    vox_rol_view(&s, single, &v);
+    CHECK(strcmp(v.result, "1 ÉXITO") == 0);
 }
 
 static void test_roll_text(void)
 {
-    char out[256];
+    char out[320];
+    vox_rol_spec_t s = vox_rol_spec_default();
     const uint16_t two[] = { 20, 7 };
-    CHECK(vox_rol_roll_json(two, 2, 20, out, sizeof(out)) > 0);
-    CHECK(strcmp(out, "{\"tirada\":\"2d20\",\"resultados\":[20,7],\"total\":27,"
-                      "\"critico\":true,\"pifia\":false,\"mostrado_en_pantalla\":true}") == 0);
+    CHECK(vox_rol_roll_json(&s, two, out, sizeof(out)) > 0);
+    CHECK(strcmp(out, "{\"tirada\":\"2d20\",\"modo\":\"suma\",\"resultados\":[20,7],"
+                      "\"total\":27,\"critico\":true,\"pifia\":false,"
+                      "\"mostrado_en_pantalla\":true}") == 0);
+    vox_rol_spec_t one_d20 = vox_rol_spec_make(VOX_ROL_SUM, 1, 20, 0);
     const uint16_t one[] = { 1 };
-    CHECK(vox_rol_roll_json(one, 1, 20, out, sizeof(out)) > 0);
+    CHECK(vox_rol_roll_json(&one_d20, one, out, sizeof(out)) > 0);
     CHECK(strstr(out, "\"pifia\":true") != NULL);
+    vox_rol_spec_t d6 = vox_rol_spec_make(VOX_ROL_SUM, 3, 6, 0);
     const uint16_t six[] = { 6, 1, 3 };
-    CHECK(vox_rol_roll_json(six, 3, 6, out, sizeof(out)) > 0);
+    CHECK(vox_rol_roll_json(&d6, six, out, sizeof(out)) > 0);
     CHECK(strstr(out, "\"critico\":false,\"pifia\":false") != NULL); /* only d20 */
-    CHECK(vox_rol_roll_json(six, 3, 6, out, 10) == 0);
+    CHECK(vox_rol_roll_json(&d6, six, out, 10) == 0);
 
-    CHECK(vox_rol_player_text(two, 2, 20, out, sizeof(out)) > 0);
+    vox_rol_spec_t pct = vox_rol_spec_make(VOX_ROL_PERCENT, 0, 0, 0);
+    const uint16_t p47[] = { 4, 7 };
+    CHECK(vox_rol_roll_json(&pct, p47, out, sizeof(out)) > 0);
+    CHECK(strcmp(out, "{\"tirada\":\"d100\",\"modo\":\"porcentaje\",\"decenas\":4,"
+                      "\"unidades\":7,\"resultado\":47,\"mostrado_en_pantalla\":true}") == 0);
+    vox_rol_spec_t pool = vox_rol_spec_make(VOX_ROL_POOL, 6, 10, 8);
+    const uint16_t dice[] = { 9, 3, 10, 8, 1, 5 };
+    CHECK(vox_rol_roll_json(&pool, dice, out, sizeof(out)) > 0);
+    CHECK(strcmp(out, "{\"tirada\":\"6d10\",\"modo\":\"reserva\",\"exito_con\":8,"
+                      "\"resultados\":[9,3,10,8,1,5],\"exitos\":3,\"unos\":1,\"maximos\":1,"
+                      "\"mostrado_en_pantalla\":true}") == 0);
+    vox_rol_spec_t big = vox_rol_spec_make(VOX_ROL_SUM, 10, 100, 0);
+    const uint16_t hundreds[] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
+    CHECK(vox_rol_roll_json(&big, hundreds, out, sizeof(out)) > 0);
+    CHECK(strstr(out, "\"total\":1000") != NULL);
+
+    CHECK(vox_rol_player_text(&s, two, out, sizeof(out)) > 0);
     CHECK(strcmp(out, "Tirada del jugador con los dados de VOX: 2d20, resultados 20 y 7, "
                       "total 27.") == 0);
-    CHECK(vox_rol_player_text(six, 3, 6, out, sizeof(out)) > 0);
+    CHECK(vox_rol_player_text(&d6, six, out, sizeof(out)) > 0);
     CHECK(strstr(out, "resultados 6, 1 y 3, total 10.") != NULL);
-    CHECK(vox_rol_player_text(one, 1, 20, out, sizeof(out)) > 0);
+    CHECK(vox_rol_player_text(&one_d20, one, out, sizeof(out)) > 0);
     CHECK(strcmp(out, "Tirada del jugador con los dados de VOX: 1d20, resultado 1.") == 0);
+    CHECK(vox_rol_player_text(&pct, p47, out, sizeof(out)) > 0);
+    CHECK(strcmp(out, "Tirada porcentual del jugador con los dados de VOX: decenas 4, "
+                      "unidades 7, resultado 47.") == 0);
+    CHECK(vox_rol_player_text(&pool, dice, out, sizeof(out)) > 0);
+    CHECK(strcmp(out, "Tirada de reserva del jugador con los dados de VOX: 6d10, éxito con 8 "
+                      "o más; resultados 9, 3, 10, 8, 1 y 5; 3 éxitos, 1 uno y 1 máximo "
+                      "(10).") == 0);
+    CHECK(vox_rol_player_text(&big, hundreds, out, sizeof(out)) > 0);
+    CHECK(vox_rol_player_text(&big, hundreds, out, 200) > 0); /* fits the session buffer */
 }
 
 static void test_secret_text(void)
@@ -190,6 +319,8 @@ int main(void)
     test_players();
     test_voices();
     test_dice();
+    test_specs();
+    test_view();
     test_roll_text();
     test_secret_text();
     if (failures) {

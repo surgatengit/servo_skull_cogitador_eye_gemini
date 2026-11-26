@@ -52,16 +52,20 @@ ahora; queda para revisar. Google Search está implementado pero
   - botón de voz en el bisel;
   - `provision_key.py --voice`.
 - Dados reales:
-  - `tirar_dados` con RNG por hardware y panel animado;
-  - botón D20 para que tiren los jugadores en modo rol (se envía a Gemini como texto; si el
-    modelo está hablando, se envía al terminar su respuesta).
+  - `tirar_dados` con RNG por hardware y panel animado de hasta 10 dados;
+  - tres modos: `suma`, `porcentaje` (d100 con dos d10) y `reserva` (éxitos con `exito_con`);
+  - botón de dados para que tiren los jugadores en modo rol: tira lo que prepara el máster con
+    `preparar_tirada` (2d20 al empezar) y su etiqueta lo dice («2D20», «D%», «6D10»). Se envía a
+    Gemini como texto; si el modelo está hablando, al terminar su respuesta.
 - `modo_rol`: máster de rol en la personalidad, espera de 180 s antes de cerrar.
 - `mostrar_secreto`: al móvil del jugador (página `app_rol_web` en la Wi-Fi de casa, solo en modo
   rol) o a la tarjeta de pantalla.
 - Probado en el PC (tests, simulador, página con servidor simulado).
 - Prueba 14 en el dispositivo (commit `1f7153b`): todo correcto salvo las tiradas del D20 hechas
-  mientras VOX hablaba, que no llegaban a Gemini. Ya está corregido, pero falta instalarlo y
-  probarlo.
+  mientras VOX hablaba, que no llegaban a Gemini. Corregido en `06dfd94` y comprobado en el
+  dispositivo.
+- Modos de tirada y 10 dados: probados en el PC (tests y simulador); falta la prueba en el
+  dispositivo (prueba 14, paso 9).
 
 ## 2. Entorno
 

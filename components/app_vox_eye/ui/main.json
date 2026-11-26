@@ -401,16 +401,16 @@
       "type": "label",
       "name": "role_badge_text",
       "bind": "role_badge_text",
-      "x": 8,
+      "x": 2,
       "y": 17,
-      "w": 40,
+      "w": 52,
       "h": 22,
-      "text": "D20",
-      "font_size": 13,
+      "text": "2D20",
+      "font_size": 12,
       "fg_color": "#FFB300",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
-      "font_charset": "D20",
+      "font_charset": "0123456789D%",
       "parent": 29
     },
     {
@@ -632,9 +632,9 @@
     {
       "type": "container",
       "x": 40,
-      "y": 136,
+      "y": 112,
       "w": 400,
-      "h": 208,
+      "h": 256,
       "radius": 28,
       "bg_color": "#0B0F14",
       "border_color": "#FFB300",
@@ -646,7 +646,7 @@
       "name": "dice_title",
       "bind": "dice_title",
       "x": 60,
-      "y": 150,
+      "y": 120,
       "w": 360,
       "h": 28,
       "text": "TIRADA",
@@ -654,7 +654,7 @@
       "fg_color": "#FFB300",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
-      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/%+",
       "parent": 47
     },
     {
@@ -662,7 +662,7 @@
       "name": "dice_total",
       "bind": "dice_total",
       "x": 60,
-      "y": 290,
+      "y": 316,
       "w": 360,
       "h": 30,
       "text": " ",
@@ -670,20 +670,24 @@
       "fg_color": "#E8D9FF",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
-      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
+      "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/%+",
       "parent": 47
     },
     {
       "type": "container",
       "name": "die0_slot",
       "x": {
-        "default": 60,
+        "default": 56,
         "min": 0,
-        "max": 404
+        "max": 416
       },
-      "y": 190,
-      "w": 76,
-      "h": 76,
+      "y": {
+        "default": 162,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
       "parent": 47
     },
     {
@@ -694,8 +698,8 @@
       "hidden": true,
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
+      "w": 64,
+      "h": 64,
       "parent": 52
     },
     {
@@ -705,9 +709,9 @@
       "bind_target": "color",
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
-      "radius": 16,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
       "bg_color": "#1E2A33",
       "parent": 53
     },
@@ -716,11 +720,11 @@
       "name": "die0_value",
       "bind": "die0_value",
       "x": 0,
-      "y": 18,
-      "w": 76,
-      "h": 42,
+      "y": 15,
+      "w": 64,
+      "h": 34,
       "text": "20",
-      "font_size": 34,
+      "font_size": 28,
       "fg_color": "#FFFFFF",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
@@ -731,13 +735,17 @@
       "type": "container",
       "name": "die1_slot",
       "x": {
-        "default": 152,
+        "default": 132,
         "min": 0,
-        "max": 404
+        "max": 416
       },
-      "y": 190,
-      "w": 76,
-      "h": 76,
+      "y": {
+        "default": 162,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
       "parent": 47
     },
     {
@@ -748,8 +756,8 @@
       "hidden": true,
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
+      "w": 64,
+      "h": 64,
       "parent": 56
     },
     {
@@ -759,9 +767,9 @@
       "bind_target": "color",
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
-      "radius": 16,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
       "bg_color": "#1E2A33",
       "parent": 57
     },
@@ -770,11 +778,11 @@
       "name": "die1_value",
       "bind": "die1_value",
       "x": 0,
-      "y": 18,
-      "w": 76,
-      "h": 42,
+      "y": 15,
+      "w": 64,
+      "h": 34,
       "text": "20",
-      "font_size": 34,
+      "font_size": 28,
       "fg_color": "#FFFFFF",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
@@ -785,13 +793,17 @@
       "type": "container",
       "name": "die2_slot",
       "x": {
-        "default": 244,
+        "default": 208,
         "min": 0,
-        "max": 404
+        "max": 416
       },
-      "y": 190,
-      "w": 76,
-      "h": 76,
+      "y": {
+        "default": 162,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
       "parent": 47
     },
     {
@@ -802,8 +814,8 @@
       "hidden": true,
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
+      "w": 64,
+      "h": 64,
       "parent": 60
     },
     {
@@ -813,9 +825,9 @@
       "bind_target": "color",
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
-      "radius": 16,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
       "bg_color": "#1E2A33",
       "parent": 61
     },
@@ -824,11 +836,11 @@
       "name": "die2_value",
       "bind": "die2_value",
       "x": 0,
-      "y": 18,
-      "w": 76,
-      "h": 42,
+      "y": 15,
+      "w": 64,
+      "h": 34,
       "text": "20",
-      "font_size": 34,
+      "font_size": 28,
       "fg_color": "#FFFFFF",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
@@ -839,13 +851,17 @@
       "type": "container",
       "name": "die3_slot",
       "x": {
-        "default": 336,
+        "default": 284,
         "min": 0,
-        "max": 404
+        "max": 416
       },
-      "y": 190,
-      "w": 76,
-      "h": 76,
+      "y": {
+        "default": 162,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
       "parent": 47
     },
     {
@@ -856,8 +872,8 @@
       "hidden": true,
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
+      "w": 64,
+      "h": 64,
       "parent": 64
     },
     {
@@ -867,9 +883,9 @@
       "bind_target": "color",
       "x": 0,
       "y": 0,
-      "w": 76,
-      "h": 76,
-      "radius": 16,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
       "bg_color": "#1E2A33",
       "parent": 65
     },
@@ -878,16 +894,364 @@
       "name": "die3_value",
       "bind": "die3_value",
       "x": 0,
-      "y": 18,
-      "w": 76,
-      "h": 42,
+      "y": 15,
+      "w": 64,
+      "h": 34,
       "text": "20",
-      "font_size": 34,
+      "font_size": 28,
       "fg_color": "#FFFFFF",
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": "0123456789",
       "parent": 65
+    },
+    {
+      "type": "container",
+      "name": "die4_slot",
+      "x": {
+        "default": 360,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 162,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die4",
+      "bind": "die4",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 68
+    },
+    {
+      "type": "container",
+      "name": "die4_face",
+      "bind": "die4_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 69
+    },
+    {
+      "type": "label",
+      "name": "die4_value",
+      "bind": "die4_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 69
+    },
+    {
+      "type": "container",
+      "name": "die5_slot",
+      "x": {
+        "default": 56,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 236,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die5",
+      "bind": "die5",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 72
+    },
+    {
+      "type": "container",
+      "name": "die5_face",
+      "bind": "die5_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 73
+    },
+    {
+      "type": "label",
+      "name": "die5_value",
+      "bind": "die5_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 73
+    },
+    {
+      "type": "container",
+      "name": "die6_slot",
+      "x": {
+        "default": 132,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 236,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die6",
+      "bind": "die6",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 76
+    },
+    {
+      "type": "container",
+      "name": "die6_face",
+      "bind": "die6_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 77
+    },
+    {
+      "type": "label",
+      "name": "die6_value",
+      "bind": "die6_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 77
+    },
+    {
+      "type": "container",
+      "name": "die7_slot",
+      "x": {
+        "default": 208,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 236,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die7",
+      "bind": "die7",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 80
+    },
+    {
+      "type": "container",
+      "name": "die7_face",
+      "bind": "die7_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 81
+    },
+    {
+      "type": "label",
+      "name": "die7_value",
+      "bind": "die7_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 81
+    },
+    {
+      "type": "container",
+      "name": "die8_slot",
+      "x": {
+        "default": 284,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 236,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die8",
+      "bind": "die8",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 84
+    },
+    {
+      "type": "container",
+      "name": "die8_face",
+      "bind": "die8_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 85
+    },
+    {
+      "type": "label",
+      "name": "die8_value",
+      "bind": "die8_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 85
+    },
+    {
+      "type": "container",
+      "name": "die9_slot",
+      "x": {
+        "default": 360,
+        "min": 0,
+        "max": 416
+      },
+      "y": {
+        "default": 236,
+        "min": 0,
+        "max": 416
+      },
+      "w": 64,
+      "h": 64,
+      "parent": 47
+    },
+    {
+      "type": "container",
+      "name": "die9",
+      "bind": "die9",
+      "bind_target": "visible",
+      "hidden": true,
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "parent": 88
+    },
+    {
+      "type": "container",
+      "name": "die9_face",
+      "bind": "die9_face",
+      "bind_target": "color",
+      "x": 0,
+      "y": 0,
+      "w": 64,
+      "h": 64,
+      "radius": 14,
+      "bg_color": "#1E2A33",
+      "parent": 89
+    },
+    {
+      "type": "label",
+      "name": "die9_value",
+      "bind": "die9_value",
+      "x": 0,
+      "y": 15,
+      "w": 64,
+      "h": 34,
+      "text": "20",
+      "font_size": 28,
+      "fg_color": "#FFFFFF",
+      "font": "fonts/DejaVuSans-Bold.ttf",
+      "text_align": "center",
+      "font_charset": "0123456789",
+      "parent": 89
     },
     {
       "type": "container",
@@ -912,7 +1276,7 @@
       "radius": 0,
       "bg_color": "#00000000",
       "callback": "secret_close",
-      "parent": 68
+      "parent": 92
     },
     {
       "type": "container",
@@ -924,7 +1288,7 @@
       "bg_color": "#120A16",
       "border_color": "#D500F9",
       "border_width": 6,
-      "parent": 68
+      "parent": 92
     },
     {
       "type": "label",
@@ -940,7 +1304,7 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
-      "parent": 68
+      "parent": 92
     },
     {
       "type": "label",
@@ -956,7 +1320,7 @@
       "text_align": "left",
       "overflow": "clip",
       "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜabcdefghijklmnopqrstuvwxyzáéíóúñü0123456789.,;:¡!¿?-'\"()·/%+=",
-      "parent": 68
+      "parent": 92
     },
     {
       "type": "label",
@@ -970,7 +1334,7 @@
       "font": "fonts/DejaVuSans-Bold.ttf",
       "text_align": "center",
       "font_charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÑÜ0123456789-·.:/",
-      "parent": 68
+      "parent": 92
     }
   ]
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /* VOX M-01 GEMINI DIRECT composition root: initialization, wiring and startup
  * order only. Behavior lives in the app_* components. */
+#include <string.h>
+
 #include "app_display.h"
 #include "app_secrets.h"
 #include "app_vox_eye.h"
@@ -74,9 +76,24 @@ static void ui_set_role_mode(void *ui, bool enabled)
     (void)app_vox_eye_set_role_mode((app_vox_eye_handle_t)ui, enabled);
 }
 
-static void ui_show_dice(void *ui, const uint16_t *values, unsigned count, unsigned sides)
+static void ui_set_role_badge(void *ui, const char *text)
 {
-    (void)app_vox_eye_show_dice((app_vox_eye_handle_t)ui, values, count, sides);
+    (void)app_vox_eye_set_role_badge((app_vox_eye_handle_t)ui, text);
+}
+
+_Static_assert(APP_VOX_SESSION_MAX_DICE == APP_VOX_EYE_MAX_DICE, "dice panel size");
+
+static void ui_show_roll(void *ui, const app_vox_session_roll_t *roll)
+{
+    app_vox_eye_roll_t view = {
+        .count = roll->count,
+        .tumble = roll->tumble,
+    };
+    memcpy(view.faces, roll->faces, sizeof(view.faces));
+    memcpy(view.marks, roll->marks, sizeof(view.marks));
+    memcpy(view.title, roll->title, sizeof(view.title));
+    memcpy(view.result, roll->result, sizeof(view.result));
+    (void)app_vox_eye_show_roll((app_vox_eye_handle_t)ui, &view);
 }
 
 static void ui_show_secret(void *ui, const char *player, const char *text)
@@ -198,7 +215,8 @@ void app_main(void)
             .hide_gallery = eye_ready ? ui_hide_gallery : NULL,
             .set_voice_initial = eye_ready ? ui_set_voice_initial : NULL,
             .set_role_mode = eye_ready ? ui_set_role_mode : NULL,
-            .show_dice = eye_ready ? ui_show_dice : NULL,
+            .set_role_badge = eye_ready ? ui_set_role_badge : NULL,
+            .show_roll = eye_ready ? ui_show_roll : NULL,
             .show_secret = eye_ready ? ui_show_secret : NULL,
             .ui = application.eye,
         },
