@@ -285,14 +285,23 @@ static void migrate_key(nvs_handle_t from, nvs_handle_t to, const char *key)
     mbedtls_platform_zeroize(value, sizeof(value));
 }
 
-/* One-time move of the 1.6 namespace; a missing legacy namespace is the normal case. */
+/* True while the legacy namespace still holds entries. Erasing its keys leaves the
+ * namespace name behind, so nvs_open() alone would report it on every boot. */
+static bool legacy_has_entries(const char *ns)
+{
+    nvs_iterator_t it = NULL;
+    const esp_err_t err = nvs_entry_find(NVS_DEFAULT_PART_NAME, ns, NVS_TYPE_ANY, &it);
+    nvs_release_iterator(it);
+    return err == ESP_OK;
+}
+
+/* One-time move of the 1.6 namespace; an empty or missing one is the normal case. */
 static void migrate_legacy_namespace(void)
 {
-    nvs_handle_t from;
-    if (nvs_open(LEGACY_NAMESPACE, NVS_READONLY, &from) != ESP_OK) {
+    if (!legacy_has_entries(LEGACY_NAMESPACE)) {
         return;
     }
-    nvs_close(from);
+    nvs_handle_t from;
     nvs_handle_t to;
     if (nvs_open(LEGACY_NAMESPACE, NVS_READWRITE, &from) != ESP_OK) {
         return;

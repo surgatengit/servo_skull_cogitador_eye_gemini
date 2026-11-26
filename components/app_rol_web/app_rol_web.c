@@ -455,6 +455,16 @@ char *app_rol_web_build_game(const rol_game_meta_t *meta, const char *summary)
     return json;
 }
 
+/* True while the legacy namespace still holds entries. Erasing its keys leaves the
+ * namespace name behind, so nvs_open() alone would report it on every boot. */
+static bool legacy_has_entries(const char *ns)
+{
+    nvs_iterator_t it = NULL;
+    const esp_err_t err = nvs_entry_find(NVS_DEFAULT_PART_NAME, ns, NVS_TYPE_ANY, &it);
+    nvs_release_iterator(it);
+    return err == ESP_OK;
+}
+
 /* One-time move of the 1.6 saved game, on the session task: from app_rol_web_start()
  * before the server exists, or from an earlier store/load call. Later calls (including
  * the server's GET /partida) only read the flag. */
@@ -465,11 +475,10 @@ static void migrate_legacy_game(void)
         return;
     }
     done = true;
-    nvs_handle_t from;
-    if (nvs_open(LEGACY_GAME_NAMESPACE, NVS_READONLY, &from) != ESP_OK) {
+    if (!legacy_has_entries(LEGACY_GAME_NAMESPACE)) {
         return;
     }
-    nvs_close(from);
+    nvs_handle_t from;
     if (nvs_open(LEGACY_GAME_NAMESPACE, NVS_READWRITE, &from) != ESP_OK) {
         return;
     }
